@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/Paintersrp/zet-cli-v3/internal/tui"
+	"github.com/Paintersrp/zet-cli/internal/tui"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"

@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Paintersrp/zet-cli-v3/internal/zet"
+	"github.com/Paintersrp/zet-cli/internal/zet"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

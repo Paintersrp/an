@@ -1,4 +1,4 @@
-module github.com/Paintersrp/zet-cli-v3
+module github.com/Paintersrp/zet-cli
 
 go 1.22.2
 

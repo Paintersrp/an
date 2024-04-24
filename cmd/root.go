@@ -18,7 +18,7 @@ package cmd
 import (
 	"os"
 
-	"github.com/Paintersrp/zet-cli-v3/internal/constants"
+	"github.com/Paintersrp/zet-cli/internal/constants"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -26,7 +26,7 @@ import (
 var cfgFile string
 
 var rootCmd = &cobra.Command{
-	Use:   "zet-cli-v3",
+	Use:   "zet-cli",
 	Short: "A brief description of your application",
 	Long: `A longer description that spans multiple lines and likely contains
 examples and usage of using your application.`,
@@ -42,7 +42,7 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.zet-cli-v3.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.zet-cli/cfg.yaml)")
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 

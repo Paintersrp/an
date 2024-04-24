@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Paintersrp/zet-cli-v3/internal/config"
+	"github.com/Paintersrp/zet-cli/internal/config"
 	"github.com/charmbracelet/bubbles/cursor"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
