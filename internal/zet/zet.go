@@ -10,15 +10,24 @@ import (
 	"github.com/spf13/viper"
 )
 
+// TODO ensure "zet" directory in vault
+
 type ZettelkastenNote struct {
 	VaultDir     string
+	SubDir       string
 	Filename     string
 	OriginalTags []string
 }
 
-func NewZettelkastenNote(vaultDir string, filename string, tags []string) *ZettelkastenNote {
+func NewZettelkastenNote(
+	vaultDir string,
+	subDir string,
+	filename string,
+	tags []string,
+) *ZettelkastenNote {
 	return &ZettelkastenNote{
 		VaultDir:     vaultDir,
+		SubDir:       subDir,
 		Filename:     filename,
 		OriginalTags: tags,
 	}
@@ -26,12 +35,46 @@ func NewZettelkastenNote(vaultDir string, filename string, tags []string) *Zette
 
 func (note *ZettelkastenNote) GetFilepath() string {
 	// Return the filename of the note.
-	return fmt.Sprintf("%s/%s.md", note.VaultDir, note.Filename)
+	return fmt.Sprintf(
+		"%s/%s/%s.md",
+		note.VaultDir,
+		note.SubDir,
+		note.Filename,
+	)
 }
 
+func (note *ZettelkastenNote) EnsurePath() (string, error) {
+	// Get the directory path of the file and absolute file path
+	dir := fmt.Sprintf("%s/%s", note.VaultDir, note.SubDir)
+	filePath := fmt.Sprintf("%s/%s.md", dir, note.Filename)
+
+	// Check if the directory already exists
+	_, err := os.Stat(dir)
+	if err == nil {
+		// Directory already exists, return file path and nil
+		return filePath, nil
+	}
+
+	// If the directory does not exist, create it
+	if os.IsNotExist(err) {
+		err := os.MkdirAll(dir, os.ModePerm)
+		if err != nil {
+			// Failed to create directory
+			return "", err
+		}
+		return filePath, nil
+	}
+
+	// Other error occurred
+	return "", err
+}
+
+// Because of the way the fuzzy finding works, we should never get a file exists error
+// as we are only selecting from the files processed directly from the vault
+// If you open into a file exists error, there's an issue with the options being
+// provided by the fuzzyfinder
 func (note *ZettelkastenNote) FileExists() (bool, string, error) {
 	noteFilePath := note.GetFilepath()
-
 	_, err := os.Stat(noteFilePath)
 
 	if err == nil {
@@ -46,22 +89,41 @@ func (note *ZettelkastenNote) FileExists() (bool, string, error) {
 
 // TODO use templates rather than building frontmatter manually
 func (note *ZettelkastenNote) Create() (bool, error) {
-	// Create the note file.
-	file, err := os.Create(note.GetFilepath())
-	if err != nil {
-		return false, err
+	// Verify the directories up to the new
+	path, pathErr := note.EnsurePath()
+
+	if pathErr != nil {
+		return false, pathErr
 	}
 
+	// Create the note file.
+	file, createErr := os.Create(path)
+	if createErr != nil {
+		return false, createErr
+	}
+
+	date := time.Now().Format("2006-01-02")
+
 	// Set up the YAML frontmatter.
-	frontmatter := fmt.Sprintf("---\ntitle: %s\ndate: %s\ntags:\n", note.Filename, time.Now().Format("2006-01-02"))
+	frontmatter := fmt.Sprintf(
+		"---\ntitle: %s\ndate: %s\ntags:\n",
+		note.Filename,
+		date,
+	)
 
 	// Iterate over tags and add them to the frontmatter.
 	for _, tag := range note.OriginalTags {
-		frontmatter += fmt.Sprintf("  - %s\n", tag)
+		frontmatter += fmt.Sprintf(
+			"  - %s\n",
+			tag,
+		)
 	}
 
 	// Add the rest of the frontmatter.
-	frontmatter += "---\n\n\n## Links:\n\n"
+	frontmatter += fmt.Sprintf(
+		"---\n\n\n## Links:\n%s\n\n",
+		date,
+	)
 	file.WriteString(frontmatter)
 
 	return true, nil

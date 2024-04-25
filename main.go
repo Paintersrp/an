@@ -15,7 +15,7 @@ limitations under the License.
 */
 package main
 
-import "github.com/Paintersrp/zet-cli/cmd"
+import "github.com/Paintersrp/an/cmd"
 
 func main() {
 	cmd.Execute()

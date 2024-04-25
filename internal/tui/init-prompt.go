@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Paintersrp/zet-cli/internal/config"
+	"github.com/Paintersrp/an/internal/config"
 	"github.com/charmbracelet/bubbles/cursor"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -129,18 +129,15 @@ func (m InitPromptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 				cfg := &config.Config{
-					VaultDir: m.inputs[0].Value(),
-					HomeDir:  m.inputs[1].Value(),
-					Editor:   m.inputs[2].Value(),
-					NvimArgs: m.inputs[3].Value(),
+					VaultDir:     m.inputs[0].Value(),
+					HomeDir:      m.inputs[1].Value(),
+					Editor:       m.inputs[2].Value(),
+					NvimArgs:     m.inputs[3].Value(),
+					Molecules:    []string{defaults[4]},
+					MoleculeMode: defaults[5],
 				}
 
-				// fmt.Println("\n\n\nVaultDir: ", cfg.VaultDir)
-				// fmt.Println("HomeDir: ", cfg.HomeDir)
-				// fmt.Println("Editor: ", cfg.Editor)
-				// fmt.Println("NvimArgs: ", cfg.NvimArgs)
-
-				cfgErr := config.ToFile(m.configPath, cfg)
+				cfgErr := cfg.ToFile()
 				if cfgErr != nil {
 					panic(cfgErr)
 				}
@@ -229,5 +226,7 @@ func SetupDefaults(homePath string) []string {
 		homePath,
 		"nvim",
 		"",
+		"atoms",
+		"confirm",
 	}
 }

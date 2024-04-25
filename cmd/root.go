@@ -16,20 +16,33 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"os"
+	"strings"
 
-	"github.com/Paintersrp/zet-cli/internal/constants"
+	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/internal/constants"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-var cfgFile string
+var (
+	cfgFile      string
+	appCfg       *config.Config
+	cfgError     error
+	moleculeName string
+)
 
 var rootCmd = &cobra.Command{
-	Use:   "zet-cli",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application.`,
+	Use:     "atomic",
+	Aliases: []string{"an", "a-n"},
+	Short:   "Launch into writing atomic notes, blended into integration with Obsidian.",
+	Long: `A utility to help you get into the habit of writing notes by providing ways to quickly
+  get up and writing with atomic notes. 
+
+              [title]  [tags]
+  an new robotics "robotics science class study-notes"
+  `,
 }
 
 func Execute() {
@@ -40,10 +53,14 @@ func Execute() {
 }
 
 func init() {
-	cobra.OnInitialize(initConfig)
+	cobra.OnInitialize(ensureConfigExists, initConfig)
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.zet-cli/cfg.yaml)")
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	rootCmd.PersistentFlags().StringVarP(&moleculeName, "molecule", "m", "atoms", "Molecule subdirectory to use for this command.")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.an/cfg.yaml)")
+	viper.BindPFlag("molecule", rootCmd.PersistentFlags().Lookup("molecule"))
+
+	// Validate the molecule flag
+	cobra.OnInitialize(handleMolecules)
 }
 
 func initConfig() {
@@ -62,4 +79,100 @@ func initConfig() {
 
 	// If a config file is found, read it in.
 	viper.ReadInConfig()
+	appCfg, cfgError = config.FromFile(viper.ConfigFileUsed())
+}
+
+func ensureConfigExists() {
+	home, homeErr := os.UserHomeDir()
+	cobra.CheckErr(homeErr)
+
+	// Get the directory path of the file and absolute file path
+	dir := fmt.Sprintf("%s/%s", home, constants.ConfigDir)
+	filePath := fmt.Sprintf("%s/%s.%s", dir, constants.ConfigFile, constants.ConfigFileType)
+
+	// Check if the directory already exists
+	_, dirErr := os.Stat(dir)
+	if os.IsNotExist(dirErr) {
+		// If the directory does not exist, create it
+		err := os.MkdirAll(dir, os.ModePerm)
+		cobra.CheckErr(err)
+	}
+
+	// Check if the file already exists
+	_, fileErr := os.Stat(filePath)
+	if os.IsNotExist(fileErr) {
+		// If the file does not exist, create an empty file
+		file, err := os.Create(filePath)
+		cobra.CheckErr(err)
+		file.Close()
+	}
+}
+
+func handleMolecules() {
+	mode := viper.GetString("moleculeMode")
+	exists, err := verifyMoleculeExists()
+	cobra.CheckErr(err)
+	switch mode {
+	case "strict":
+		if !exists {
+			fmt.Println("Error: Molecule", moleculeName, "does not exist.")
+			fmt.Println("In strict mode, new molecules are added with the add-molecule command.")
+			os.Exit(1)
+		}
+	case "free":
+		if !exists {
+			AddMoleculeToConfig(moleculeName)
+		}
+	case "confirm":
+		if !exists {
+			getConfirmation()
+		}
+	default:
+		if !exists {
+			getConfirmation()
+		}
+	}
+}
+
+func verifyMoleculeExists() (bool, error) {
+	var molecules []string
+	if err := viper.UnmarshalKey("molecules", &molecules); err != nil {
+		fmt.Println("Error unmarshalling molecules:", err)
+		return false, err
+	}
+
+	// Check if the specified molecule exists
+	moleculeExists := false
+	for _, molecule := range molecules {
+		if molecule == moleculeName {
+			moleculeExists = true
+			break
+		}
+	}
+
+	if !moleculeExists {
+		return moleculeExists, nil
+	}
+
+	return moleculeExists, nil
+}
+
+func getConfirmation() {
+	var response string
+	for {
+		fmt.Printf("Molecule %s does not exist.\nDo you want to create it?\n(y/n): ", moleculeName)
+		fmt.Scanln(&response)
+		response = strings.ToLower(strings.TrimSpace(response))
+
+		switch response {
+		case "yes", "y":
+			AddMoleculeToConfig(moleculeName)
+			return
+		case "no", "n":
+			fmt.Println("Exiting due to non-existing molecule")
+			os.Exit(0)
+		default:
+			fmt.Println("Invalid response. Please enter 'y'/'yes' or 'n'/'no'.")
+		}
+	}
 }
