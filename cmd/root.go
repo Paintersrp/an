@@ -22,15 +22,20 @@ import (
 
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/internal/constants"
+	"github.com/Paintersrp/an/internal/templater"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var (
 	cfgFile      string
-	appCfg       *config.Config
-	cfgError     error
 	moleculeName string
+
+	appCfg   *config.Config
+	cfgError error
+
+	appTemplater   *templater.Templater
+	templaterError error
 )
 
 var rootCmd = &cobra.Command{
@@ -58,6 +63,13 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&moleculeName, "molecule", "m", "atoms", "Molecule subdirectory to use for this command.")
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.an/cfg.yaml)")
 	viper.BindPFlag("molecule", rootCmd.PersistentFlags().Lookup("molecule"))
+
+	appTemplater, templaterError = templater.NewTemplater()
+
+	if templaterError != nil {
+		fmt.Printf("failed to create templater: %v", templaterError)
+		cobra.CheckErr(templaterError)
+	}
 
 	// Validate the molecule flag
 	cobra.OnInitialize(handleMolecules)

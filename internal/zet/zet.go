@@ -1,3 +1,4 @@
+// Package zet provides functionality for managing zettelkasten (atomic) notes.
 package zet
 
 import (
@@ -5,13 +6,14 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"time"
 
+	"github.com/Paintersrp/an/internal/templater"
 	"github.com/spf13/viper"
 )
 
-// TODO ensure "zet" directory in vault
+// TODO:ensure "zet" / "atoms" directory in vault
 
+// ZettelkastenNote represents a zettelkasten note with its metadata.
 type ZettelkastenNote struct {
 	VaultDir     string
 	SubDir       string
@@ -33,8 +35,8 @@ func NewZettelkastenNote(
 	}
 }
 
+// GetFilepath returns the file path of the zettelkasten note.
 func (note *ZettelkastenNote) GetFilepath() string {
-	// Return the filename of the note.
 	return fmt.Sprintf(
 		"%s/%s/%s.md",
 		note.VaultDir,
@@ -43,15 +45,15 @@ func (note *ZettelkastenNote) GetFilepath() string {
 	)
 }
 
+// EnsurePath creates the necessary directory structure for the note file.
 func (note *ZettelkastenNote) EnsurePath() (string, error) {
-	// Get the directory path of the file and absolute file path
 	dir := fmt.Sprintf("%s/%s", note.VaultDir, note.SubDir)
 	filePath := fmt.Sprintf("%s/%s.md", dir, note.Filename)
 
 	// Check if the directory already exists
 	_, err := os.Stat(dir)
 	if err == nil {
-		// Directory already exists, return file path and nil
+		// Directory already exists, return file path
 		return filePath, nil
 	}
 
@@ -73,6 +75,8 @@ func (note *ZettelkastenNote) EnsurePath() (string, error) {
 // as we are only selecting from the files processed directly from the vault
 // If you open into a file exists error, there's an issue with the options being
 // provided by the fuzzyfinder
+//
+// FileExists checks if the Zettelkasten note file already exists.
 func (note *ZettelkastenNote) FileExists() (bool, string, error) {
 	noteFilePath := note.GetFilepath()
 	_, err := os.Stat(noteFilePath)
@@ -87,48 +91,44 @@ func (note *ZettelkastenNote) FileExists() (bool, string, error) {
 	return false, noteFilePath, err
 }
 
-// TODO use templates rather than building frontmatter manually
-func (note *ZettelkastenNote) Create() (bool, error) {
-	// Verify the directories up to the new
+// Create generates a new Zettelkasten note using a template.
+func (note *ZettelkastenNote) Create(tmplName string, t *templater.Templater) (bool, error) {
+	// Verify the directories up to the new note
 	path, pathErr := note.EnsurePath()
-
 	if pathErr != nil {
-		return false, pathErr
+		return false, pathErr // exit
 	}
 
-	// Create the note file.
+	// Create the empty note file.
 	file, createErr := os.Create(path)
 	if createErr != nil {
-		return false, createErr
+		return false, createErr // exit
 	}
 
-	date := time.Now().Format("2006-01-02")
-
-	// Set up the YAML frontmatter.
-	frontmatter := fmt.Sprintf(
-		"---\ntitle: %s\ndate: %s\ntags:\n",
-		note.Filename,
-		date,
-	)
-
-	// Iterate over tags and add them to the frontmatter.
-	for _, tag := range note.OriginalTags {
-		frontmatter += fmt.Sprintf(
-			"  - %s\n",
-			tag,
-		)
+	// Setup template metadata
+	zetTime, tags := t.GenerateTagsAndDate(tmplName)
+	data := templater.TemplateData{
+		Title: note.Filename,
+		Date:  zetTime,
+		Tags:  append(note.OriginalTags, tags...),
 	}
 
-	// Add the rest of the frontmatter.
-	frontmatter += fmt.Sprintf(
-		"---\n\n\n## Links:\n%s\n\n",
-		date,
-	)
-	file.WriteString(frontmatter)
+	// Execute the template and return the rendered output
+	output, renderErr := t.Execute(tmplName, data)
+	if renderErr != nil {
+		// TODO: delete file made on failure?
+		fmt.Printf("Failed to execute template: %v", renderErr)
+		return false, renderErr // exit
+	}
 
+	// Write to file
+	file.WriteString(output)
+
+	// Return created (true) and nil (error)
 	return true, nil
 }
 
+// Open opens the Zettelkasten note in the configured editor.
 func (note *ZettelkastenNote) Open() error {
 	exists, filePath, existsErr := note.FileExists()
 
@@ -136,6 +136,7 @@ func (note *ZettelkastenNote) Open() error {
 		return existsErr
 	}
 
+	// TODO: fix flag notes, as we are using molecule mode now
 	if !exists {
 		fmt.Println("error: Note with given title does not exist in the vault directory.")
 		fmt.Println("hint: Try again with a new title, or run 'zet-cli open [title]' again with a create (-c) flag to create an empty note forcefully.")
@@ -144,6 +145,7 @@ func (note *ZettelkastenNote) Open() error {
 
 	fmt.Println("Opening file:", filePath)
 
+	// TODO: eventually support more editors and therefore we need to rename nvimargs. sorry one true god
 	editor := viper.GetString("editor")
 	editorArgs := viper.GetString("nvimargs")
 

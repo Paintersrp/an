@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/Paintersrp/an/internal/templater"
 	"github.com/Paintersrp/an/internal/zet"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -17,7 +18,8 @@ var newCmd = &cobra.Command{
 	Use:     "new [title] [tags]",
 	Aliases: []string{"n"},
 	Short:   "Create a new zettelkasten note.",
-	Long: `This command creates a new atomic kettelkasten note into your note vault directory.
+	Long: `
+  This command creates a new atomic kettelkasten note into your note vault directory.
   It takes a required title argument and an optional tags argument to quickly add tags to the newly made note.
 
               [title]  [tags]
@@ -38,6 +40,11 @@ var newCmd = &cobra.Command{
 			tags = strings.Split(args[1], " ")
 		}
 
+		tmpl := viper.GetString("template")
+		if _, ok := templater.AvailableTemplates[tmpl]; !ok {
+			return fmt.Errorf("error: Invalid template specified. Available templates are: daily, roadmap, zet")
+		}
+
 		moleculeFlag := viper.GetString("molecule")
 
 		vaultDir := viper.GetString("vaultdir")
@@ -54,7 +61,7 @@ var newCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		_, createErr := note.Create()
+		_, createErr := note.Create(tmpl, appTemplater)
 		if createErr != nil {
 			return createErr
 		}
@@ -69,7 +76,9 @@ var newCmd = &cobra.Command{
 	},
 }
 
-// TODO -o and -i flags
+// TODO -overwrite and -increment flags ?
 func init() {
+	newCmd.Flags().StringP("template", "t", "zet", "Specify the template to use (default is 'zet'). Available templates: daily, roadmap, zet")
+	viper.BindPFlag("template", newCmd.Flags().Lookup("template"))
 	rootCmd.AddCommand(newCmd)
 }

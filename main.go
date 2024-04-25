@@ -20,3 +20,7 @@ import "github.com/Paintersrp/an/cmd"
 func main() {
 	cmd.Execute()
 }
+
+// func main() {
+// 	templater.Init()
+// }
