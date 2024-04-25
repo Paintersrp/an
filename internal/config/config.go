@@ -11,12 +11,12 @@ import (
 )
 
 type Config struct {
-	VaultDir     string
-	Editor       string
-	NvimArgs     string
-	HomeDir      string
-	Molecules    []string
-	MoleculeMode string
+	VaultDir     string   `json:"vault_dir"     yaml:"vault_dir"`
+	Editor       string   `json:"editor"        yaml:"editor"`
+	NvimArgs     string   `json:"nvim_args"     yaml:"nvim_args"`
+	HomeDir      string   `json:"home_dir"      yaml:"home_dir"`
+	Molecules    []string `json:"molecules"     yaml:"molecules"`
+	MoleculeMode string   `json:"molecule_mode" yaml:"molecule_mode"`
 }
 
 var ValidModes = map[string]bool{
@@ -50,7 +50,10 @@ func (cfg *Config) ToFile() error {
 	}
 	p := cfg.GetConfigPath()
 	d := path.Dir(p)
-	if _, err := os.Stat(d); errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Stat(d); errors.Is(
+		err,
+		os.ErrNotExist,
+	) {
 		if err := os.MkdirAll(d, 0755); err != nil {
 			return err
 		}
@@ -92,7 +95,10 @@ func (cfg *Config) GetConfigPath() string {
 func (cfg *Config) ChangeMode(mode string) {
 	// Validate the input mode
 	if _, valid := ValidModes[mode]; !valid {
-		fmt.Printf("Invalid mode: %s. Please choose from 'strict', 'confirm', or 'free'.\n", mode)
+		fmt.Printf(
+			"Invalid mode: %s. Please choose from 'strict', 'confirm', or 'free'.\n",
+			mode,
+		)
 		return
 	}
 
@@ -106,13 +112,19 @@ func (cfg *Config) ChangeMode(mode string) {
 		return
 	}
 
-	fmt.Printf("Mode changed to '%s' and configuration saved successfully.\n", mode)
+	fmt.Printf(
+		"Mode changed to '%s' and configuration saved successfully.\n",
+		mode,
+	)
 }
 
 func (cfg *Config) ChangeEditor(editor string) {
 	// Validate the input editor
 	if _, valid := ValidEditors[editor]; !valid {
-		fmt.Printf("Invalid editor: %s. The only valid option is 'nvim'.\n", editor)
+		fmt.Printf(
+			"Invalid editor: %s. The only valid option is 'nvim'.\n",
+			editor,
+		)
 		return
 	}
 
@@ -126,5 +138,8 @@ func (cfg *Config) ChangeEditor(editor string) {
 		return
 	}
 
-	fmt.Printf("Editor changed to '%s' and configuration saved successfully.\n", editor)
+	fmt.Printf(
+		"Editor changed to '%s' and configuration saved successfully.\n",
+		editor,
+	)
 }

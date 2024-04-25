@@ -54,7 +54,10 @@ func AddMoleculeToConfig(name string) {
 
 	// Save the configuration
 	if err := viper.WriteConfig(); err != nil {
-		fmt.Println("Error writing configuration file:", err)
+		fmt.Println(
+			"Error writing configuration file:",
+			err,
+		)
 		return
 	}
 

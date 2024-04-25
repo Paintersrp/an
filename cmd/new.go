@@ -28,7 +28,9 @@ var newCmd = &cobra.Command{
 	Example: "atomic new cli-notes 'cli go zettelkasten notetaking learn'",
 	Args: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
-			return fmt.Errorf("error: No title given. Try again with zet-cli new [title]")
+			return fmt.Errorf(
+				"error: No title given. Try again with zet-cli new [title]",
+			)
 		}
 		return nil
 	},
@@ -42,13 +44,20 @@ var newCmd = &cobra.Command{
 
 		tmpl := viper.GetString("template")
 		if _, ok := templater.AvailableTemplates[tmpl]; !ok {
-			return fmt.Errorf("error: Invalid template specified. Available templates are: daily, roadmap, zet")
+			return fmt.Errorf(
+				"error: Invalid template specified. Available templates are: daily, roadmap, zet",
+			)
 		}
 
 		moleculeFlag := viper.GetString("molecule")
 
 		vaultDir := viper.GetString("vaultdir")
-		note := zet.NewZettelkastenNote(vaultDir, moleculeFlag, title, tags)
+		note := zet.NewZettelkastenNote(
+			vaultDir,
+			moleculeFlag,
+			title,
+			tags,
+		)
 
 		exists, _, existsErr := note.FileExists()
 		if existsErr != nil {
@@ -56,8 +65,12 @@ var newCmd = &cobra.Command{
 		}
 
 		if exists {
-			fmt.Println("error: Note with given title already exists in the vault directory.")
-			fmt.Println("hint: Try again with a new title, or run again with either an overwrite (-o) flag or an increment (-i) flag")
+			fmt.Println(
+				"error: Note with given title already exists in the vault directory.",
+			)
+			fmt.Println(
+				"hint: Try again with a new title, or run again with either an overwrite (-o) flag or an increment (-i) flag",
+			)
 			os.Exit(1)
 		}
 
@@ -68,7 +81,10 @@ var newCmd = &cobra.Command{
 
 		// Open the note in Neovim.
 		if err := note.Open(); err != nil {
-			fmt.Println("Error opening note in Neovim:", err)
+			fmt.Println(
+				"Error opening note in Neovim:",
+				err,
+			)
 			os.Exit(1)
 		}
 
@@ -78,7 +94,11 @@ var newCmd = &cobra.Command{
 
 // TODO -overwrite and -increment flags ?
 func init() {
-	newCmd.Flags().StringP("template", "t", "zet", "Specify the template to use (default is 'zet'). Available templates: daily, roadmap, zet")
-	viper.BindPFlag("template", newCmd.Flags().Lookup("template"))
+	newCmd.Flags().
+		StringP("template", "t", "zet", "Specify the template to use (default is 'zet'). Available templates: daily, roadmap, zet")
+	viper.BindPFlag(
+		"template",
+		newCmd.Flags().Lookup("template"),
+	)
 	rootCmd.AddCommand(newCmd)
 }

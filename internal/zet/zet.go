@@ -15,10 +15,10 @@ import (
 
 // ZettelkastenNote represents a zettelkasten note with its metadata.
 type ZettelkastenNote struct {
-	VaultDir     string
-	SubDir       string
-	Filename     string
-	OriginalTags []string
+	VaultDir     string   `json:"vault_dir"     yaml:"vault_dir"`
+	SubDir       string   `json:"sub_dir"       yaml:"sub_dir"`
+	Filename     string   `json:"filename"      yaml:"filename"`
+	OriginalTags []string `json:"original_tags" yaml:"original_tags"`
 }
 
 func NewZettelkastenNote(
@@ -92,7 +92,10 @@ func (note *ZettelkastenNote) FileExists() (bool, string, error) {
 }
 
 // Create generates a new Zettelkasten note using a template.
-func (note *ZettelkastenNote) Create(tmplName string, t *templater.Templater) (bool, error) {
+func (note *ZettelkastenNote) Create(
+	tmplName string,
+	t *templater.Templater,
+) (bool, error) {
 	// Verify the directories up to the new note
 	path, pathErr := note.EnsurePath()
 	if pathErr != nil {
@@ -138,8 +141,12 @@ func (note *ZettelkastenNote) Open() error {
 
 	// TODO: fix flag notes, as we are using molecule mode now
 	if !exists {
-		fmt.Println("error: Note with given title does not exist in the vault directory.")
-		fmt.Println("hint: Try again with a new title, or run 'zet-cli open [title]' again with a create (-c) flag to create an empty note forcefully.")
+		fmt.Println(
+			"error: Note with given title does not exist in the vault directory.",
+		)
+		fmt.Println(
+			"hint: Try again with a new title, or run 'zet-cli open [title]' again with a create (-c) flag to create an empty note forcefully.",
+		)
 		os.Exit(1)
 	}
 

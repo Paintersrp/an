@@ -22,8 +22,8 @@ var AvailableTemplates = map[string]bool{
 
 // SingleTemplate represents a single template file and its associated data.
 type SingleTemplate struct {
-	FilePath string       // Path to the template file.
-	Data     TemplateData // Data structure to be used with the template.
+	FilePath string       `json:"file_path" yaml:"file_path"` // Path to the template file.
+	Data     TemplateData `json:"data"      yaml:"data"`      // Data structure to be used with the template.
 }
 
 // TemplateMap is a map of template names to SingleTemplate instances.
@@ -36,9 +36,9 @@ type Templater struct {
 
 // TemplateData defines the structure for data that will be passed to templates during rendering.
 type TemplateData struct {
-	Title string   // Title of the note.
-	Date  string   // Date associated with the note.
-	Tags  []string // Tags to be associated with the note.
+	Title string   `json:"title" yaml:"title"` // Title of the note.
+	Date  string   `json:"date"  yaml:"date"`  // Date associated with the note.
+	Tags  []string `json:"tags"  yaml:"tags"`  // Tags to be associated with the note.
 }
 
 // NewTemplater initializes a new Templater instance by loading template files from a specified directory.
@@ -46,19 +46,28 @@ func NewTemplater() (*Templater, error) {
 	tmplMap := make(TemplateMap)
 
 	// do we need to do this, or just target file JIT...?
-	err := filepath.Walk("./internal/templater/views", func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err // exit
-		}
+	err := filepath.Walk(
+		"./internal/templater/views",
+		func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err // exit
+			}
 
-		// if not a directory and extension is .tmpl, we add it to the template map
-		if !info.IsDir() && filepath.Ext(path) == ".tmpl" {
-			name := strings.TrimSuffix(info.Name(), filepath.Ext(info.Name()))
-			var data TemplateData
-			tmplMap[name] = SingleTemplate{FilePath: path, Data: data}
-		}
-		return nil // walk on or finish
-	})
+			// if not a directory and extension is .tmpl, we add it to the template map
+			if !info.IsDir() && filepath.Ext(path) == ".tmpl" {
+				name := strings.TrimSuffix(
+					info.Name(),
+					filepath.Ext(info.Name()),
+				)
+				var data TemplateData
+				tmplMap[name] = SingleTemplate{
+					FilePath: path,
+					Data:     data,
+				}
+			}
+			return nil // walk on or finish
+		},
+	)
 	if err != nil {
 		return nil, err // exit
 	}
@@ -68,7 +77,10 @@ func NewTemplater() (*Templater, error) {
 }
 
 // Execute finds the template by name, validates the data against the expected struct, and renders the template.
-func (t *Templater) Execute(templateName string, data interface{}) (string, error) {
+func (t *Templater) Execute(
+	templateName string,
+	data interface{},
+) (string, error) {
 	tmplData, ok := t.templates[templateName]
 	if !ok {
 		return "", errors.New("template not found")
@@ -78,8 +90,11 @@ func (t *Templater) Execute(templateName string, data interface{}) (string, erro
 	// Since we are auto generating the metadata, and most of the user input is already validated...
 	// Do we need this?
 	expectedType := reflect.TypeOf(tmplData.Data)
-	if expectedType != nil && !reflect.TypeOf(data).AssignableTo(expectedType) {
-		return "", errors.New("provided data type does not match expected template data type")
+	if expectedType != nil &&
+		!reflect.TypeOf(data).AssignableTo(expectedType) {
+		return "", errors.New(
+			"provided data type does not match expected template data type",
+		)
 	}
 
 	// Parse and execute the template.
@@ -100,7 +115,9 @@ func (t *Templater) Execute(templateName string, data interface{}) (string, erro
 }
 
 // GenerateTagsAndDate generates the Zettelkasten-style timestamp and auto-generated tags.
-func (t *Templater) GenerateTagsAndDate(tmplName string) (string, []string) {
+func (t *Templater) GenerateTagsAndDate(
+	tmplName string,
+) (string, []string) {
 	// Get the current time in UTC.
 	currentTime := time.Now().UTC()
 
@@ -115,7 +132,11 @@ func (t *Templater) GenerateTagsAndDate(tmplName string) (string, []string) {
 	// maybe better way to handle this somehow?
 	switch tmplName {
 	case "daily":
-		return zettelkastenTime, []string{"daily", dayOfWeekTag, hourOfDayTag}
+		return zettelkastenTime, []string{
+			"daily",
+			dayOfWeekTag,
+			hourOfDayTag,
+		}
 	default:
 		return zettelkastenTime, []string{dayOfWeekTag, hourOfDayTag}
 	}

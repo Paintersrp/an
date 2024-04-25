@@ -56,32 +56,42 @@ func (f *FuzzyFinder) findAndExecute(query string) {
 // listFiles walks the user's vault directory recursively gathering files for searching
 func (f *FuzzyFinder) listFiles() ([]string, error) {
 	var files []string
-	err := filepath.Walk(f.vaultDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err // exit
-		}
-		// append file if not a directory
-		if !info.IsDir() {
-			files = append(files, path)
-		}
-		return nil // walk on or finish
-	})
+	err := filepath.Walk(
+		f.vaultDir,
+		func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err // exit
+			}
+			// append file if not a directory
+			if !info.IsDir() {
+				files = append(files, path)
+			}
+			return nil // walk on or finish
+		},
+	)
 
 	// Return files and any errors
 	return files, err
 }
 
 // fuzzySelectFile performs fuzzy selection on files based on query
-func (f *FuzzyFinder) fuzzySelectFile(query string) (int, error) {
+func (f *FuzzyFinder) fuzzySelectFile(
+	query string,
+) (int, error) {
 	// Initial options for the fuzzy finder, in this case our preview window with
 	// our glamour formatted and styled content
 	options := []fuzzyfinder.Option{
-		fuzzyfinder.WithPreviewWindow(f.renderMarkdownPreview),
+		fuzzyfinder.WithPreviewWindow(
+			f.renderMarkdownPreview,
+		),
 	}
 
 	// Append the query, if exists
 	if query != "" {
-		options = append(options, fuzzyfinder.WithQuery(query))
+		options = append(
+			options,
+			fuzzyfinder.WithQuery(query),
+		)
 	}
 
 	// Collect titles and tags for fuzzy selection
@@ -96,10 +106,17 @@ func (f *FuzzyFinder) fuzzySelectFile(query string) (int, error) {
 		title, tags := parseFrontMatter(content)
 
 		// Format title for fuzzy finder display to include tags
-		titleWithTag := fmt.Sprintf("%s [Tags: %s] ", title, strings.Join(tags, ", "))
+		titleWithTag := fmt.Sprintf(
+			"%s [Tags: %s] ",
+			title,
+			strings.Join(tags, ", "),
+		)
 
 		// Append to our array of files
-		filesWithTitlesAndTags = append(filesWithTitlesAndTags, titleWithTag)
+		filesWithTitlesAndTags = append(
+			filesWithTitlesAndTags,
+			titleWithTag,
+		)
 	}
 
 	// Run the find on the files, showing the formatted titles
@@ -110,7 +127,9 @@ func (f *FuzzyFinder) fuzzySelectFile(query string) (int, error) {
 
 // renderMarkdownPreview handles rendering the colorized preview display with glamour,
 // adding formatting and styling to the terminal display.
-func (f *FuzzyFinder) renderMarkdownPreview(i, w, h int) string {
+func (f *FuzzyFinder) renderMarkdownPreview(
+	i, w, h int,
+) string {
 	if i == -1 {
 		return "" // show nothing
 	}
@@ -139,7 +158,9 @@ func (f *FuzzyFinder) renderMarkdownPreview(i, w, h int) string {
 }
 
 // parseFrontMatter extracts title and tags from YAML front matter
-func parseFrontMatter(content []byte) (title string, tags []string) {
+func parseFrontMatter(
+	content []byte,
+) (title string, tags []string) {
 	// Get everything between the ---s
 	re := regexp.MustCompile(`(?ms)^---\n(.+?)\n---`)
 	match := re.FindSubmatch(content)
@@ -178,16 +199,25 @@ func (f *FuzzyFinder) Execute(idx int) {
 	selectedFile := f.files[idx]
 
 	// Remove the vault directory from the file path
-	fileWithoutVault := strings.TrimPrefix(selectedFile, f.vaultDir+"/")
+	fileWithoutVault := strings.TrimPrefix(
+		selectedFile,
+		f.vaultDir+"/",
+	)
 
 	// Split the file path by the path separator
-	pathParts := strings.Split(fileWithoutVault, string(filepath.Separator))
+	pathParts := strings.Split(
+		fileWithoutVault,
+		string(filepath.Separator),
+	)
 
 	// The first part is the subdirectory
 	subDir := pathParts[0]
 
 	// The remaining parts joined together form the filename
-	fileName := strings.Join(pathParts[1:], string(filepath.Separator))
+	fileName := strings.Join(
+		pathParts[1:],
+		string(filepath.Separator),
+	)
 
 	// Setup temporary struct to launch with the internal Open functionality
 	n := &zet.ZettelkastenNote{

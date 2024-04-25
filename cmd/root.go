@@ -60,14 +60,22 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(ensureConfigExists, initConfig)
 
-	rootCmd.PersistentFlags().StringVarP(&moleculeName, "molecule", "m", "atoms", "Molecule subdirectory to use for this command.")
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.an/cfg.yaml)")
-	viper.BindPFlag("molecule", rootCmd.PersistentFlags().Lookup("molecule"))
+	rootCmd.PersistentFlags().
+		StringVarP(&moleculeName, "molecule", "m", "atoms", "Molecule subdirectory to use for this command.")
+	rootCmd.PersistentFlags().
+		StringVar(&cfgFile, "config", "", "config file (default is $HOME/.an/cfg.yaml)")
+	viper.BindPFlag(
+		"molecule",
+		rootCmd.PersistentFlags().Lookup("molecule"),
+	)
 
 	appTemplater, templaterError = templater.NewTemplater()
 
 	if templaterError != nil {
-		fmt.Printf("failed to create templater: %v", templaterError)
+		fmt.Printf(
+			"failed to create templater: %v",
+			templaterError,
+		)
 		cobra.CheckErr(templaterError)
 	}
 
@@ -91,7 +99,9 @@ func initConfig() {
 
 	// If a config file is found, read it in.
 	viper.ReadInConfig()
-	appCfg, cfgError = config.FromFile(viper.ConfigFileUsed())
+	appCfg, cfgError = config.FromFile(
+		viper.ConfigFileUsed(),
+	)
 }
 
 func ensureConfigExists() {
@@ -100,7 +110,12 @@ func ensureConfigExists() {
 
 	// Get the directory path of the file and absolute file path
 	dir := fmt.Sprintf("%s/%s", home, constants.ConfigDir)
-	filePath := fmt.Sprintf("%s/%s.%s", dir, constants.ConfigFile, constants.ConfigFileType)
+	filePath := fmt.Sprintf(
+		"%s/%s.%s",
+		dir,
+		constants.ConfigFile,
+		constants.ConfigFileType,
+	)
 
 	// Check if the directory already exists
 	_, dirErr := os.Stat(dir)
@@ -127,8 +142,14 @@ func handleMolecules() {
 	switch mode {
 	case "strict":
 		if !exists {
-			fmt.Println("Error: Molecule", moleculeName, "does not exist.")
-			fmt.Println("In strict mode, new molecules are added with the add-molecule command.")
+			fmt.Println(
+				"Error: Molecule",
+				moleculeName,
+				"does not exist.",
+			)
+			fmt.Println(
+				"In strict mode, new molecules are added with the add-molecule command.",
+			)
 			os.Exit(1)
 		}
 	case "free":
@@ -172,19 +193,29 @@ func verifyMoleculeExists() (bool, error) {
 func getConfirmation() {
 	var response string
 	for {
-		fmt.Printf("Molecule %s does not exist.\nDo you want to create it?\n(y/n): ", moleculeName)
+		fmt.Printf(
+			"Molecule %s does not exist.\nDo you want to create it?\n(y/n): ",
+			moleculeName,
+		)
 		fmt.Scanln(&response)
-		response = strings.ToLower(strings.TrimSpace(response))
+		response = strings.ToLower(
+			strings.TrimSpace(response),
+		)
 
 		switch response {
 		case "yes", "y":
+			// TODO: should use appCfg.AddMolecule
 			AddMoleculeToConfig(moleculeName)
 			return
 		case "no", "n":
-			fmt.Println("Exiting due to non-existing molecule")
+			fmt.Println(
+				"Exiting due to non-existing molecule",
+			)
 			os.Exit(0)
 		default:
-			fmt.Println("Invalid response. Please enter 'y'/'yes' or 'n'/'no'.")
+			fmt.Println(
+				"Invalid response. Please enter 'y'/'yes' or 'n'/'no'.",
+			)
 		}
 	}
 }

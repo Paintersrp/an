@@ -13,16 +13,23 @@ import (
 )
 
 var (
-	focusedStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("#cba6f7"))
-	focusedDimStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#585b70"))
-	blurredStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("#cba6f7"))
+	focusedStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#cba6f7"))
+	focusedDimStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#585b70"))
+	blurredStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#cba6f7"))
 	cursorStyle         = focusedStyle.Copy()
 	noStyle             = lipgloss.NewStyle()
 	helpStyle           = blurredStyle.Copy()
-	cursorModeHelpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#cba6f7"))
+	cursorModeHelpStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#cba6f7"))
 
 	focusedButton = focusedStyle.Copy().Render("[ Submit ]")
-	blurredButton = fmt.Sprintf("[ %s ]", blurredStyle.Render("Submit"))
+	blurredButton = fmt.Sprintf(
+		"[ %s ]",
+		blurredStyle.Render("Submit"),
+	)
 )
 
 type InitPromptModel struct {
@@ -215,7 +222,9 @@ func (m InitPromptModel) View() string {
 	b.WriteString(helpStyle.Render("cursor mode is "))
 	b.WriteString(cursorModeHelpStyle.Render(m.cursorMode.String()))
 	b.WriteString(helpStyle.Render(" (ctrl+r to change style)"))
-	b.WriteString(helpStyle.Render("\n(Leave inputs blank for default values)"))
+	b.WriteString(
+		helpStyle.Render("\n(Leave inputs blank for default values)"),
+	)
 
 	return b.String()
 }
