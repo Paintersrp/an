@@ -11,12 +11,12 @@ import (
 )
 
 type Config struct {
-	VaultDir     string   `json:"vault_dir"     yaml:"vault_dir"`
+	VaultDir     string   `json:"vault_dir"     yaml:"vaultdir"`
 	Editor       string   `json:"editor"        yaml:"editor"`
-	NvimArgs     string   `json:"nvim_args"     yaml:"nvim_args"`
-	HomeDir      string   `json:"home_dir"      yaml:"home_dir"`
+	NvimArgs     string   `json:"nvim_args"     yaml:"nvimargs"`
+	HomeDir      string   `json:"home_dir"      yaml:"homedir"`
 	Molecules    []string `json:"molecules"     yaml:"molecules"`
-	MoleculeMode string   `json:"molecule_mode" yaml:"molecule_mode"`
+	MoleculeMode string   `json:"molecule_mode" yaml:"moleculemode"`
 }
 
 var ValidModes = map[string]bool{
@@ -40,6 +40,7 @@ func FromFile(path string) (*Config, error) {
 	if err := yaml.Unmarshal(cfg_file, cfg); err != nil {
 		return nil, err
 	}
+	fmt.Println(cfg)
 	return cfg, nil
 }
 
@@ -49,6 +50,7 @@ func (cfg *Config) ToFile() error {
 		return err
 	}
 	p := cfg.GetConfigPath()
+	fmt.Println(p)
 	d := path.Dir(p)
 	if _, err := os.Stat(d); errors.Is(
 		err,
@@ -141,5 +143,15 @@ func (cfg *Config) ChangeEditor(editor string) {
 	fmt.Printf(
 		"Editor changed to '%s' and configuration saved successfully.\n",
 		editor,
+	)
+}
+
+func StaticGetConfigPath(homeDir string) string {
+	return fmt.Sprintf(
+		"%s%s%s.%s",
+		homeDir,
+		constants.ConfigDir,
+		constants.ConfigFile,
+		constants.ConfigFileType,
 	)
 }
