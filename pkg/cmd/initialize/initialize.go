@@ -18,7 +18,6 @@ package initialize
 import (
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/tui"
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 )
 
@@ -30,7 +29,7 @@ func NewCmdInit(c *config.Config) *cobra.Command {
 		Long:    "This command will walk you through setting up and initializing your zet-cli's configuration.",
 		Example: "zet init",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if _, err := tea.NewProgram(tui.InitialPrompt(c.GetConfigPath())).Run(); err != nil {
+			if err := tui.Run(c); err != nil {
 				return err
 			}
 			return nil

@@ -239,3 +239,11 @@ func SetupDefaults(homePath string) []string {
 		"confirm",
 	}
 }
+
+func Run(c *config.Config) error {
+	if _, err := tea.NewProgram(InitialPrompt(c.GetConfigPath())).Run(); err != nil {
+		return err
+	}
+
+	return nil
+}
