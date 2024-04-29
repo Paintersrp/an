@@ -23,9 +23,14 @@ import (
 func NewCmdChangeEditor(c *config.Config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "change-editor [editor]",
-		Short: "",
-		Long:  ``,
-		Args:  cobra.ExactArgs(1),
+		Short: "Change the default text editor",
+		Long: `The change-editor command updates the default text editor used by the application and saves the new setting to the configuration file.
+This allows for customization of the text editing experience to suit the user's preferences.`,
+		Example: `
+    # Change the default editor to 'vim'
+    an-cli change-editor vim
+    `,
+		Args: cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			c.ChangeEditor(args[0])
 		},

@@ -13,28 +13,29 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package changeMode
+package taskPin
 
 import (
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/spf13/cobra"
 )
 
-func NewCmdChangeMode(c *config.Config) *cobra.Command {
+func NewCmdTaskPin(c *config.Config) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "change-mode [mode]",
-		Short: "Change the application mode",
-		Long: `The change-mode command updates the current mode of the application and saves the new setting to the configuration file.
-This allows for switching between different modes of operation, such as 'edit', 'view', or custom modes defined by the user.`,
+		Use:     "pin [file path]",
+		Aliases: []string{"p"},
+		Short:   "Pin a task file",
+		Long:    `The pin command is used to pin a task file, making it the target for other task operations.`,
 		Example: `
-    # Change the application mode to 'edit'
-    an-cli change-mode edit
+    # Pin a task file
+    an-cli tasks pin ~/tasks.md
     `,
 		Args: cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
-			c.ChangeMode(args[0])
+		RunE: func(cmd *cobra.Command, args []string) error {
+			filePath := args[0]
+			c.ChangePin(filePath, "task")
+			return nil
 		},
 	}
-
 	return cmd
 }

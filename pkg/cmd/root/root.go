@@ -24,9 +24,12 @@ import (
 	"github.com/Paintersrp/an/pkg/cmd/addMolecule"
 	"github.com/Paintersrp/an/pkg/cmd/changeEditor"
 	"github.com/Paintersrp/an/pkg/cmd/changeMode"
+	"github.com/Paintersrp/an/pkg/cmd/day"
+	"github.com/Paintersrp/an/pkg/cmd/echo"
 	"github.com/Paintersrp/an/pkg/cmd/initialize"
 	"github.com/Paintersrp/an/pkg/cmd/new"
 	"github.com/Paintersrp/an/pkg/cmd/open"
+	"github.com/Paintersrp/an/pkg/cmd/pin"
 	"github.com/Paintersrp/an/pkg/cmd/tags"
 	"github.com/Paintersrp/an/pkg/cmd/tasks"
 	"github.com/Paintersrp/an/pkg/fs/templater"
@@ -81,6 +84,9 @@ func NewCmdRoot(
 	cmd.AddCommand(open.NewCmdOpen(c))
 	cmd.AddCommand(tags.NewCmdTags(c))
 	cmd.AddCommand(tasks.NewCmdTasks(c))
+	cmd.AddCommand(day.NewCmdDay(c, t))
+	cmd.AddCommand(pin.NewCmdPin(c))
+	cmd.AddCommand(echo.NewCmdEcho(c))
 
 	return cmd, nil
 }

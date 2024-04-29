@@ -13,26 +13,35 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package changeMode
+package taskList
 
 import (
+	"fmt"
+
 	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/pkg/fs/parser"
 	"github.com/spf13/cobra"
 )
 
-func NewCmdChangeMode(c *config.Config) *cobra.Command {
+func NewCmdTasksList(c *config.Config) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "change-mode [mode]",
-		Short: "Change the application mode",
-		Long: `The change-mode command updates the current mode of the application and saves the new setting to the configuration file.
-This allows for switching between different modes of operation, such as 'edit', 'view', or custom modes defined by the user.`,
+		Use:     "list",
+		Aliases: []string{"l"},
+		Short:   "List all tasks",
+		Long:    `The list command displays all the tasks in a tabular format.`,
 		Example: `
-    # Change the application mode to 'edit'
-    an-cli change-mode edit
+    # List all tasks
+    an-cli tasks list
     `,
-		Args: cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			c.ChangeMode(args[0])
+			p := parser.NewParser(c.VaultDir)
+
+			if err := p.Walk(); err != nil {
+				fmt.Println("Error:", err)
+				return
+			}
+
+			p.ShowTasksTable()
 		},
 	}
 

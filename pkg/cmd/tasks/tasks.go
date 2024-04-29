@@ -16,31 +16,33 @@ limitations under the License.
 package tasks
 
 import (
-	"fmt"
-
 	"github.com/Paintersrp/an/internal/config"
-	"github.com/Paintersrp/an/pkg/fs/parser"
+	"github.com/Paintersrp/an/pkg/cmd/tasks/taskEcho"
+	"github.com/Paintersrp/an/pkg/cmd/tasks/taskList"
+	"github.com/Paintersrp/an/pkg/cmd/tasks/taskPin"
 	"github.com/spf13/cobra"
 )
 
 func NewCmdTasks(c *config.Config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "tasks",
-		Short: "",
-		Long:  ``,
-		// Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
-			p := parser.NewParser(c.VaultDir)
+		Short: "Task management and operations",
+		Long:  `The tasks command is used for managing and operating on tasks within the system.`,
+		Example: `
+    # List all tasks
+    an-cli tasks list
 
-			if err := p.Walk(); err != nil {
-				fmt.Println("Error:", err)
-				return
-			}
+    # Pin a task file
+    an-cli tasks pin ~/tasks.md
 
-			p.ShowTasksTable()
-
-		},
+    # Echo a new task into the pinned task file
+    an-cli tasks echo "Finish the report" -p high
+    `,
 	}
+
+	cmd.AddCommand(taskEcho.NewCmdTaskEcho(c))
+	cmd.AddCommand(taskPin.NewCmdTaskPin(c))
+	cmd.AddCommand(taskList.NewCmdTasksList(c))
 
 	return cmd
 }

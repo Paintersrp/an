@@ -15,7 +15,7 @@ import (
 
 // AvailableTemplates defines the set of templates that are available for use
 var AvailableTemplates = map[string]bool{
-	"daily":   true,
+	"day":     true,
 	"roadmap": true,
 	"zet":     true,
 }
@@ -45,31 +45,39 @@ type TemplateData struct {
 func NewTemplater() (*Templater, error) {
 	tmplMap := make(TemplateMap)
 
-	// do we need to do this, or just target file JIT...?
-	err := filepath.Walk(
-		"./pkg/fs/templater/views",
-		func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err // exit
-			}
-
-			// if not a directory and extension is .tmpl, we add it to the template map
-			if !info.IsDir() && filepath.Ext(path) == ".tmpl" {
-				name := strings.TrimSuffix(
-					info.Name(),
-					filepath.Ext(info.Name()),
-				)
-				var data TemplateData
-				tmplMap[name] = SingleTemplate{
-					FilePath: path,
-					Data:     data,
-				}
-			}
-			return nil // walk on or finish
-		},
-	)
+	// Load user templates first to give them precedence.
+	userHomeDir, err := os.UserHomeDir()
 	if err != nil {
-		return nil, err // exit
+		return nil, err
+	}
+	userTemplateDir := filepath.Join(userHomeDir, ".an", "templates")
+	err = loadTemplates(userTemplateDir, tmplMap)
+	if err != nil {
+		return nil, err
+	}
+
+	// Update AvailableTemplates to include user templates.
+	for templateName := range tmplMap {
+		AvailableTemplates[templateName] = true
+	}
+
+	// Determine the directory of the executable or the working directory based on the mode of execution.
+	var templateDir string
+	if os.Getenv("DEV_MODE") == "true" {
+		// In development, use the relative path from the current working directory.
+		templateDir = "./pkg/fs/templater/views"
+	} else {
+		// In production, use the directory of the executable.
+		executableDir, err := os.Executable()
+		if err != nil {
+			return nil, err
+		}
+		templateDir = filepath.Join(filepath.Dir(executableDir), "pkg/fs/templater/views")
+	}
+
+	err = loadTemplates(templateDir, tmplMap)
+	if err != nil {
+		return nil, err
 	}
 
 	// Return templater loaded ready to execute the available templates
@@ -140,4 +148,33 @@ func (t *Templater) GenerateTagsAndDate(
 	default:
 		return zettelkastenTime, []string{dayOfWeekTag, hourOfDayTag}
 	}
+}
+
+// loadTemplates loads templates from the specified directory into the provided TemplateMap.
+func loadTemplates(dirPath string, tmplMap TemplateMap) error {
+	return filepath.Walk(
+		dirPath,
+		func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err // exit
+			}
+
+			// if not a directory and extension is .tmpl, we add it to the template map
+			if !info.IsDir() && filepath.Ext(path) == ".tmpl" {
+				name := strings.TrimSuffix(
+					info.Name(),
+					filepath.Ext(info.Name()),
+				)
+				// Check if the template is already loaded (from the user's directory).
+				if _, exists := tmplMap[name]; !exists {
+					var data TemplateData
+					tmplMap[name] = SingleTemplate{
+						FilePath: path,
+						Data:     data,
+					}
+				}
+			}
+			return nil // walk on or finish
+		},
+	)
 }

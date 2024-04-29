@@ -61,8 +61,18 @@ func NewCmdNew(
 
 			tmpl := viper.GetString("template")
 			if _, ok := templater.AvailableTemplates[tmpl]; !ok {
+				// Create a slice to hold the keys from AvailableTemplates.
+				var templateNames []string
+				for name := range templater.AvailableTemplates {
+					templateNames = append(templateNames, name)
+				}
+
+				// Join the template names into a single string separated by commas.
+				availableTemplateNames := strings.Join(templateNames, ", ")
+
 				return fmt.Errorf(
-					"error: Invalid template specified. Available templates are: daily, roadmap, zet",
+					"invalid template specified. Available templates are: %s",
+					availableTemplateNames,
 				)
 			}
 

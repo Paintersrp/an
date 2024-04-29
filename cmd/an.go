@@ -33,7 +33,6 @@ func Execute() {
 	if cfgErr != nil {
 		return // exit?
 	}
-
 	templater, templaterErr := templater.NewTemplater()
 
 	if templaterErr != nil {

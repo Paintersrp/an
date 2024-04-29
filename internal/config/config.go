@@ -11,11 +11,13 @@ import (
 )
 
 type Config struct {
-	VaultDir     string   `json:"vault_dir"     yaml:"vaultdir"`
-	Editor       string   `json:"editor"        yaml:"editor"`
-	NvimArgs     string   `json:"nvim_args"     yaml:"nvimargs"`
-	Molecules    []string `json:"molecules"     yaml:"molecules"`
-	MoleculeMode string   `json:"molecule_mode" yaml:"moleculemode"`
+	VaultDir       string   `json:"vault_dir"        yaml:"vaultdir"`
+	Editor         string   `json:"editor"           yaml:"editor"`
+	NvimArgs       string   `json:"nvim_args"        yaml:"nvimargs"`
+	Molecules      []string `json:"molecules"        yaml:"molecules"`
+	MoleculeMode   string   `json:"molecule_mode"    yaml:"moleculemode"`
+	PinnedFile     string   `json:"pinned_file"      yaml:"pinned_file"`
+	PinnedTaskFile string   `json:"pinned_task_file" yaml:"pinned_task_file"`
 }
 
 var ValidModes = map[string]bool{
@@ -39,7 +41,6 @@ func FromFile(path string) (*Config, error) {
 	if err := yaml.Unmarshal(cfg_file, cfg); err != nil {
 		return nil, err
 	}
-	fmt.Println(cfg)
 	return cfg, nil
 }
 
@@ -147,6 +148,32 @@ func (cfg *Config) ChangeEditor(editor string) {
 	fmt.Printf(
 		"Editor changed to '%s' and configuration saved successfully.\n",
 		editor,
+	)
+}
+
+func (cfg *Config) ChangePin(file, pinType string) {
+	// TODO: Validation
+
+	switch pinType {
+	case "task":
+		cfg.PinnedTaskFile = file
+	case "text":
+		cfg.PinnedFile = file
+	default:
+		fmt.Println("Invalid Pin File Type. Valid options are text and task.")
+		return
+	}
+
+	// Save the updated configuration to file
+	err := cfg.ToFile()
+	if err != nil {
+		fmt.Println("Error saving the configuration:", err)
+		return
+	}
+
+	fmt.Printf(
+		"Pinned File changed to '%s' and configuration saved successfully.\n",
+		file,
 	)
 }
 

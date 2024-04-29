@@ -130,11 +130,13 @@ func (m InitPromptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 				cfg := &config.Config{
-					VaultDir:     m.inputs[0].Value(),
-					Editor:       m.inputs[1].Value(),
-					NvimArgs:     m.inputs[2].Value(),
-					Molecules:    []string{defaults[3]},
-					MoleculeMode: defaults[4],
+					VaultDir:       m.inputs[0].Value(),
+					Editor:         m.inputs[1].Value(),
+					NvimArgs:       m.inputs[2].Value(),
+					Molecules:      []string{defaults[3]},
+					MoleculeMode:   defaults[4],
+					PinnedFile:     defaults[5],
+					PinnedTaskFile: defaults[6],
 				}
 
 				cfgErr := cfg.ToFile()
@@ -229,6 +231,8 @@ func SetupDefaults(path string) []string {
 		"",
 		"atoms",
 		"confirm",
+		"",
+		"",
 	}
 }
 
