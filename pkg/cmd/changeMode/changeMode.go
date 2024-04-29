@@ -16,8 +16,6 @@ limitations under the License.
 package changeMode
 
 import (
-	"fmt"
-
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/spf13/cobra"
 )
@@ -29,7 +27,6 @@ func NewCmdChangeMode(c *config.Config) *cobra.Command {
 		Long:  ``,
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println(c.HomeDir, "home")
 			c.ChangeMode(args[0])
 		},
 	}

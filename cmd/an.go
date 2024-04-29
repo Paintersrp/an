@@ -13,7 +13,6 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-
 package cmd
 
 import (
@@ -67,12 +66,9 @@ func initConfig() (*config.Config, error) {
 	// If a config file is found, read it in.
 	viper.ReadInConfig()
 
-	fmt.Println(home, "an.go")
-	fmt.Println(config.StaticGetConfigPath(home), "an.go static")
 	cfg, err := config.FromFile(
 		config.StaticGetConfigPath(home),
 	)
-	fmt.Println(cfg.HomeDir, "an.go cfg.home")
 
 	return cfg, err
 }

@@ -11,52 +11,24 @@ import (
 	"github.com/yuin/goldmark/text"
 )
 
-type TaskFile struct {
-	Path      string
-	TaskCount int
+type Parser struct {
+	DirPath     string
+	TaskHandler *TaskHandler
+	TagHandler  *TagHandler
 }
 
-func ParseMarkdownFile(
-	path string,
-	taskMap *map[string][]string,
-) error {
-	source, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Errorf("error reading file: %w", err)
+func NewParser(dirPath string) *Parser {
+	return &Parser{
+		DirPath:     dirPath,
+		TaskHandler: NewTaskHandler(),
+		TagHandler:  NewTagHandler(),
 	}
-
-	parser := goldmark.DefaultParser()
-	reader := text.NewReader(source)
-	document := parser.Parse(reader)
-
-	var tasks []string
-
-	ast.Walk(
-		document,
-		func(n ast.Node, entering bool) (ast.WalkStatus, error) {
-			if entering {
-				if listItem, ok := n.(*ast.ListItem); ok {
-					content := strings.TrimSpace(
-						string(listItem.Text(source)),
-					)
-					if (strings.HasPrefix(content, "[ ]") || strings.HasPrefix(content, "[x]")) &&
-						len(strings.TrimSpace(content[3:])) > 0 {
-						tasks = append(tasks, content)
-					}
-				}
-			}
-			return ast.WalkContinue, nil
-		},
-	)
-
-	(*taskMap)[path] = tasks
-
-	return nil
 }
 
-func WalkDir(dirPath string, taskMap *map[string][]string) error {
+// Walk traverses the directory set in the Parser and processes Markdown files.
+func (p *Parser) Walk() error {
 	return filepath.Walk(
-		dirPath,
+		p.DirPath,
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return fmt.Errorf(
@@ -66,11 +38,78 @@ func WalkDir(dirPath string, taskMap *map[string][]string) error {
 				)
 			}
 			if !info.IsDir() && filepath.Ext(path) == ".md" {
-				if err := ParseMarkdownFile(path, taskMap); err != nil {
+				if err := p.parse(path); err != nil {
 					return err
 				}
 			}
 			return nil
 		},
 	)
+}
+
+// parse is a private method that reads and parses a Markdown file into an AST.
+func (p *Parser) parse(path string) error {
+	source, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("error reading file: %w", err)
+	}
+
+	parser := goldmark.DefaultParser()
+	reader := text.NewReader(source)
+	document := parser.Parse(reader)
+
+	var inTagsSection bool
+
+	ast.Walk(
+		document,
+		func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+			if entering {
+				switch n := n.(type) {
+				case *ast.ListItem:
+					content := strings.TrimSpace(string(n.Text(source)))
+
+					if inTagsSection {
+						// Handle tag parsing using TagHandler
+						p.TagHandler.ParseTag(content)
+					} else {
+						// Handle task parsing using TaskHandler
+						p.TaskHandler.ParseTask(content)
+					}
+				case *ast.Text:
+					content := strings.TrimSpace(string(n.Text(source)))
+
+					if content == "tags:" {
+						inTagsSection = true
+					}
+				}
+			} else {
+				if _, ok := n.(*ast.List); ok && inTagsSection {
+					inTagsSection = false
+				}
+			}
+			return ast.WalkContinue, nil
+		},
+	)
+
+	return nil
+}
+
+func (p *Parser) PrintTagCounts() {
+	p.TagHandler.PrintTagCounts()
+}
+
+func (p *Parser) PrintSortedTagCounts(order string) {
+	p.TagHandler.PrintSortedTagCounts(order)
+}
+
+func (p *Parser) ShowTagTable() {
+	p.TagHandler.ShowTagTable()
+}
+
+func (p *Parser) PrintTasks(sortType, sortOrder string) {
+	p.TaskHandler.PrintTasks(sortType, sortOrder)
+}
+
+func (p *Parser) ShowTasksTable() {
+	p.TaskHandler.ShowTasksTable()
 }

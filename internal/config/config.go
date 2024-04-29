@@ -14,7 +14,6 @@ type Config struct {
 	VaultDir     string   `json:"vault_dir"     yaml:"vaultdir"`
 	Editor       string   `json:"editor"        yaml:"editor"`
 	NvimArgs     string   `json:"nvim_args"     yaml:"nvimargs"`
-	HomeDir      string   `json:"home_dir"      yaml:"homedir"`
 	Molecules    []string `json:"molecules"     yaml:"molecules"`
 	MoleculeMode string   `json:"molecule_mode" yaml:"moleculemode"`
 }
@@ -85,9 +84,14 @@ func (cfg *Config) AddMolecule(name string) {
 }
 
 func (cfg *Config) GetConfigPath() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Println("Home directory not found")
+		os.Exit(1)
+	}
 	return fmt.Sprintf(
 		"%s%s%s.%s",
-		cfg.HomeDir,
+		home,
 		constants.ConfigDir,
 		constants.ConfigFile,
 		constants.ConfigFileType,

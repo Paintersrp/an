@@ -27,6 +27,8 @@ import (
 	"github.com/Paintersrp/an/pkg/cmd/initialize"
 	"github.com/Paintersrp/an/pkg/cmd/new"
 	"github.com/Paintersrp/an/pkg/cmd/open"
+	"github.com/Paintersrp/an/pkg/cmd/tags"
+	"github.com/Paintersrp/an/pkg/cmd/tasks"
 	"github.com/Paintersrp/an/pkg/fs/templater"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -67,6 +69,7 @@ func NewCmdRoot(
 		cmd.PersistentFlags().Lookup("molecule"),
 	)
 
+	// TODO: Molecule creation is being asked even on the init command, should prob find a way to avoid that
 	handleMolecules(c)
 
 	// Add Child Commands to Root
@@ -76,6 +79,8 @@ func NewCmdRoot(
 	cmd.AddCommand(changeMode.NewCmdChangeMode(c))
 	cmd.AddCommand(new.NewCmdNew(c, t))
 	cmd.AddCommand(open.NewCmdOpen(c))
+	cmd.AddCommand(tags.NewCmdTags(c))
+	cmd.AddCommand(tasks.NewCmdTasks(c))
 
 	return cmd, nil
 }

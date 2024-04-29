@@ -1,4 +1,4 @@
-package tui
+package initialize
 
 import (
 	"fmt"
@@ -41,7 +41,7 @@ type InitPromptModel struct {
 
 func InitialPrompt(cfgPath string) InitPromptModel {
 	m := InitPromptModel{
-		inputs:     make([]textinput.Model, 4),
+		inputs:     make([]textinput.Model, 3),
 		configPath: cfgPath,
 	}
 
@@ -66,17 +66,11 @@ func InitialPrompt(cfgPath string) InitPromptModel {
 			t.TextStyle = focusedStyle
 			t.CharLimit = 64
 		case 1:
-			t.Prompt = "Home Directory: "
-			t.Placeholder = home
-			t.PlaceholderStyle = focusedDimStyle
-			t.PromptStyle = noStyle
-			t.CharLimit = 64
-		case 2:
 			t.Prompt = "Editor: "
 			t.Placeholder = "nvim"
 			t.PlaceholderStyle = focusedDimStyle
 			t.PromptStyle = noStyle
-		case 3:
+		case 2:
 			t.Prompt = "Editor Arguments: "
 			t.Placeholder = "none"
 			t.PlaceholderStyle = focusedDimStyle
@@ -137,11 +131,10 @@ func (m InitPromptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 				cfg := &config.Config{
 					VaultDir:     m.inputs[0].Value(),
-					HomeDir:      m.inputs[1].Value(),
-					Editor:       m.inputs[2].Value(),
-					NvimArgs:     m.inputs[3].Value(),
-					Molecules:    []string{defaults[4]},
-					MoleculeMode: defaults[5],
+					Editor:       m.inputs[1].Value(),
+					NvimArgs:     m.inputs[2].Value(),
+					Molecules:    []string{defaults[3]},
+					MoleculeMode: defaults[4],
 				}
 
 				cfgErr := cfg.ToFile()
@@ -229,10 +222,9 @@ func (m InitPromptModel) View() string {
 	return b.String()
 }
 
-func SetupDefaults(homePath string) []string {
+func SetupDefaults(path string) []string {
 	return []string{
-		fmt.Sprintf("%s/notes", homePath),
-		homePath,
+		fmt.Sprintf("%s/notes", path),
 		"nvim",
 		"",
 		"atoms",
