@@ -186,3 +186,36 @@ func StaticGetConfigPath(homeDir string) string {
 		constants.ConfigFileType,
 	)
 }
+func EnsureConfigExists(home string) {
+	// Get the directory path of the file and absolute file path
+	dir := fmt.Sprintf("%s/%s", home, constants.ConfigDir)
+	filePath := fmt.Sprintf(
+		"%s/%s.%s",
+		dir,
+		constants.ConfigFile,
+		constants.ConfigFileType,
+	)
+
+	// Check if the directory already exists
+	_, dirErr := os.Stat(dir)
+	if os.IsNotExist(dirErr) {
+		// If the directory does not exist, create it
+		err := os.MkdirAll(dir, os.ModePerm)
+		if err != nil {
+			fmt.Printf("failed to create config directory.\nerror: %s", err)
+			os.Exit(1)
+		}
+	}
+
+	// Check if the file already exists
+	_, fileErr := os.Stat(filePath)
+	if os.IsNotExist(fileErr) {
+		// If the file does not exist, create an empty file
+		file, err := os.Create(filePath)
+		if err != nil {
+			fmt.Printf("Error: failed to create config file. \nerror: %s", err)
+			os.Exit(1)
+		}
+		file.Close()
+	}
+}

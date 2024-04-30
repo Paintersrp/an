@@ -1,18 +1,3 @@
-/*
-Copyright © 2024 Ryan Painter paintersrp@gmail.com
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-	http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
 package root
 
 import (
@@ -20,21 +5,22 @@ import (
 	"os"
 	"strings"
 
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/pkg/cmd/addMolecule"
-	"github.com/Paintersrp/an/pkg/cmd/changeEditor"
-	"github.com/Paintersrp/an/pkg/cmd/changeMode"
 	"github.com/Paintersrp/an/pkg/cmd/day"
 	"github.com/Paintersrp/an/pkg/cmd/echo"
 	"github.com/Paintersrp/an/pkg/cmd/initialize"
 	"github.com/Paintersrp/an/pkg/cmd/new"
 	"github.com/Paintersrp/an/pkg/cmd/open"
+	"github.com/Paintersrp/an/pkg/cmd/openPin"
 	"github.com/Paintersrp/an/pkg/cmd/pin"
+	"github.com/Paintersrp/an/pkg/cmd/settings"
 	"github.com/Paintersrp/an/pkg/cmd/tags"
 	"github.com/Paintersrp/an/pkg/cmd/tasks"
 	"github.com/Paintersrp/an/pkg/fs/templater"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -78,15 +64,15 @@ func NewCmdRoot(
 	// Add Child Commands to Root
 	cmd.AddCommand(initialize.NewCmdInit(c))
 	cmd.AddCommand(addMolecule.NewCmdAddMolecule(c))
-	cmd.AddCommand(changeEditor.NewCmdChangeEditor(c))
-	cmd.AddCommand(changeMode.NewCmdChangeMode(c))
 	cmd.AddCommand(new.NewCmdNew(c, t))
 	cmd.AddCommand(open.NewCmdOpen(c))
+	cmd.AddCommand(openPin.NewCmdOpenPin(c))
 	cmd.AddCommand(tags.NewCmdTags(c))
-	cmd.AddCommand(tasks.NewCmdTasks(c))
+	cmd.AddCommand(tasks.NewCmdTasks(c, t))
 	cmd.AddCommand(day.NewCmdDay(c, t))
 	cmd.AddCommand(pin.NewCmdPin(c))
 	cmd.AddCommand(echo.NewCmdEcho(c))
+	cmd.AddCommand(settings.NewCmdSettings(c))
 
 	return cmd, nil
 }

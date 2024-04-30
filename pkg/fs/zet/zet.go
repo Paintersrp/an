@@ -15,10 +15,11 @@ import (
 
 // ZettelkastenNote represents a zettelkasten note with its metadata.
 type ZettelkastenNote struct {
-	VaultDir     string   `json:"vault_dir"     yaml:"vault_dir"`
-	SubDir       string   `json:"sub_dir"       yaml:"sub_dir"`
-	Filename     string   `json:"filename"      yaml:"filename"`
-	OriginalTags []string `json:"original_tags" yaml:"original_tags"`
+	VaultDir      string   `json:"vault_dir"      yaml:"vault_dir"`
+	SubDir        string   `json:"sub_dir"        yaml:"sub_dir"`
+	Filename      string   `json:"filename"       yaml:"filename"`
+	OriginalTags  []string `json:"original_tags"  yaml:"original_tags"`
+	OriginalLinks []string `json:"original_links" yaml:"original_links"`
 }
 
 func NewZettelkastenNote(
@@ -26,12 +27,14 @@ func NewZettelkastenNote(
 	subDir string,
 	filename string,
 	tags []string,
+	links []string,
 ) *ZettelkastenNote {
 	return &ZettelkastenNote{
-		VaultDir:     vaultDir,
-		SubDir:       subDir,
-		Filename:     filename,
-		OriginalTags: tags,
+		VaultDir:      vaultDir,
+		SubDir:        subDir,
+		Filename:      filename,
+		OriginalTags:  tags,
+		OriginalLinks: links,
 	}
 }
 
@@ -114,6 +117,7 @@ func (note *ZettelkastenNote) Create(
 		Title: note.Filename,
 		Date:  zetTime,
 		Tags:  append(note.OriginalTags, tags...),
+		Links: note.OriginalLinks,
 	}
 
 	// Execute the template and return the rendered output
@@ -150,7 +154,59 @@ func (note *ZettelkastenNote) Open() error {
 		os.Exit(1)
 	}
 
-	fmt.Println("Opening file:", filePath)
+	if err := OpenFromPath(filePath); err != nil {
+		fmt.Println(
+			"Error opening note in Neovim:",
+			err,
+		)
+		os.Exit(1)
+	}
+
+	return nil
+}
+
+// GetNotesInDirectory retrieves all note filenames in the specified vault and subdirectory.
+func GetNotesInDirectory(vaultDir, subDir string) ([]string, error) {
+	var notes []string
+	// Construct the directory path
+	dirPath := fmt.Sprintf("%s/%s", vaultDir, subDir)
+	// Read the directory contents
+	files, err := os.ReadDir(dirPath)
+	if err != nil {
+		return nil, err
+	}
+	// Filter and collect note filenames
+	for _, file := range files {
+		if !file.IsDir() {
+			notes = append(notes, file.Name())
+		}
+	}
+	return notes, nil
+}
+
+func StaticHandleNoteLaunch(
+	note *ZettelkastenNote,
+	t *templater.Templater,
+	tmpl string,
+) {
+	_, createErr := note.Create(tmpl, t)
+	if createErr != nil {
+		fmt.Printf("error creating note file: %s", createErr)
+		os.Exit(1)
+	}
+
+	// Open the note in Neovim.
+	if err := note.Open(); err != nil {
+		fmt.Println(
+			"Error opening note in Neovim:",
+			err,
+		)
+		os.Exit(1)
+	}
+}
+
+func OpenFromPath(path string) error {
+	fmt.Println("Opening file:", path)
 
 	// TODO: eventually support more editors and therefore we need to rename nvimargs. sorry one true god
 	editor := viper.GetString("editor")
@@ -162,10 +218,10 @@ func (note *ZettelkastenNote) Open() error {
 	if editorArgs != "" {
 		// User specified command
 		cmdArgs = strings.Fields(editorArgs)
-		cmdArgs = append([]string{editor, filePath}, cmdArgs...)
+		cmdArgs = append([]string{editor, path}, cmdArgs...)
 	} else {
 		// Default to just opening nvim if no command is specified
-		cmdArgs = []string{editor, filePath}
+		cmdArgs = []string{editor, path}
 	}
 
 	// Open the note in Editor.

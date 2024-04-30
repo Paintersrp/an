@@ -1,0 +1,24 @@
+---
+title: {{.Title}}
+date: {{.Date}}
+tags:
+  - tasks 
+  - task-echo
+{{- range .Tags}}
+  - {{.}}
+{{- end}}
+---
+
+## Tasks
+
+### High Priority
+
+### Medium Priority
+
+### Low Priority
+
+## Links
+[[{{.Date}}]]
+{{- range .Links}}
+[[{{.}}]]
+{{- end}}

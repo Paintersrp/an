@@ -1,4 +1,3 @@
-
 ---
 title: Project Roadmap - {{.Title}}
 date: {{.Date}}
@@ -6,7 +5,6 @@ tags:
 {{- range .Tags}}
   - {{.}}
 {{- end}}
-
 ---
 
 ## Project Overview:
@@ -45,3 +43,6 @@ Provide a brief overview of the project, including its purpose, objectives, and 
 
 ## Links
 [[{{.Date}}]]
+{{- range .Links}}
+[[{{.}}]]
+{{- end}}

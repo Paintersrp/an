@@ -39,6 +39,7 @@ type TemplateData struct {
 	Title string   `json:"title" yaml:"title"` // Title of the note.
 	Date  string   `json:"date"  yaml:"date"`  // Date associated with the note.
 	Tags  []string `json:"tags"  yaml:"tags"`  // Tags to be associated with the note.
+	Links []string `json:"links" yaml:"links"` // Tags to be associated with the note.
 }
 
 // NewTemplater initializes a new Templater instance by loading template files from a specified directory.
