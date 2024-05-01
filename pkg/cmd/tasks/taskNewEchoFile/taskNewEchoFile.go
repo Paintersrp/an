@@ -42,21 +42,22 @@ func run(
 	c *config.Config,
 ) error {
 	tags := handleTags(args)
-	rootMoleculeFlag := viper.GetString("molecule")
+	rootSubdirFlag := viper.GetString("subdir")
 	rootVaultDirFlag := viper.GetString("vaultdir")
 
 	// Get the highest existing increment
-	highestIncrement := findHighestIncrement(rootVaultDirFlag, rootMoleculeFlag)
+	highestIncrement := findHighestIncrement(rootVaultDirFlag, rootSubdirFlag)
 
 	// Generate the next title
 	nextTitle := fmt.Sprintf("task-echo-%02d", highestIncrement+1)
 
 	note := zet.NewZettelkastenNote(
 		rootVaultDirFlag,
-		rootMoleculeFlag,
+		rootSubdirFlag,
 		nextTitle,
 		tags,
 		[]string{},
+		"",
 	)
 
 	// Check if the --pin flag is set

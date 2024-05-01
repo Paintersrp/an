@@ -14,8 +14,8 @@ type Config struct {
 	VaultDir       string   `json:"vault_dir"        yaml:"vaultdir"`
 	Editor         string   `json:"editor"           yaml:"editor"`
 	NvimArgs       string   `json:"nvim_args"        yaml:"nvimargs"`
-	Molecules      []string `json:"molecules"        yaml:"molecules"`
-	MoleculeMode   string   `json:"molecule_mode"    yaml:"moleculemode"`
+	SubDirs        []string `json:"sub_dirs"         yaml:"subdirs"`
+	FileSystemMode string   `json:"fs_mode"          yaml:"fsmode"`
 	PinnedFile     string   `json:"pinned_file"      yaml:"pinned_file"`
 	PinnedTaskFile string   `json:"pinned_task_file" yaml:"pinned_task_file"`
 }
@@ -68,20 +68,20 @@ func (cfg *Config) ToFile() error {
 	return nil
 }
 
-func (cfg *Config) AddMolecule(name string) {
-	// Check if the molecule already exists
-	for _, molecule := range cfg.Molecules {
-		if molecule == name {
-			fmt.Println("Molecule", name, "already exists.")
+func (cfg *Config) AddSubdir(name string) {
+	// Check if the subdirectory already exists
+	for _, subDir := range cfg.SubDirs {
+		if subDir == name {
+			fmt.Println("Subdirectory", name, "already exists.")
 			return
 		}
 	}
 
-	// Append the new molecule
-	cfg.Molecules = append(cfg.Molecules, name)
+	// Append the new sub directory
+	cfg.SubDirs = append(cfg.SubDirs, name)
 	cfg.ToFile()
 
-	fmt.Println("Molecule", name, "added successfully.")
+	fmt.Println("Subdirectory", name, "added successfully.")
 }
 
 func (cfg *Config) GetConfigPath() string {
@@ -110,7 +110,7 @@ func (cfg *Config) ChangeMode(mode string) {
 	}
 
 	// Update the struct with the new mode
-	cfg.MoleculeMode = mode
+	cfg.FileSystemMode = mode
 
 	// Save the updated configuration to file
 	err := cfg.ToFile()

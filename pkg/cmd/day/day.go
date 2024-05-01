@@ -62,6 +62,7 @@ func NewCmdDay(
 				fmt.Sprintf("day-%s", date),
 				tags,
 				links,
+				"",
 			)
 
 			exists, _, existsErr := note.FileExists()

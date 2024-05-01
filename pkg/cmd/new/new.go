@@ -3,9 +3,11 @@ package new
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/pkg/fs/fzf"
 	"github.com/Paintersrp/an/pkg/fs/templater"
 	"github.com/Paintersrp/an/pkg/fs/zet"
 	"github.com/Paintersrp/an/utils"
@@ -65,7 +67,7 @@ func NewCmdNew(
 
 	// Add the --pin flag
 	cmd.Flags().BoolP("pin", "p", false, "Pin the newly created file")
-
+	cmd.Flags().BoolP("upstream", "u", false, "Select a file for the upstream property")
 	return cmd
 }
 
@@ -79,15 +81,17 @@ func run(
 	tags := handleTags(args)
 	links := handleLinks(cmd)
 	tmpl := handleTemplate(cmd)
-	rootMoleculeFlag := viper.GetString("molecule")
+	rootSubdirFlag := viper.GetString("subdir")
 	rootVaultDirFlag := viper.GetString("vaultdir")
+	upstream := handleUpstream(cmd, rootVaultDirFlag)
 
 	note := zet.NewZettelkastenNote(
 		rootVaultDirFlag,
-		rootMoleculeFlag,
+		rootSubdirFlag,
 		title,
 		tags,
 		links,
+		upstream,
 	)
 
 	handleConflicts(note)
@@ -164,6 +168,27 @@ func handleTemplate(cmd *cobra.Command) string {
 	}
 
 	return tmpl
+}
+
+func handleUpstream(cmd *cobra.Command, vaultDir string) string {
+	upstreamFlag, _ := cmd.Flags().GetBool("upstream")
+
+	if upstreamFlag {
+		finder := fzf.NewFuzzyFinder(vaultDir, "Select upstream file.")
+		upstreamFile, err := finder.Run(false)
+
+		if err != nil {
+			fmt.Printf("error selecting upstream file: %s", err)
+			os.Exit(1)
+		}
+
+		// Extract just the base file name
+		baseFileName := filepath.Base(upstreamFile)
+		trimmedName := strings.TrimSuffix(baseFileName, filepath.Ext(baseFileName))
+		return trimmedName
+	}
+
+	return ""
 }
 
 func handleConflicts(note *zet.ZettelkastenNote) {

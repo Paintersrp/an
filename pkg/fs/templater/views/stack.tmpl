@@ -1,0 +1,47 @@
+---
+title: {{.Title}}
+up: "[[{{.Upstream}}]]"
+date: {{.Date}}
+tags:
+{{- range .Tags}}
+  - {{.}}
+{{- end}}
+---
+## 📄 Overview
+A detailed examination of {{.Title}}, including its role in the project and its unique features.
+
+---
+
+## 🔑 Key Features
+List the key features of the stack item.
+
+---
+
+## 🧩 Integration
+How {{.Title}} integrates with other components of the project.
+
+---
+
+## 💡 Usage Examples
+Provide examples of how to use {{.Title}} within the project.
+
+---
+
+## 📚 Resources
+- Official Documentation
+- Community Resources
+- Tutorials
+
+---
+
+## ⚠️ Limitations
+Note any known limitations or issues with {{.Title}}.
+
+---
+
+## 🔗 Related
+Link to any related stack items or documentation that might be helpful.
+
+{{- range .Links}}
+- [[{{.}}]]
+{{- end}}

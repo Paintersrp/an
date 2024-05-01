@@ -1,16 +1,25 @@
 ---
 title: {{.Title}}
+up: "[[{{.Upstream}}]]"
 date: {{.Date}}
 tags:
 {{- range .Tags}}
   - {{.}}
 {{- end}}
 ---
+## Content
 
+---
 
+### **Relations**
 
-## Links
-{{.Date}}
 {{- range .Links}}
 [[{{.}}]]
 {{- end}}
+
+##### Prompt-like Questions for Finding Connections
+
+- How does this idea relate to other concepts you've noted?
+- Are there any opposing viewpoints or contrasting ideas worth exploring?
+- Can you draw parallels between this idea and real-life experiences?
+- Are there any unanswered questions or areas for further exploration sparked by this note?

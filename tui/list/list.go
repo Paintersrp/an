@@ -82,7 +82,7 @@ func NewListModel(cfg *config.Config) ListModel {
 		ListItem{title: "VaultDir", description: cfg.VaultDir},
 		ListItem{title: "Editor", description: cfg.Editor},
 		ListItem{title: "NvimArgs", description: cfg.NvimArgs},
-		ListItem{title: "MoleculeMode", description: cfg.MoleculeMode},
+		ListItem{title: "FileSystemMode", description: cfg.FileSystemMode},
 		ListItem{title: "PinnedFile", description: cfg.PinnedFile},
 		ListItem{title: "PinnedTaskFile", description: cfg.PinnedTaskFile},
 	}
@@ -160,7 +160,7 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case "NvimArgs":
 					m.config.NvimArgs = inputValue
 				case "MoleculeMode":
-					m.config.MoleculeMode = inputValue
+					m.config.FileSystemMode = inputValue
 				case "PinnedFile":
 					m.config.PinnedFile = inputValue
 				case "PinnedTaskFile":

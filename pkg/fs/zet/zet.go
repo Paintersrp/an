@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/Paintersrp/an/pkg/fs/templater"
@@ -20,6 +22,7 @@ type ZettelkastenNote struct {
 	Filename      string   `json:"filename"       yaml:"filename"`
 	OriginalTags  []string `json:"original_tags"  yaml:"original_tags"`
 	OriginalLinks []string `json:"original_links" yaml:"original_links"`
+	Upstream      string   `json:"upstream"       yaml:"upstream"`
 }
 
 func NewZettelkastenNote(
@@ -28,6 +31,7 @@ func NewZettelkastenNote(
 	filename string,
 	tags []string,
 	links []string,
+	upstream string,
 ) *ZettelkastenNote {
 	return &ZettelkastenNote{
 		VaultDir:      vaultDir,
@@ -35,6 +39,7 @@ func NewZettelkastenNote(
 		Filename:      filename,
 		OriginalTags:  tags,
 		OriginalLinks: links,
+		Upstream:      upstream,
 	}
 }
 
@@ -114,10 +119,11 @@ func (note *ZettelkastenNote) Create(
 	// Setup template metadata
 	zetTime, tags := t.GenerateTagsAndDate(tmplName)
 	data := templater.TemplateData{
-		Title: note.Filename,
-		Date:  zetTime,
-		Tags:  append(note.OriginalTags, tags...),
-		Links: note.OriginalLinks,
+		Title:    note.Filename,
+		Date:     zetTime,
+		Tags:     append(note.OriginalTags, tags...),
+		Links:    note.OriginalLinks,
+		Upstream: note.Upstream,
 	}
 
 	// Execute the template and return the rendered output
@@ -205,40 +211,108 @@ func StaticHandleNoteLaunch(
 	}
 }
 
+// OpenFromPath opens the note in the configured editor.
 func OpenFromPath(path string) error {
-	fmt.Println("Opening file:", path)
-
-	// TODO: eventually support more editors and therefore we need to rename nvimargs. sorry one true god
 	editor := viper.GetString("editor")
-	editorArgs := viper.GetString("nvimargs")
 
-	// We will split the command into arguments
-	var cmdArgs []string
+	switch editor {
+	case "nvim":
+		return OpenWithNvim(path)
+	case "obsidian":
+		return OpenWithObsidian(path)
+	default:
+		fmt.Printf("Error: Unsupported editor '%s'\n", editor)
+		return fmt.Errorf("unsupported editor: %s", editor)
+	}
+}
 
-	if editorArgs != "" {
-		// User specified command
-		cmdArgs = strings.Fields(editorArgs)
-		cmdArgs = append([]string{editor, path}, cmdArgs...)
-	} else {
-		// Default to just opening nvim if no command is specified
-		cmdArgs = []string{editor, path}
+// OpenWithNvim opens the note in Neovim.
+func OpenWithNvim(path string) error {
+	nvimArgs := viper.GetString("nvimargs")
+	cmdArgs := []string{"nvim", path}
+
+	if nvimArgs != "" {
+		// Append user-specified arguments for Neovim
+		cmdArgs = append(cmdArgs, strings.Fields(nvimArgs)...)
 	}
 
-	// Open the note in Editor.
-	cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	return runEditorCommand(cmdArgs)
+}
 
-	// Start the command and wait for it to finish
+// OpenWithObsidian opens the note in Obsidian.
+func OpenWithObsidian(path string) error {
+	// Get the full vault directory path from the configuration
+	fullVaultDir := viper.GetString("vaultdir")
+	fmt.Printf("config vault dir: %s", fullVaultDir)
+
+	// Extract the vault name from the full vault directory path
+	vaultName := filepath.Base(fullVaultDir)
+	fmt.Printf("VAULTNAME BASE: %s", vaultName)
+
+	// Get the relative path by removing the full vault directory path from the file path
+	relativePath := strings.TrimPrefix(path, fmt.Sprintf("%s/", fullVaultDir))
+	fmt.Printf("relative file path: %s", relativePath)
+
+	// Construct the obsidian URI
+	obsidianURI := fmt.Sprintf(
+		"obsidian://open?vault=%s&file=%s",
+		vaultName,
+		relativePath,
+	)
+
+	// Obsidian is opened via a URL scheme, so we use 'open' command on macOS,
+	// 'xdg-open' on Linux, and 'start' on Windows.
+	var cmdArgs []string
+	switch runtime.GOOS {
+	case "darwin":
+		cmdArgs = []string{"open", obsidianURI}
+	case "linux":
+		cmdArgs = []string{"xdg-open", obsidianURI}
+	case "windows":
+		cmdArgs = []string{"cmd", "/c", "start", obsidianURI}
+	default:
+		fmt.Printf("Error: Unsupported operating system '%s'\n", runtime.GOOS)
+		return fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
+	}
+
+	return runEditorCommand(cmdArgs)
+}
+
+// runEditorCommand runs the editor command with the provided arguments.
+func runEditorCommand(cmdArgs []string) error {
+	cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
+
+	// If the editor is Obsidian, we want to silence the output
+	if cmdArgs[0] == "open" || cmdArgs[0] == "xdg-open" || cmdArgs[0] == "cmd" {
+		devNull, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+		if err != nil {
+			fmt.Printf("Error opening null device: %v\n", err)
+			return err
+		}
+		defer devNull.Close()
+
+		cmd.Stdout = devNull
+		cmd.Stderr = devNull
+	} else {
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
+
 	err := cmd.Start()
 	if err != nil {
-		fmt.Println("Error starting Neovim:", err)
+		fmt.Printf("Error starting editor: %v\n", err)
 		return err
 	}
+
+	// If the editor is Obsidian, we do not wait for the process to finish
+	if cmdArgs[0] == "open" || cmdArgs[0] == "xdg-open" || cmdArgs[0] == "cmd" {
+		return nil
+	}
+
 	err = cmd.Wait()
 	if err != nil {
-		fmt.Println("Error waiting for Neovim to close:", err)
+		fmt.Printf("Error waiting for editor to close: %v\n", err)
 		return err
 	}
 

@@ -18,6 +18,9 @@ var AvailableTemplates = map[string]bool{
 	"day":     true,
 	"roadmap": true,
 	"zet":     true,
+	"project": true,
+	"feature": true,
+	"stack":   true,
 }
 
 // SingleTemplate represents a single template file and its associated data.
@@ -36,10 +39,11 @@ type Templater struct {
 
 // TemplateData defines the structure for data that will be passed to templates during rendering.
 type TemplateData struct {
-	Title string   `json:"title" yaml:"title"` // Title of the note.
-	Date  string   `json:"date"  yaml:"date"`  // Date associated with the note.
-	Tags  []string `json:"tags"  yaml:"tags"`  // Tags to be associated with the note.
-	Links []string `json:"links" yaml:"links"` // Tags to be associated with the note.
+	Title    string   `json:"title"    yaml:"title"`    // Title of the note.
+	Date     string   `json:"date"     yaml:"date"`     // Date associated with the note.
+	Tags     []string `json:"tags"     yaml:"tags"`     // Tags to be associated with the note.
+	Links    []string `json:"links"    yaml:"links"`    // Tags to be associated with the note.
+	Upstream string   `json:"upstream" yaml:"upstream"` // Tags to be associated with the note.
 }
 
 // NewTemplater initializes a new Templater instance by loading template files from a specified directory.
@@ -147,7 +151,7 @@ func (t *Templater) GenerateTagsAndDate(
 			hourOfDayTag,
 		}
 	default:
-		return zettelkastenTime, []string{dayOfWeekTag, hourOfDayTag}
+		return zettelkastenTime, []string{}
 	}
 }
 

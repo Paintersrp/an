@@ -8,17 +8,13 @@ tags:
   - {{.}}
 {{- end}}
 ---
+## Links
+{{- range .Links}}
+[[{{.}}]]
+{{- end}}
 
 ## Tasks
 
 ### High Priority
-
 ### Medium Priority
-
 ### Low Priority
-
-## Links
-[[{{.Date}}]]
-{{- range .Links}}
-[[{{.}}]]
-{{- end}}

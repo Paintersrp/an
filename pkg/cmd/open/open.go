@@ -3,6 +3,7 @@ package open
 import (
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/pkg/fs/fzf"
+	"github.com/Paintersrp/an/pkg/fs/zet"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -20,15 +21,22 @@ func NewCmdOpen(c *config.Config) *cobra.Command {
 		Args:    cobra.MaximumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			vaultDir := viper.GetString("vaultDir")
-			finder := fzf.NewFuzzyFinder(vaultDir)
+			vaultFlag, _ := cmd.Flags().GetBool("vault")
 
-			if len(args) == 0 {
-				finder.Run()
+			if vaultFlag {
+				zet.OpenFromPath(vaultDir)
 			} else {
-				finder.RunWithQuery(args[0])
+				finder := fzf.NewFuzzyFinder(vaultDir, "Select file to open.")
+
+				if len(args) == 0 {
+					finder.Run(true)
+				} else {
+					finder.RunWithQuery(args[0], true)
+				}
 			}
 		},
 	}
 
+	cmd.Flags().BoolP("vault", "v", false, "Open the vault directory directly")
 	return cmd
 }

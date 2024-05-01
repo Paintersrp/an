@@ -18,42 +18,72 @@ import (
 type FuzzyFinder struct {
 	vaultDir string
 	files    []string
+	Header   string
 }
 
-func NewFuzzyFinder(vaultDir string) *FuzzyFinder {
-	return &FuzzyFinder{vaultDir: vaultDir}
+func NewFuzzyFinder(vaultDir, header string) *FuzzyFinder {
+	return &FuzzyFinder{vaultDir: vaultDir, Header: header}
 }
 
-func (f *FuzzyFinder) Run() {
-	f.findAndExecute("")
+func (f *FuzzyFinder) Run(execute bool) (string, error) {
+	if execute {
+		f.findAndExecute("")
+		return "", nil
+	} else {
+		return f.findAndReturn("")
+	}
 }
 
-func (f *FuzzyFinder) RunWithQuery(query string) {
-	f.findAndExecute(query)
+func (f *FuzzyFinder) RunWithQuery(query string, execute bool) (string, error) {
+	if execute {
+		f.findAndExecute(query)
+		return "", nil
+	} else {
+		return f.findAndReturn(query)
+	}
 }
 
-// findAndExecute encapsulates the common logic for file finding and execution
-func (f *FuzzyFinder) findAndExecute(query string) {
-	// Load the files from the targer directory for searching
+func (f *FuzzyFinder) find(query string) (int, error) {
 	files, err := f.listFiles()
 	if err != nil {
-		fmt.Println("Error listing files:", err)
-		return // exit
+		return -1, fmt.Errorf("error listing files: %w", err)
 	}
 
 	f.files = files
 
-	idx, err := f.fuzzySelectFile(query)
+	return f.fuzzySelectFile(query)
+}
+
+// findAndReturn handles the logic of finding and returning the selected file
+func (f *FuzzyFinder) findAndReturn(query string) (string, error) {
+	idx, err := f.find(query)
 	if err != nil {
 		f.handleFuzzySelectError(err)
-		return // exit
+		return "", err
 	}
 
-	// Execute open into editor on given file index
-	f.Execute(idx)
+	if idx == -1 {
+		return "", fmt.Errorf("no file selected")
+	}
+
+	return f.files[idx], nil
+}
+
+// findAndExecute encapsulates the common logic for file finding and execution
+func (f *FuzzyFinder) findAndExecute(query string) {
+	idx, err := f.find(query)
+	if err != nil {
+		f.handleFuzzySelectError(err)
+		return
+	}
+
+	if idx != -1 {
+		f.Execute(idx)
+	}
 }
 
 // listFiles walks the user's vault directory recursively gathering files for searching
+
 func (f *FuzzyFinder) listFiles() ([]string, error) {
 	var files []string
 	err := filepath.Walk(
@@ -61,6 +91,13 @@ func (f *FuzzyFinder) listFiles() ([]string, error) {
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err // exit
+			}
+			// Skip hidden files or directories
+			if strings.HasPrefix(filepath.Base(path), ".") {
+				if info.IsDir() {
+					return filepath.SkipDir // skip directory if hidden
+				}
+				return nil // skip file if hidden
 			}
 			// append file if not a directory
 			if !info.IsDir() {
@@ -91,6 +128,14 @@ func (f *FuzzyFinder) fuzzySelectFile(
 		options = append(
 			options,
 			fuzzyfinder.WithQuery(query),
+		)
+	}
+
+	// Append the header, if exists
+	if f.Header != "" {
+		options = append(
+			options,
+			fuzzyfinder.WithHeader(f.Header),
 		)
 	}
 

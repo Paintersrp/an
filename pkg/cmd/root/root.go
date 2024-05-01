@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/Paintersrp/an/internal/config"
-	"github.com/Paintersrp/an/pkg/cmd/addMolecule"
+	"github.com/Paintersrp/an/pkg/cmd/addSubdir"
 	"github.com/Paintersrp/an/pkg/cmd/day"
 	"github.com/Paintersrp/an/pkg/cmd/echo"
 	"github.com/Paintersrp/an/pkg/cmd/initialize"
@@ -20,11 +20,12 @@ import (
 	"github.com/Paintersrp/an/pkg/cmd/settings"
 	"github.com/Paintersrp/an/pkg/cmd/tags"
 	"github.com/Paintersrp/an/pkg/cmd/tasks"
+	"github.com/Paintersrp/an/pkg/cmd/vault"
 	"github.com/Paintersrp/an/pkg/fs/templater"
 )
 
 var (
-	moleculeName string
+	subdirName string
 )
 
 func NewCmdRoot(
@@ -43,27 +44,27 @@ func NewCmdRoot(
   `,
 	}
 
-	// Validate the molecule flag
+	// Validate the subdirectory flag
 	cmd.PersistentFlags().
 		StringVarP(
-			&moleculeName,
-			"molecule",
-			"m",
+			&subdirName,
+			"subdir",
+			"s",
 			"atoms",
-			"Molecule subdirectory to use for this command.",
+			"Subdirectory to use for this command.",
 		)
 
 	viper.BindPFlag(
-		"molecule",
-		cmd.PersistentFlags().Lookup("molecule"),
+		"subdir",
+		cmd.PersistentFlags().Lookup("subdir"),
 	)
 
-	// TODO: Molecule creation is being asked even on the init command, should prob find a way to avoid that
-	handleMolecules(c)
+	// TODO: Subdirectory creation is being asked even on the init command, should prob find a way to avoid that
+	handleSubdirs(c)
 
 	// Add Child Commands to Root
 	cmd.AddCommand(initialize.NewCmdInit(c))
-	cmd.AddCommand(addMolecule.NewCmdAddMolecule(c))
+	cmd.AddCommand(addSubdir.NewCmdAddSubdir(c))
 	cmd.AddCommand(new.NewCmdNew(c, t))
 	cmd.AddCommand(open.NewCmdOpen(c))
 	cmd.AddCommand(openPin.NewCmdOpenPin(c))
@@ -73,30 +74,31 @@ func NewCmdRoot(
 	cmd.AddCommand(pin.NewCmdPin(c))
 	cmd.AddCommand(echo.NewCmdEcho(c))
 	cmd.AddCommand(settings.NewCmdSettings(c))
+	cmd.AddCommand(vault.NewCmdVault(c))
 
 	return cmd, nil
 }
 
-func handleMolecules(c *config.Config) {
-	mode := viper.GetString("moleculeMode")
-	exists, err := verifyMoleculeExists()
+func handleSubdirs(c *config.Config) {
+	mode := viper.GetString("fsmode")
+	exists, err := verifySubdirExists()
 	cobra.CheckErr(err)
 	switch mode {
 	case "strict":
 		if !exists {
 			fmt.Println(
-				"Error: Molecule",
-				moleculeName,
+				"Error: Subdirectory",
+				subdirName,
 				"does not exist.",
 			)
 			fmt.Println(
-				"In strict mode, new molecules are added with the add-molecule command.",
+				"In strict mode, new subdirectories are included with the add-subdir command.",
 			)
 			os.Exit(1)
 		}
 	case "free":
 		if !exists {
-			c.AddMolecule(moleculeName)
+			c.AddSubdir(subdirName)
 		}
 	case "confirm":
 		if !exists {
@@ -109,35 +111,35 @@ func handleMolecules(c *config.Config) {
 	}
 }
 
-func verifyMoleculeExists() (bool, error) {
-	var molecules []string
-	if err := viper.UnmarshalKey("molecules", &molecules); err != nil {
-		fmt.Println("Error unmarshalling molecules:", err)
+func verifySubdirExists() (bool, error) {
+	var subdirs []string
+	if err := viper.UnmarshalKey("subdirs", &subdirs); err != nil {
+		fmt.Println("Error unmarshalling subdirs:", err)
 		return false, err
 	}
 
-	// Check if the specified molecule exists
-	moleculeExists := false
-	for _, molecule := range molecules {
-		if molecule == moleculeName {
-			moleculeExists = true
+	// Check if the specified subdirectory exists
+	subdirExists := false
+	for _, subdir := range subdirs {
+		if subdir == subdirName {
+			subdirExists = true
 			break
 		}
 	}
 
-	if !moleculeExists {
-		return moleculeExists, nil
+	if !subdirExists {
+		return subdirExists, nil
 	}
 
-	return moleculeExists, nil
+	return subdirExists, nil
 }
 
 func getConfirmation(c *config.Config) {
 	var response string
 	for {
 		fmt.Printf(
-			"Molecule %s does not exist.\nDo you want to create it?\n(y/n): ",
-			moleculeName,
+			"Subdirectory %s does not exist.\nDo you want to create it?\n(y/n): ",
+			subdirName,
 		)
 		fmt.Scanln(&response)
 		response = strings.ToLower(
@@ -146,12 +148,11 @@ func getConfirmation(c *config.Config) {
 
 		switch response {
 		case "yes", "y":
-			// TODO: should use appCfg.AddMolecule
-			c.AddMolecule(moleculeName)
+			c.AddSubdir(subdirName)
 			return
 		case "no", "n":
 			fmt.Println(
-				"Exiting due to non-existing molecule",
+				"Exiting due to non-existing subdirectory",
 			)
 			os.Exit(0)
 		default:

@@ -1,0 +1,73 @@
+---
+title: {{.Title}}
+up: "[[{{.Upstream}}]]"
+date: {{.Date}}
+tags:
+{{- range .Tags}}
+  - {{.}}
+{{- end}}
+---
+## 🌟 Overview
+A concise summary of the project, its objectives, and the problem it aims to solve.
+
+---
+
+## 🛠️ Stack
+Detail the technologies, frameworks, and tools that will be utilized in this project. Replace the placeholders with actual stack item links as needed.
+
+### 🧰 Technologies
+- Technology Name 1: Brief description or purpose of the technology.
+- Technology Name 2: Brief description or purpose of the technology.
+
+### 🏗️ Frameworks
+- Framework Name 1: Brief description or purpose of the framework.
+- Framework Name 2: Brief description or purpose of the framework.
+
+### 🔧 Tools
+- Tool Name 1: Brief description or purpose of the tool.
+- Tool Name 2: Brief description or purpose of the tool.
+
+---
+
+## 🔍 Features
+
+### [[Feature Name]]
+- **Description**: Brief description of the feature
+- **Details**: [[Link to the detailed note for the feature]]
+- Sub-features
+    - [[Sub-feature Name]]
+        - **Description**: Brief description of the sub-feature
+        - **Details**: [[Link to the detailed note for the sub-feature]]
+
+### [[Feature Name]]
+- **Description**: Brief description of the feature
+- **Details**: [[Link to the detailed note for the feature]]
+- Sub-features
+    - [[Sub-feature Name]]
+        - **Description**: Brief description of the sub-feature
+        - **Details**: [[Link to the detailed note for the sub-feature]]
+
+---
+
+## 🗺️ Roadmaps
+
+- **Current**: Roadmap for Version X.Y
+- Roadmap for Version X.Y
+- Roadmap for Version X.Y
+
+---
+
+## 🔗 Important Links
+- Project Repository
+- Documentation
+- Issue Tracker
+- Roadmap
+
+---
+
+## 📝 Additional Notes
+Include any other relevant information or links to notes that provide further insights into the project.
+
+{{- range .Links}}
+[[{{.}}]]
+{{- end}}
