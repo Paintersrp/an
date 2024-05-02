@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 )
 
 func AppendIfNotExists(slice []string, value string) []string {
@@ -36,4 +37,8 @@ func isValidInput(input string) bool {
 	// Define the criteria for a valid input, for example:
 	// A valid input contains only letters, numbers, hyphens, and underscores.
 	return regexp.MustCompile(`^[a-zA-Z0-9-_]+$`).MatchString(input)
+}
+
+func IncrementDays(numDays int) string {
+	return time.Now().AddDate(0, 0, numDays).Format("20060102")
 }

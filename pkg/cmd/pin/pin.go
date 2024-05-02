@@ -5,43 +5,50 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/pkg/flags"
 	"github.com/Paintersrp/an/pkg/fs/fzf"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 func NewCmdPin(c *config.Config) *cobra.Command {
+	var check bool
+
 	cmd := &cobra.Command{
-		Use:   "pin [query] --path {file_path}",
-		Short: "Pin a file to be used with the echo command.",
-		Long: `The pin command allows the user to specify a file that can be used with the echo command.
-The path to the pinned file is saved in the configuration.`,
+		Use:     "pin [query] [--path file_path] [--check]",
+		Aliases: []string{"p"},
+		Short:   "Pin a file to be used with the echo command or check the current pin.",
+		Long: heredoc.Doc(`
+			The pin command allows you to specify a file that can be used with the echo command,
+			or check the currently pinned file. The path to the pinned file is saved in the configuration.
+
+			Examples:
+			  an pin --path /path/to/myfile.txt
+			  an pin my-note
+			  an pin --check
+		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if check {
+				fmt.Println("Current pinned file:", c.PinnedFile)
+				return nil
+			}
 			return run(cmd, args, c)
 		},
 	}
 
-	cmd.Flags().
-		StringP(
-			"path",
-			"p",
-			"",
-			"Manually enter the path to the file to pin without fuzzyfinding",
-		)
+	cmd.Flags().BoolVarP(&check, "check", "c", false, "Check the current pinned file")
+	flags.AddPath(cmd)
 
 	return cmd
 }
 
 func run(cmd *cobra.Command, args []string, c *config.Config) error {
-	pathFlag, err := cmd.Flags().GetString("path")
-	if err != nil {
-		fmt.Printf("error retrieving path flag: %s\n", err)
-		os.Exit(1)
-	}
+	path := flags.HandlePath(cmd)
 
-	if pathFlag == "" {
+	if path == "" {
 		vaultDir := viper.GetString("vaultDir")
 		finder := fzf.NewFuzzyFinder(vaultDir, "Select file to pin.")
 
@@ -61,10 +68,10 @@ func run(cmd *cobra.Command, args []string, c *config.Config) error {
 			c.ChangePin(choice, "text")
 		}
 	} else {
-		if _, err := os.Stat(pathFlag); os.IsNotExist(err) {
+		if _, err := os.Stat(path); os.IsNotExist(err) {
 			return errors.New("the specified file does not exist")
 		}
-		c.ChangePin(pathFlag, "text")
+		c.ChangePin(path, "text")
 	}
 
 	return nil

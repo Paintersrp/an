@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/spf13/cobra"
 
 	"github.com/Paintersrp/an/internal/config"
@@ -13,18 +14,19 @@ import (
 
 func NewCmdOpenPin(c *config.Config) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "open-pin",
-		Aliases: []string{"op, open-p, o-p"},
+		Use:     "pin",
+		Aliases: []string{"p"},
 		Short:   "Open the pinned file",
-		Long:    `OpenPin opens the user's currently pinned file for quick access and editing.`,
-		Example: `
-    # Opens the currently pinned file open-pin
-    # Use the alias 'op', 'o-p', 'open-p', or 'open-pin' to open the pinned file
-    an open-pin
-    an open-p
-    an o-p
-    an op
-    `,
+		Long: heredoc.Doc(`
+			OpenPin provides quick access to your most important file. With this command,
+			you can immediately open the file you've pinned, ensuring that your key notes
+			and information are always at your fingertips. Customize your experience with
+			various flags to streamline your workflow.
+		`),
+		Example: heredoc.Doc(`
+      an open pin
+      an o p
+    `),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(c)
 		},

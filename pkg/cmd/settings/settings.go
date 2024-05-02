@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/tui/list"
 	"github.com/spf13/cobra"
@@ -11,8 +12,11 @@ func NewCmdSettings(c *config.Config) *cobra.Command {
 		Use:     "settings",
 		Aliases: []string{"s"},
 		Short:   "CLI settings menu",
-		Long:    "This command allows you to adjusts your settings directly from the CLI tool.",
-		Example: "an settings",
+		Long: heredoc.Doc(`
+			This command opens the settings menu, allowing you to adjust your CLI tool's settings.
+			You can customize your application behavior through various options, ensuring that the
+			CLI adapts to your workflow and preferences.
+		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := list.Run(c); err != nil {
 				return err

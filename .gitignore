@@ -9,3 +9,6 @@ an
 
 make-command-notes
 make-feature-notes
+
+.test-main.go
+test-main.go

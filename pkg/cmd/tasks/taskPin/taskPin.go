@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/pkg/flags"
 	"github.com/Paintersrp/an/pkg/fs/fzf"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -28,25 +29,16 @@ func NewCmdTaskPin(c *config.Config) *cobra.Command {
 			return run(cmd, args, c)
 		},
 	}
-	cmd.Flags().
-		StringP(
-			"path",
-			"p",
-			"",
-			"Manually enter the path to the file to pin without fuzzyfinding",
-		)
+
+	flags.AddPath(cmd)
 
 	return cmd
 }
 
 func run(cmd *cobra.Command, args []string, c *config.Config) error {
-	pathFlag, err := cmd.Flags().GetString("path")
-	if err != nil {
-		fmt.Printf("error retrieving path flag: %s\n", err)
-		os.Exit(1)
-	}
+	path := flags.HandlePath(cmd)
 
-	if pathFlag == "" {
+	if path == "" {
 		vaultDir := viper.GetString("vaultDir")
 		finder := fzf.NewFuzzyFinder(vaultDir, "Select file to pin")
 
@@ -66,10 +58,10 @@ func run(cmd *cobra.Command, args []string, c *config.Config) error {
 			c.ChangePin(choice, "task")
 		}
 	} else {
-		if _, err := os.Stat(pathFlag); os.IsNotExist(err) {
+		if _, err := os.Stat(path); os.IsNotExist(err) {
 			return errors.New("the specified task echo file does not exist")
 		}
-		c.ChangePin(pathFlag, "task")
+		c.ChangePin(path, "task")
 	}
 
 	return nil

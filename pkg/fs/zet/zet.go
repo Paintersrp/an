@@ -2,6 +2,7 @@
 package zet
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -105,15 +106,15 @@ func (note *ZettelkastenNote) Create(
 	t *templater.Templater,
 ) (bool, error) {
 	// Verify the directories up to the new note
-	path, pathErr := note.EnsurePath()
-	if pathErr != nil {
-		return false, pathErr // exit
+	path, err := note.EnsurePath()
+	if err != nil {
+		return false, err // exit
 	}
 
 	// Create the empty note file.
-	file, createErr := os.Create(path)
-	if createErr != nil {
-		return false, createErr // exit
+	file, err := os.Create(path)
+	if err != nil {
+		return false, err // exit
 	}
 
 	// Setup template metadata
@@ -127,11 +128,11 @@ func (note *ZettelkastenNote) Create(
 	}
 
 	// Execute the template and return the rendered output
-	output, renderErr := t.Execute(tmplName, data)
-	if renderErr != nil {
+	output, err := t.Execute(tmplName, data)
+	if err != nil {
 		// TODO: delete file made on failure?
-		fmt.Printf("Failed to execute template: %v", renderErr)
-		return false, renderErr // exit
+		fmt.Printf("Failed to execute template: %v", err)
+		return false, err // exit
 	}
 
 	// Write to file
@@ -143,10 +144,10 @@ func (note *ZettelkastenNote) Create(
 
 // Open opens the Zettelkasten note in the configured editor.
 func (note *ZettelkastenNote) Open() error {
-	exists, filePath, existsErr := note.FileExists()
+	exists, filePath, err := note.FileExists()
 
-	if existsErr != nil {
-		return existsErr
+	if err != nil {
+		return err
 	}
 
 	// TODO: fix flag notes, as we are using molecule mode now
@@ -166,6 +167,24 @@ func (note *ZettelkastenNote) Open() error {
 			err,
 		)
 		os.Exit(1)
+	}
+
+	return nil
+}
+
+func (note *ZettelkastenNote) HandleConflicts() error {
+	exists, _, err := note.FileExists()
+	if err != nil {
+		fmt.Printf("error processing note file: %s", err)
+		return err
+	}
+
+	if exists {
+		fmt.Println("error: Note with given title already exists in the vault directory.")
+		fmt.Println(
+			"hint: Try again with a new title, or run again with either an overwrite (-o) flag or an increment (-i) flag",
+		)
+		return errors.New("file naming conflict")
 	}
 
 	return nil
@@ -195,9 +214,9 @@ func StaticHandleNoteLaunch(
 	t *templater.Templater,
 	tmpl string,
 ) {
-	_, createErr := note.Create(tmpl, t)
-	if createErr != nil {
-		fmt.Printf("error creating note file: %s", createErr)
+	_, err := note.Create(tmpl, t)
+	if err != nil {
+		fmt.Printf("error creating note file: %s", err)
 		os.Exit(1)
 	}
 

@@ -15,12 +15,10 @@ import (
 	"github.com/Paintersrp/an/pkg/cmd/initialize"
 	"github.com/Paintersrp/an/pkg/cmd/new"
 	"github.com/Paintersrp/an/pkg/cmd/open"
-	"github.com/Paintersrp/an/pkg/cmd/openPin"
 	"github.com/Paintersrp/an/pkg/cmd/pin"
 	"github.com/Paintersrp/an/pkg/cmd/settings"
 	"github.com/Paintersrp/an/pkg/cmd/tags"
 	"github.com/Paintersrp/an/pkg/cmd/tasks"
-	"github.com/Paintersrp/an/pkg/cmd/vault"
 	"github.com/Paintersrp/an/pkg/fs/templater"
 )
 
@@ -54,10 +52,7 @@ func NewCmdRoot(
 			"Subdirectory to use for this command.",
 		)
 
-	viper.BindPFlag(
-		"subdir",
-		cmd.PersistentFlags().Lookup("subdir"),
-	)
+	viper.BindPFlag("subdir", cmd.PersistentFlags().Lookup("subdir"))
 
 	// TODO: Subdirectory creation is being asked even on the init command, should prob find a way to avoid that
 	handleSubdirs(c)
@@ -67,14 +62,12 @@ func NewCmdRoot(
 	cmd.AddCommand(addSubdir.NewCmdAddSubdir(c))
 	cmd.AddCommand(new.NewCmdNew(c, t))
 	cmd.AddCommand(open.NewCmdOpen(c))
-	cmd.AddCommand(openPin.NewCmdOpenPin(c))
 	cmd.AddCommand(tags.NewCmdTags(c))
 	cmd.AddCommand(tasks.NewCmdTasks(c, t))
 	cmd.AddCommand(day.NewCmdDay(c, t))
 	cmd.AddCommand(pin.NewCmdPin(c))
 	cmd.AddCommand(echo.NewCmdEcho(c))
 	cmd.AddCommand(settings.NewCmdSettings(c))
-	cmd.AddCommand(vault.NewCmdVault(c))
 
 	return cmd, nil
 }
@@ -86,11 +79,7 @@ func handleSubdirs(c *config.Config) {
 	switch mode {
 	case "strict":
 		if !exists {
-			fmt.Println(
-				"Error: Subdirectory",
-				subdirName,
-				"does not exist.",
-			)
+			fmt.Println("Error: Subdirectory", subdirName, "does not exist.")
 			fmt.Println(
 				"In strict mode, new subdirectories are included with the add-subdir command.",
 			)
@@ -142,23 +131,17 @@ func getConfirmation(c *config.Config) {
 			subdirName,
 		)
 		fmt.Scanln(&response)
-		response = strings.ToLower(
-			strings.TrimSpace(response),
-		)
+		response = strings.ToLower(strings.TrimSpace(response))
 
 		switch response {
 		case "yes", "y":
 			c.AddSubdir(subdirName)
 			return
 		case "no", "n":
-			fmt.Println(
-				"Exiting due to non-existing subdirectory",
-			)
+			fmt.Println("Exiting due to non-existing subdirectory")
 			os.Exit(0)
 		default:
-			fmt.Println(
-				"Invalid response. Please enter 'y'/'yes' or 'n'/'no'.",
-			)
+			fmt.Println("Invalid response. Please enter 'y'/'yes' or 'n'/'no'.")
 		}
 	}
 }

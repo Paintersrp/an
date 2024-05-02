@@ -18,17 +18,23 @@ func NewCmdTasksList(c *config.Config) *cobra.Command {
     # List all tasks
     an-cli tasks list
     `,
-		Run: func(cmd *cobra.Command, args []string) {
-			p := parser.NewParser(c.VaultDir)
-
-			if err := p.Walk(); err != nil {
-				fmt.Println("Error:", err)
-				return
-			}
-
-			p.ShowTasksTable()
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return run(c)
 		},
 	}
 
 	return cmd
+}
+
+func run(c *config.Config) error {
+	p := parser.NewParser(c.VaultDir)
+
+	if err := p.Walk(); err != nil {
+		fmt.Println("Error:", err)
+		return err
+	}
+
+	p.ShowTasksTable()
+
+	return nil
 }

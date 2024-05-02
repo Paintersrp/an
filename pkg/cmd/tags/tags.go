@@ -18,17 +18,22 @@ allowing for quick access and organization of notes by their associated tags.`,
     # Display a table of tags
     an-cli tags
     `,
-		Run: func(cmd *cobra.Command, args []string) {
-			p := parser.NewParser(c.VaultDir)
-
-			if err := p.Walk(); err != nil {
-				fmt.Println("Error:", err)
-				return
-			}
-
-			p.ShowTagTable()
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return run(c)
 		},
 	}
 
 	return cmd
+}
+
+func run(c *config.Config) error {
+	p := parser.NewParser(c.VaultDir)
+
+	if err := p.Walk(); err != nil {
+		fmt.Println("Error:", err)
+		return err
+	}
+
+	p.ShowTagTable()
+	return nil
 }

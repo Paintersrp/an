@@ -2,16 +2,17 @@ package taskNewEchoFile
 
 import (
 	"fmt"
-	"os"
 	"regexp"
 	"strconv"
 
-	"github.com/Paintersrp/an/internal/config"
-	"github.com/Paintersrp/an/pkg/fs/templater"
-	"github.com/Paintersrp/an/pkg/fs/zet"
-	"github.com/Paintersrp/an/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/pkg/arg"
+	"github.com/Paintersrp/an/pkg/flags"
+	"github.com/Paintersrp/an/pkg/fs/templater"
+	"github.com/Paintersrp/an/pkg/fs/zet"
 )
 
 func NewCmdNewEchoFile(
@@ -28,8 +29,8 @@ func NewCmdNewEchoFile(
 			return run(cmd, args, t, c)
 		},
 	}
-	// Add the --pin flag
-	cmd.Flags().BoolP("pin", "p", false, "Pin the newly created task echo file")
+
+	flags.AddPin(cmd)
 
 	return cmd
 }
@@ -41,7 +42,7 @@ func run(
 	t *templater.Templater,
 	c *config.Config,
 ) error {
-	tags := handleTags(args)
+	tags := arg.HandleTags(args)
 	rootSubdirFlag := viper.GetString("subdir")
 	rootVaultDirFlag := viper.GetString("vaultdir")
 
@@ -60,35 +61,11 @@ func run(
 		"",
 	)
 
-	// Check if the --pin flag is set
-	pinFlag, _ := cmd.Flags().GetBool("pin")
-	if pinFlag {
-		// Update the config's pinned task file to the new file path
-		c.ChangePin(note.GetFilepath(), "task")
-	}
+	flags.HandlePin(cmd, c, note, "task")
 
 	zet.StaticHandleNoteLaunch(note, t, "task-echo")
 
 	return nil // no errors
-}
-
-func handleTags(args []string) []string {
-	var (
-		tags    []string
-		tagsErr error
-	)
-
-	if len(args) > 1 {
-		tags, tagsErr = utils.ValidateInput(args[1])
-
-		if tagsErr != nil {
-			fmt.Printf("error processing tags argument: %s", tagsErr)
-			os.Exit(1)
-		}
-
-	}
-
-	return tags
 }
 
 func findHighestIncrement(vaultDir, molecule string) int {
