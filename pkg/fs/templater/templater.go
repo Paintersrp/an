@@ -13,14 +13,17 @@ import (
 	"time"
 )
 
+// TODO: template aliases?
+
 // AvailableTemplates defines the set of templates that are available for use
 var AvailableTemplates = map[string]bool{
-	"day":     true,
-	"roadmap": true,
-	"zet":     true,
-	"project": true,
-	"feature": true,
-	"stack":   true,
+	"day":      true,
+	"roadmap":  true,
+	"zet":      true,
+	"project":  true,
+	"feature":  true,
+	"stack":    true,
+	"question": true,
 }
 
 // SingleTemplate represents a single template file and its associated data.
