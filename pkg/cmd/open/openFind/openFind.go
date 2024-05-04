@@ -24,7 +24,7 @@ func NewCmdOpenFind(c *config.Config) *cobra.Command {
         an o f linux            // Fuzzyfind with query
         an o f                  // Fuzzyfind no query
 		`),
-		Args: cobra.MaximumNArgs(1),
+		Args: cobra.MaximumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(args)
 		},

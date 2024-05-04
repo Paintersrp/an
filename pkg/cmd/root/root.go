@@ -17,6 +17,7 @@ import (
 	"github.com/Paintersrp/an/pkg/cmd/open"
 	"github.com/Paintersrp/an/pkg/cmd/pin"
 	"github.com/Paintersrp/an/pkg/cmd/settings"
+	"github.com/Paintersrp/an/pkg/cmd/symlink"
 	"github.com/Paintersrp/an/pkg/cmd/tags"
 	"github.com/Paintersrp/an/pkg/cmd/tasks"
 	"github.com/Paintersrp/an/pkg/fs/templater"
@@ -68,6 +69,7 @@ func NewCmdRoot(
 	cmd.AddCommand(pin.NewCmdPin(c))
 	cmd.AddCommand(echo.NewCmdEcho(c))
 	cmd.AddCommand(settings.NewCmdSettings(c))
+	cmd.AddCommand(symlink.NewCmdSymlink(c))
 
 	return cmd, nil
 }
