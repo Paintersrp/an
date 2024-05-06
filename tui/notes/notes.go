@@ -20,17 +20,19 @@ import (
 // DONE: Would be nice to hold tab and see alt info like path and tertiary details
 // TODO: cache mode outputs
 // TODO: don't include files in the base vault dir in archive
+// TODO: Replace panics
+// TODO: Replace Magic Number (Cache Size)
 
 type NoteListModel struct {
-	list              list.Model
+	modes             map[string]ModeConfig
+	config            *config.Config
+	cache             *cache.Cache
 	keys              *listKeyMap
 	delegateKeys      *delegateKeyMap
-	config            *config.Config
-	previewContent    string
-	previewCache      *cache.LRUCache
+	list              list.Model
+	preview           string
 	width             int
 	height            int
-	modes             map[string]ModeConfig
 	modeFlag          string
 	orphansFlag       bool
 	showAsFileDetails bool
@@ -41,33 +43,39 @@ func NewNoteListModel(
 	modes map[string]ModeConfig,
 	modeFlag string,
 ) NoteListModel {
-	noteFiles, _ := getFilesByMode(modes, modeFlag, cfg.VaultDir)
-	items := parseNoteFiles(noteFiles, cfg.VaultDir, false)
+	files, _ := getFilesByMode(modes, modeFlag, cfg.VaultDir)
+	items := parseNoteFiles(files, cfg.VaultDir, false)
 
-	delegateKeys := newDelegateKeyMap()
-	listKeys := newListKeyMap()
-	listTitle := getTitleForMode(modeFlag)
+	dkeys := newDelegateKeyMap()
+	lkeys := newListKeyMap()
+	t := getTitleForMode(modeFlag)
 
 	// Setup list
-	delegate := newItemDelegate(delegateKeys, cfg)
-	configList := list.New(items, delegate, 0, 0)
-	configList.Title = listTitle
-	configList.Styles.Title = titleStyle
+	delegate := newItemDelegate(dkeys, cfg)
+	l := list.New(items, delegate, 0, 0)
+	l.Title = t
+	l.Styles.Title = titleStyle
 
-	configList.AdditionalShortHelpKeys = func() []key.Binding {
+	l.AdditionalShortHelpKeys = func() []key.Binding {
 		return []key.Binding{
-			listKeys.openNote,
-			listKeys.changeMode,
+			lkeys.openNote,
+			lkeys.changeMode,
 		}
 	}
 
-	configList.AdditionalFullHelpKeys = listKeys.fullHelp
+	l.AdditionalFullHelpKeys = lkeys.fullHelp
+	c, err := cache.New(100)
+
+	if err != nil {
+		panic(err)
+	}
+
 	return NoteListModel{
-		list:         configList,
-		keys:         listKeys,
-		delegateKeys: delegateKeys,
+		list:         l,
+		keys:         lkeys,
+		delegateKeys: dkeys,
 		config:       cfg,
-		previewCache: cache.NewLRUCache(100),
+		cache:        c,
 		modes:        modes,
 		modeFlag:     modeFlag,
 	}
@@ -80,8 +88,8 @@ func (m NoteListModel) Init() tea.Cmd {
 func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
-	newListModel, cmd := m.list.Update(msg)
-	m.list = newListModel
+	nl, cmd := m.list.Update(msg)
+	m.list = nl
 	cmds = append(cmds, cmd)
 
 	switch msg := msg.(type) {
@@ -159,17 +167,15 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m NoteListModel) View() string {
-	// Render the list and preview sections with borders
-	listSection := listStyle.Render(m.list.View())
-	previewSection := previewStyle.Render(
+	list := listStyle.MaxWidth(m.width / 2).Render(m.list.View())
+	preview := previewStyle.Render(
 		lipgloss.NewStyle().
 			Height(m.list.Height()).
 			MaxHeight(m.list.Height()).
-			Render(fmt.Sprintf("%s\n%s", titleStyle.Render("Preview"), m.previewContent)),
+			Render(fmt.Sprintf("%s\n%s", titleStyle.Render("Preview"), m.preview)),
 	)
 
-	// Join the list and preview sections side by side
-	layout := lipgloss.JoinHorizontal(lipgloss.Top, listSection, previewSection)
+	layout := lipgloss.JoinHorizontal(lipgloss.Top, list, preview)
 
 	return appStyle.Render(layout)
 }
@@ -186,6 +192,8 @@ func Run(
 	}
 
 	defer func() {
+		// in the event that the editor we open into does not terminate gracefully,
+		// we attempt to recover original state so that we can terminate gracefully (aka reach the return nil)
 		if err := term.Restore(int(os.Stdin.Fd()), originalState); err != nil {
 			log.Fatalf("Failed to restore original terminal state: %v", err)
 		}
@@ -200,40 +208,61 @@ func Run(
 		}
 	}
 
+	// ran with no errors*, terminal gracefully
 	return nil
 }
 
+// handles markdown preview generation for selected (highlighted) items
+// caches up to 100 previews to avoid reprocessing when navigating the list
 func (m *NoteListModel) handlePreview() {
-	if selectedItem, ok := m.list.SelectedItem().(ListItem); ok {
-		// Check if the preview is already in the cache
-		if cachedPreview, exists := m.previewCache.Get(selectedItem.path); exists {
-			m.previewContent = cachedPreview.(string)
+	if s, ok := m.list.SelectedItem().(ListItem); ok {
+		// check if the preview is already in the cache
+		if p, exists, err := m.cache.Get(s.path); err == nil && exists {
+			m.list.NewStatusMessage(statusStyle("Cache Hit"))
+			m.preview = p.(string)
 		} else {
-			// Calculate the width and height for the preview pane
-			previewWidth := m.width / 2
-			previewHeight := m.list.Height()
+			// cache tries to recover from errors internally, so we *should* only see errors from
+			// nil values and improper size on New (negative values)
+			if err != nil {
+				m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Error accessing cache: %s", err)))
+			} else {
+				m.list.NewStatusMessage(statusStyle("Cache Miss"))
+			}
 
-			// Render the preview and store it in the cache
-			renderedPreview := utils.RenderMarkdownPreview(
-				selectedItem.path,
-				previewWidth,
-				previewHeight,
+			// calculate the width and height for the preview pane
+			w := m.width / 2
+			h := m.list.Height()
+
+			// render the preview
+			r := utils.RenderMarkdownPreview(
+				s.path,
+				w,
+				h,
 			)
 
-			// Add item preview to cache
-			m.previewCache.Put(selectedItem.path, renderedPreview)
-			m.previewContent = renderedPreview
+			// add item preview to cache
+			if err := m.cache.Put(s.path, r); err != nil {
+				// handle the error appropriately, e.g., log it or show an error message
+				m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Error updating cache: %s", err)))
+			} else {
+				// no errors, update preview with rendered content
+				m.preview = r
+			}
 		}
 	}
-
 }
 
+// refreshes the list items based on mode conditions
 func (m *NoteListModel) refreshItems() tea.Cmd {
-	noteFiles, _ := getFilesByMode(m.modes, m.modeFlag, m.config.VaultDir)
-	items := parseNoteFiles(noteFiles, m.config.VaultDir, m.showAsFileDetails)
+	files, _ := getFilesByMode(m.modes, m.modeFlag, m.config.VaultDir)
+	items := parseNoteFiles(files, m.config.VaultDir, m.showAsFileDetails)
 	return m.list.SetItems(items)
 }
 
+// cycles through modes
+// default -> archive
+// archive -> orphan
+// orphan -> default -> repeat
 func (m *NoteListModel) cycleMode() {
 	switch m.modeFlag {
 	case "default":
@@ -249,19 +278,22 @@ func (m *NoteListModel) cycleMode() {
 	m.list.Title = getTitleForMode(m.modeFlag)
 }
 
+// should prob use an error over a bool but a "success" flag sort of feels more natural for the context.
+// unsuccessful opens provide a status message and the program stays live
+// successful opens return true which trigger graceful stdin passing and closing of the program
 func (m *NoteListModel) openNote() bool {
-	var filePath string
+	var p string
 
 	if i, ok := m.list.SelectedItem().(ListItem); ok {
-		filePath = i.path
+		p = i.path
 	} else {
 		return false
 	}
 
-	err := zet.OpenFromPath(filePath)
+	err := zet.OpenFromPath(p)
 
 	if err != nil {
-		m.list.NewStatusMessage(statusMessageStyle(fmt.Sprintf("Open Error: %s", err)))
+		m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Open Error: %s", err)))
 		return false
 	}
 

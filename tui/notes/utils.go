@@ -14,51 +14,51 @@ import (
 
 func parseNoteFiles(noteFiles []string, vaultDir string, asFileDetails bool) []list.Item {
 	var items []list.Item
-	for _, fullPath := range noteFiles {
+	for _, p := range noteFiles {
 		fileWithoutVault := strings.TrimPrefix(
-			fullPath,
+			p,
 			vaultDir+"/",
 		)
 
 		// Split the file path by the path separator
-		pathParts := strings.Split(
+		parts := strings.Split(
 			fileWithoutVault,
 			string(filepath.Separator),
 		)
 
-		var fileName string
+		var n string
 
-		if len(pathParts) < 2 {
-			fileName = pathParts[0]
+		if len(parts) < 2 {
+			n = parts[0]
 		} else {
 			// The remaining parts joined together form the filename
-			fileName = strings.Join(
-				pathParts[1:],
+			n = strings.Join(
+				parts[1:],
 				string(filepath.Separator),
 			)
 		}
 
-		fileInfo, err := os.Stat(fullPath)
+		info, err := os.Stat(p)
 		if err != nil {
 			continue
 		}
-		size := fileInfo.Size()
-		lastModified := fileInfo.ModTime().Format(time.RFC1123)
+		size := info.Size()
+		last := info.ModTime().Format(time.RFC1123)
 
 		// Read the content of the note file
-		content, err := os.ReadFile(fullPath)
+		c, err := os.ReadFile(p)
 		if err != nil {
 			continue
 		}
 
 		// Extract title and tags from front matter
-		title, tags := parseFrontMatter(content, fileName)
+		title, tags := parseFrontMatter(c, n)
 
 		items = append(items, ListItem{
-			fileName:     fileName,
-			path:         fullPath,
+			fileName:     n,
+			path:         p,
 			size:         size,
-			lastModified: lastModified,
+			lastModified: last,
 			title:        title,
 			tags:         tags,
 			showFullPath: asFileDetails,
@@ -74,12 +74,12 @@ func parseFrontMatter(
 ) (title string, tags []string) {
 	// Get everything between the ---s
 	re := regexp.MustCompile(`(?ms)^---\n(.+?)\n---`)
-	match := re.FindSubmatch(content)
-	if len(match) < 2 {
+	m := re.FindSubmatch(content)
+	if len(m) < 2 {
 		return "", nil // no yaml content found
 	}
 
-	yamlContent := match[1]
+	yamlContent := m[1]
 
 	// Setup struct for binding the unmarshaled yamlContent
 	var data struct {
@@ -102,17 +102,17 @@ func getSubdirectories(directory, excludeDir string) []string {
 		log.Fatalf("Failed to read directory: %v", err)
 	}
 
-	var subdirs []string
-	for _, file := range files {
-		if file.IsDir() && file.Name() != excludeDir {
+	var subDirs []string
+	for _, f := range files {
+		if f.IsDir() && f.Name() != excludeDir {
 
-			subdir := strings.TrimPrefix(filepath.Join(directory, file.Name()), directory)
-			subdir = strings.TrimPrefix(
-				subdir,
+			subDir := strings.TrimPrefix(filepath.Join(directory, f.Name()), directory)
+			subDir = strings.TrimPrefix(
+				subDir,
 				string(os.PathSeparator),
 			)
-			subdirs = append(subdirs, subdir)
+			subDirs = append(subDirs, subDir)
 		}
 	}
-	return subdirs
+	return subDirs
 }

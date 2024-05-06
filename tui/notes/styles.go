@@ -17,9 +17,9 @@ var (
 			BorderStyle(lipgloss.NormalBorder()).
 			Padding(0, 1).Width(80)
 
-	statusMessageStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.AdaptiveColor{Light: "#0AF", Dark: "#0AF"}).
-				Render
+	statusStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.AdaptiveColor{Light: "#0AF", Dark: "#0AF"}).
+			Render
 
 	focusedStyle = lipgloss.NewStyle().
 			Bold(true).

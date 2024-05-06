@@ -6,13 +6,13 @@ import (
 )
 
 type ListItem struct {
+	size         int64
 	fileName     string
 	path         string
-	size         int64
 	lastModified string
 	title        string
-	tags         []string
 	showFullPath bool
+	tags         []string
 }
 
 func (i ListItem) Title() string {
@@ -36,10 +36,10 @@ func (i ListItem) Description() string {
 }
 
 func (i ListItem) FilterValue() string {
-	tagString := strings.Join(i.tags, " ") // Join all tags with a space
+	str := strings.Join(i.tags, " ")
 	return fmt.Sprintf(
 		"%s [%s]",
 		i.title,
-		tagString,
-	) // Include tags in square brackets for clarity
+		str,
+	)
 }

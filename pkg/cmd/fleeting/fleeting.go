@@ -6,12 +6,15 @@ import (
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/Paintersrp/an/internal/config"
+	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 )
 
 func NewCmdFleeting(c *config.Config) *cobra.Command {
+	var yank bool // Define a flag for yank
+
 	cmd := &cobra.Command{
 		Use:     "fleeting",
 		Aliases: []string{"fleet", "f"},
@@ -23,7 +26,7 @@ func NewCmdFleeting(c *config.Config) *cobra.Command {
 			an f
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			p := tea.NewProgram(initialModel())
+			p := tea.NewProgram(initialModel(yank)) // Pass the yank flag to initialModel
 
 			if _, err := p.Run(); err != nil {
 				log.Fatal(err)
@@ -32,6 +35,10 @@ func NewCmdFleeting(c *config.Config) *cobra.Command {
 			return nil
 		},
 	}
+
+	// Add the yank flag
+	cmd.Flags().
+		BoolVarP(&yank, "yank", "y", false, "Automatically input clipboard content into the textarea")
 
 	return cmd
 }
@@ -43,10 +50,23 @@ type model struct {
 	err      error
 }
 
-func initialModel() model {
+func initialModel(yank bool) model {
 	ti := textarea.New()
 	ti.Placeholder = "..."
+	ti.SetHeight(40)
+	ti.CharLimit = 0
+	ti.SetWidth(100)
 	ti.Focus()
+
+	if yank {
+		// Get the clipboard content
+		content, err := clipboard.ReadAll()
+		if err != nil {
+			log.Fatal(err)
+		}
+		// Set the clipboard content as the initial text in the textarea
+		ti.SetValue(content)
+	}
 
 	return model{
 		textarea: ti,

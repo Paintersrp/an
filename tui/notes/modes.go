@@ -42,19 +42,19 @@ func GenerateModes(vaultDir string) map[string]ModeConfig {
 }
 
 func getTitleForMode(modeFlag string) string {
-	var title string
+	var t string
 	switch modeFlag {
 	case "archive":
-		title = "Archived Notes"
+		t = "Archived Notes"
 	case "default":
-		title = "Active Notes"
+		t = "Active Notes"
 	case "orphan":
-		title = "Orphaned Notes"
+		t = "Orphaned Notes"
 	default:
-		title = "Active Notes"
+		t = "Active Notes"
 	}
 
-	return title
+	return t
 }
 
 func getFilesByMode(
@@ -70,7 +70,7 @@ func getFilesByMode(
 		excludeFiles []string
 	)
 
-	modeConfig, ok := modes[modeFlag]
+	m, ok := modes[modeFlag]
 	if !ok {
 		availableModes := getAvailableModes(modes)
 		panic(fmt.Errorf(
@@ -81,24 +81,24 @@ func getFilesByMode(
 
 	}
 	// Use the provided arguments if they are not empty; otherwise, use the defaults
-	if len(modeConfig.ExcludeDirs) == 0 {
+	if len(m.ExcludeDirs) == 0 {
 		excludeDirs = defaultExcludeDirs
 	} else {
-		excludeDirs = modeConfig.ExcludeDirs
+		excludeDirs = m.ExcludeDirs
 	}
 	if len(excludeFiles) == 0 {
 		excludeFiles = defaultExcludeFiles
 	} else {
-		excludeDirs = modeConfig.ExcludeFiles
+		excludeDirs = m.ExcludeFiles
 	}
 
 	return fzf.StaticListFiles(vaultDir, excludeDirs, excludeFiles, modeFlag)
 }
 
 func getAvailableModes(modes map[string]ModeConfig) string {
-	var modesList []string
-	for mode := range modes {
-		modesList = append(modesList, mode)
+	var l []string
+	for m := range modes {
+		l = append(l, m)
 	}
-	return strings.Join(modesList, ", ")
+	return strings.Join(l, ", ")
 }

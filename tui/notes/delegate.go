@@ -21,13 +21,13 @@ func newItemDelegate(
 
 	d.UpdateFunc = func(msg tea.Msg, m *list.Model) tea.Cmd {
 		var (
-			filename string
-			path     string
+			n string
+			p string
 		)
 
 		if i, ok := m.SelectedItem().(ListItem); ok {
-			filename = i.fileName
-			path = i.path
+			n = i.fileName
+			p = i.path
 		} else {
 			return nil
 		}
@@ -36,20 +36,18 @@ func newItemDelegate(
 		case tea.KeyMsg:
 			switch {
 			case key.Matches(msg, keys.archive):
-				// Call ArchiveNote to move the note to the archive directory
-				if err := archiveNote(path, cfg); err != nil {
-					// Handle the error, perhaps set a status message indicating failure
-					return m.NewStatusMessage(statusMessageStyle("Failed to archive " + filename))
+				if err := archive(p, cfg); err != nil {
+					return m.NewStatusMessage(statusStyle("Failed to archive " + n))
 				}
 				i := m.Index()
 				m.RemoveItem(i)
-				return m.NewStatusMessage(statusMessageStyle("Archived " + filename))
+				return m.NewStatusMessage(statusStyle("Archived " + n))
 
 			case key.Matches(msg, keys.delete):
-				return m.NewStatusMessage(statusMessageStyle("You chose " + filename))
+				return m.NewStatusMessage(statusStyle("You chose " + n))
 
 			case key.Matches(msg, keys.rename):
-				return m.NewStatusMessage(statusMessageStyle("You chose " + filename))
+				return m.NewStatusMessage(statusStyle("You chose " + n))
 
 			}
 		}
@@ -93,19 +91,19 @@ func newDelegateKeyMap() *delegateKeyMap {
 	}
 }
 
-func archiveNote(path string, cfg *config.Config) error {
-	archivePath := filepath.Join(cfg.VaultDir, "archive")
+func archive(path string, cfg *config.Config) error {
+	p := filepath.Join(cfg.VaultDir, "archive")
 
 	// Check if the archive directory exists, if not create it
-	if _, err := os.Stat(archivePath); os.IsNotExist(err) {
-		if err := os.MkdirAll(archivePath, os.ModePerm); err != nil {
+	if _, err := os.Stat(p); os.IsNotExist(err) {
+		if err := os.MkdirAll(p, os.ModePerm); err != nil {
 			return err
 		}
 	}
 
 	// Move the note to the archive directory
-	newPath := filepath.Join(archivePath, filepath.Base(path))
-	if err := os.Rename(path, newPath); err != nil {
+	new := filepath.Join(p, filepath.Base(path))
+	if err := os.Rename(path, new); err != nil {
 		return err
 	}
 
