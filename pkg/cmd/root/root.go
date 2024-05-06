@@ -12,8 +12,10 @@ import (
 	"github.com/Paintersrp/an/pkg/cmd/addSubdir"
 	"github.com/Paintersrp/an/pkg/cmd/day"
 	"github.com/Paintersrp/an/pkg/cmd/echo"
+	"github.com/Paintersrp/an/pkg/cmd/fleeting"
 	"github.com/Paintersrp/an/pkg/cmd/initialize"
 	"github.com/Paintersrp/an/pkg/cmd/new"
+	"github.com/Paintersrp/an/pkg/cmd/notes"
 	"github.com/Paintersrp/an/pkg/cmd/open"
 	"github.com/Paintersrp/an/pkg/cmd/pin"
 	"github.com/Paintersrp/an/pkg/cmd/settings"
@@ -70,6 +72,8 @@ func NewCmdRoot(
 	cmd.AddCommand(echo.NewCmdEcho(c))
 	cmd.AddCommand(settings.NewCmdSettings(c))
 	cmd.AddCommand(symlink.NewCmdSymlink(c))
+	cmd.AddCommand(fleeting.NewCmdFleeting(c))
+	cmd.AddCommand(notes.NewCmdNotes(c))
 
 	return cmd, nil
 }

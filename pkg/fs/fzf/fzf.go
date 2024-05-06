@@ -2,6 +2,7 @@ package fzf
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -44,7 +45,7 @@ func (f *FuzzyFinder) RunWithQuery(query string, execute bool) (string, error) {
 }
 
 func (f *FuzzyFinder) find(query string) (int, error) {
-	files, err := f.listFiles()
+	files, err := f.ListFiles()
 	if err != nil {
 		return -1, fmt.Errorf("error listing files: %w", err)
 	}
@@ -84,7 +85,7 @@ func (f *FuzzyFinder) findAndExecute(query string) {
 
 // listFiles walks the user's vault directory recursively gathering files for searching
 
-func (f *FuzzyFinder) listFiles() ([]string, error) {
+func (f *FuzzyFinder) ListFiles() ([]string, error) {
 	var files []string
 	err := filepath.Walk(
 		f.vaultDir,
@@ -273,4 +274,77 @@ func (f *FuzzyFinder) Execute(idx int) {
 
 	// Opens the note in the configured editor
 	n.Open()
+}
+
+func StaticListFiles(
+	vaultDir string,
+	excludeDirs []string,
+	excludeFiles []string,
+	modeFlag string,
+) ([]string, error) {
+	var files []string
+	err := filepath.Walk(
+		vaultDir,
+		func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err // exit
+			}
+
+			// Check if the current directory is in the list of directories to exclude
+			dir := filepath.Dir(path)
+			for _, d := range excludeDirs {
+				if dir == filepath.Join(vaultDir, d) {
+					if info.IsDir() {
+						return filepath.SkipDir // skip the entire directory
+					}
+					return nil // skip the single file
+				}
+			}
+
+			// Check if the current file is in the list of files to exclude
+			file := filepath.Base(path)
+			for _, f := range excludeFiles {
+				if file == f {
+					return nil // skip this file
+				}
+			}
+
+			// Skip hidden files or directories
+			if strings.HasPrefix(file, ".") {
+				if info.IsDir() {
+					return filepath.SkipDir // skip directory if hidden
+				}
+				return nil // skip file if hidden
+			}
+
+			// Append file if not a directory
+			if !info.IsDir() {
+				if modeFlag == "orphan" {
+					content, err := os.ReadFile(path)
+					if err != nil {
+						log.Printf("Error reading file: %s, error: %v", path, err)
+						return nil // skip this file due to read error
+					}
+
+					// Only append the file if it contains note links
+					if hasNoteLinks(content) {
+						return nil
+					} else {
+						files = append(files, path)
+					}
+				} else {
+					files = append(files, path)
+				}
+			}
+			return nil // walk on or finish
+		},
+	)
+
+	// Return files and any errors
+	return files, err
+}
+
+func hasNoteLinks(content []byte) bool {
+	re := regexp.MustCompile(`\[\[.+\]\]`)
+	return re.Match(content)
 }
