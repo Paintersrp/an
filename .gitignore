@@ -12,3 +12,6 @@ make-feature-notes
 
 .test-main.go
 test-main.go
+
+roadmap.md
+commit.md

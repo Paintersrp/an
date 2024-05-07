@@ -18,7 +18,7 @@ func GenerateModes(vaultDir string) map[string]ModeConfig {
 
 	// Default mode configuration
 	modes["default"] = ModeConfig{
-		ExcludeDirs:  []string{"archive"},
+		ExcludeDirs:  []string{"archive", "trash"},
 		ExcludeFiles: []string{},
 		OrphanOnly:   false,
 	}
@@ -31,9 +31,15 @@ func GenerateModes(vaultDir string) map[string]ModeConfig {
 	}
 
 	modes["orphan"] = ModeConfig{
-		ExcludeDirs:  []string{"archive"},
+		ExcludeDirs:  []string{"archive", "trash"},
 		ExcludeFiles: []string{},
 		OrphanOnly:   true,
+	}
+
+	modes["trash"] = ModeConfig{
+		ExcludeDirs:  getSubdirectories(vaultDir, "trash"),
+		ExcludeFiles: []string{},
+		OrphanOnly:   false,
 	}
 
 	// Add more modes as needed
@@ -44,14 +50,16 @@ func GenerateModes(vaultDir string) map[string]ModeConfig {
 func getTitleForMode(modeFlag string) string {
 	var t string
 	switch modeFlag {
-	case "archive":
-		t = "Archived Notes"
 	case "default":
-		t = "Active Notes"
+		t = "1. Active Notes"
+	case "archive":
+		t = "2. Archived Notes"
 	case "orphan":
-		t = "Orphaned Notes"
+		t = "3. Orphaned Notes"
+	case "trash":
+		t = "4. Trashed Notes"
 	default:
-		t = "Active Notes"
+		t = "1. Active Notes"
 	}
 
 	return t

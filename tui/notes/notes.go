@@ -30,12 +30,16 @@ type NoteListModel struct {
 	keys              *listKeyMap
 	delegateKeys      *delegateKeyMap
 	list              list.Model
+	sublist           SubListModel
 	preview           string
 	width             int
 	height            int
 	modeFlag          string
 	orphansFlag       bool
 	showAsFileDetails bool
+	renaming          bool
+	linking           bool
+	input             ListInputModel
 }
 
 func NewNoteListModel(
@@ -51,7 +55,7 @@ func NewNoteListModel(
 	t := getTitleForMode(modeFlag)
 
 	// Setup list
-	delegate := newItemDelegate(dkeys, cfg)
+	delegate := newItemDelegate(dkeys, cfg, modeFlag)
 	l := list.New(items, delegate, 0, 0)
 	l.Title = t
 	l.Styles.Title = titleStyle
@@ -70,14 +74,22 @@ func NewNoteListModel(
 		panic(err)
 	}
 
+	// Initialize the input field
+	i := initialInputModel()
+	sl := NewSubListModel(cfg, modes)
+
 	return NoteListModel{
 		list:         l,
+		sublist:      sl,
 		keys:         lkeys,
 		delegateKeys: dkeys,
 		config:       cfg,
 		cache:        c,
 		modes:        modes,
 		modeFlag:     modeFlag,
+		input:        i,
+		renaming:     false,
+		linking:      false,
 	}
 }
 
@@ -87,10 +99,6 @@ func (m NoteListModel) Init() tea.Cmd {
 
 func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
-
-	nl, cmd := m.list.Update(msg)
-	m.list = nl
-	cmds = append(cmds, cmd)
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -103,6 +111,63 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Don't match any of the keys below if we're actively filtering.
 		if m.list.FilterState() == list.Filtering {
 			break
+		}
+
+		if m.renaming {
+			// Handle exiting input mode
+			if key.Matches(msg, m.keys.exitAltView) {
+				m.input.Input.Blur()
+				m.renaming = false
+				return m, nil
+			}
+
+			// Update the text input and handle its commands
+			var cmd tea.Cmd
+			m.input.Input, cmd = m.input.Input.Update(msg)
+			cmds = append(cmds, cmd)
+
+			// Handle the case when Enter is pressed and the input is submitted
+			if key.Matches(msg, m.keys.submitAltView) {
+				// Retrieve the new name from the input model
+				err := renameFile(m)
+
+				if err != nil {
+					return m, nil
+				}
+
+				m.renaming = false
+				m.refresh()
+				return m, cmd
+
+			}
+
+			return m, tea.Batch(cmds...)
+		}
+
+		if m.linking {
+			// Handle exiting input mode
+			if key.Matches(msg, m.keys.exitAltView) {
+				m.linking = false
+				return m, nil
+			}
+
+			// Handle the case when Enter is pressed and the input is submitted
+			if key.Matches(msg, m.keys.submitAltView) {
+				if s, ok := m.sublist.List.SelectedItem().(ListItem); ok {
+					m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Link Pick: %s", s.title)))
+				}
+
+				m.linking = false
+				return m, nil
+
+			}
+
+			// Update the text input and handle its commands
+			var cmd tea.Cmd
+			m.sublist.List, cmd = m.sublist.List.Update(msg)
+			cmds = append(cmds, cmd)
+
+			return m, tea.Batch(cmds...)
 		}
 
 		switch {
@@ -139,28 +204,47 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case key.Matches(msg, m.keys.changeMode):
 			m.cycleMode()
-			cmd := m.refreshItems()
+			cmd := m.refresh()
 			return m, cmd
 
 		case key.Matches(msg, m.keys.switchToDefaultMode):
 			m.modeFlag = "default"
-			m.list.Title = getTitleForMode(m.modeFlag)
-			cmd := m.refreshItems()
+			cmd := m.refresh()
 			return m, cmd
 
 		case key.Matches(msg, m.keys.switchToArchiveMode):
 			m.modeFlag = "archive"
-			m.list.Title = getTitleForMode(m.modeFlag)
-			cmd := m.refreshItems()
+			cmd := m.refresh()
 			return m, cmd
 
 		case key.Matches(msg, m.keys.switchToOrphanMode):
 			m.modeFlag = "orphan"
-			m.list.Title = getTitleForMode(m.modeFlag)
-			cmd := m.refreshItems()
+			cmd := m.refresh()
+			return m, cmd
+
+		case key.Matches(msg, m.keys.switchToTrashMode):
+			m.modeFlag = "trash"
+			cmd := m.refresh()
 			return m, cmd
 		}
+
+		if key.Matches(msg, m.keys.rename) {
+			m.renaming = true
+			m.input.Input.Focus()
+			// Optionally, prefill the input with the current item's name
+			if s, ok := m.list.SelectedItem().(ListItem); ok {
+				m.input.Input.SetValue(s.title)
+			}
+		}
+
+		if key.Matches(msg, m.keys.link) {
+			m.linking = true
+		}
 	}
+
+	nl, cmd := m.list.Update(msg)
+	m.list = nl
+	cmds = append(cmds, cmd)
 
 	m.handlePreview()
 	return m, tea.Batch(cmds...)
@@ -168,6 +252,28 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m NoteListModel) View() string {
 	list := listStyle.MaxWidth(m.width / 2).Render(m.list.View())
+
+	if m.renaming {
+		textPrompt := textPromptStyle.Render(
+			lipgloss.NewStyle().
+				Height(m.list.Height()).
+				MaxHeight(m.list.Height()).
+				Padding(0, 2).
+				Render(fmt.Sprintf("%s\n\n%s", titleStyle.Render("Rename File"), m.input.View())),
+		)
+
+		layout := lipgloss.JoinHorizontal(lipgloss.Top, list, textPrompt)
+		return appStyle.Render(layout)
+	}
+
+	if m.linking {
+
+		return appStyle.Render(m.sublist.List.View())
+
+		// layout := lipgloss.JoinHorizontal(lipgloss.Top, list, m.sublist.list.View())
+		// return appStyle.Render(layout)
+	}
+
 	preview := previewStyle.Render(
 		lipgloss.NewStyle().
 			Height(m.list.Height()).
@@ -176,7 +282,6 @@ func (m NoteListModel) View() string {
 	)
 
 	layout := lipgloss.JoinHorizontal(lipgloss.Top, list, preview)
-
 	return appStyle.Render(layout)
 }
 
@@ -218,15 +323,12 @@ func (m *NoteListModel) handlePreview() {
 	if s, ok := m.list.SelectedItem().(ListItem); ok {
 		// check if the preview is already in the cache
 		if p, exists, err := m.cache.Get(s.path); err == nil && exists {
-			m.list.NewStatusMessage(statusStyle("Cache Hit"))
 			m.preview = p.(string)
 		} else {
 			// cache tries to recover from errors internally, so we *should* only see errors from
 			// nil values and improper size on New (negative values)
 			if err != nil {
 				m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Error accessing cache: %s", err)))
-			} else {
-				m.list.NewStatusMessage(statusStyle("Cache Miss"))
 			}
 
 			// calculate the width and height for the preview pane
@@ -252,6 +354,14 @@ func (m *NoteListModel) handlePreview() {
 	}
 }
 
+func (m *NoteListModel) refresh() tea.Cmd {
+	m.list.Title = getTitleForMode(m.modeFlag)
+	m.refreshDelegate()
+	cmd := m.refreshItems()
+	m.handlePreview()
+	return cmd
+}
+
 // refreshes the list items based on mode conditions
 func (m *NoteListModel) refreshItems() tea.Cmd {
 	files, _ := getFilesByMode(m.modes, m.modeFlag, m.config.VaultDir)
@@ -259,10 +369,17 @@ func (m *NoteListModel) refreshItems() tea.Cmd {
 	return m.list.SetItems(items)
 }
 
+func (m *NoteListModel) refreshDelegate() {
+	dkeys := newDelegateKeyMap()
+	delegate := newItemDelegate(dkeys, m.config, m.modeFlag)
+	m.list.SetDelegate(delegate)
+}
+
 // cycles through modes
 // default -> archive
 // archive -> orphan
-// orphan -> default -> repeat
+// orphan -> trash
+// trash -> default -> repeat
 func (m *NoteListModel) cycleMode() {
 	switch m.modeFlag {
 	case "default":
@@ -270,12 +387,12 @@ func (m *NoteListModel) cycleMode() {
 	case "archive":
 		m.modeFlag = "orphan"
 	case "orphan":
+		m.modeFlag = "trash"
+	case "trash":
 		m.modeFlag = "default"
 	default:
 		m.modeFlag = "default"
 	}
-
-	m.list.Title = getTitleForMode(m.modeFlag)
 }
 
 // should prob use an error over a bool but a "success" flag sort of feels more natural for the context.

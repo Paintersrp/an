@@ -1,6 +1,8 @@
 package notes
 
 import (
+	"bytes"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -115,4 +117,46 @@ func getSubdirectories(directory, excludeDir string) []string {
 		}
 	}
 	return subDirs
+}
+
+func renameFile(m NoteListModel) error {
+	newName := m.input.Input.Value()
+
+	// Get the path of the currently selected item
+	if s, ok := m.list.SelectedItem().(ListItem); ok {
+		// Construct the new path with the updated name
+		newPath := filepath.Join(filepath.Dir(s.path), newName+".md")
+
+		// Read the content of the current file
+		content, err := os.ReadFile(s.path)
+		if err != nil {
+			m.list.NewStatusMessage(
+				statusStyle(fmt.Sprintf("Error reading file: %s", err)),
+			)
+			return err
+		}
+
+		m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Error renaming: %s", err)))
+		// Extract the current front matter
+		title, _ := parseFrontMatter(content, s.path)
+
+		// Update the title in the front matter
+		updatedContent := bytes.Replace(content, []byte(title), []byte(newName), 1)
+
+		// Write the updated content back to the file
+		if err := os.WriteFile(s.path, updatedContent, 0644); err != nil {
+			m.list.NewStatusMessage(
+				statusStyle(fmt.Sprintf("Error writing file: %s", err)),
+			)
+			return err
+		}
+
+		// Rename the file
+		if err := os.Rename(s.path, newPath); err != nil {
+			m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Error renaming: %s", err)))
+			return err
+		}
+
+	}
+	return nil
 }

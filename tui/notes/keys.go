@@ -11,17 +11,22 @@ type listKeyMap struct {
 	toggleFocus         key.Binding
 	quit                key.Binding
 	changeMode          key.Binding
+	rename              key.Binding
+	link                key.Binding
+	submitAltView       key.Binding
+	exitAltView         key.Binding
 	toggleDisplayMode   key.Binding
 	switchToDefaultMode key.Binding
 	switchToArchiveMode key.Binding
 	switchToOrphanMode  key.Binding
+	switchToTrashMode   key.Binding
 }
 
 func newListKeyMap() *listKeyMap {
 	return &listKeyMap{
 		toggleTitleBar: key.NewBinding(
-			key.WithKeys("T"),
-			key.WithHelp("T", "toggle title"),
+			key.WithKeys("B"),
+			key.WithHelp("B", "toggle title"),
 		),
 		toggleStatusBar: key.NewBinding(
 			key.WithKeys("S"),
@@ -47,6 +52,22 @@ func newListKeyMap() *listKeyMap {
 			key.WithKeys("M"),
 			key.WithHelp("M", "mode"),
 		),
+		rename: key.NewBinding(
+			key.WithKeys("R"),
+			key.WithHelp("R", "rename"),
+		),
+		link: key.NewBinding(
+			key.WithKeys("L"),
+			key.WithHelp("L", "link"),
+		),
+		submitAltView: key.NewBinding(
+			key.WithKeys("enter"),
+			key.WithHelp("enter", "submit"),
+		),
+		exitAltView: key.NewBinding(
+			key.WithKeys("esc"),
+			key.WithHelp("esc", "exit input mode"),
+		),
 		switchToDefaultMode: key.NewBinding(
 			key.WithKeys("1"),
 			key.WithHelp("1", "switch to default mode"),
@@ -59,6 +80,10 @@ func newListKeyMap() *listKeyMap {
 			key.WithKeys("3"),
 			key.WithHelp("3", "switch to orphan mode"),
 		),
+		switchToTrashMode: key.NewBinding(
+			key.WithKeys("4"),
+			key.WithHelp("4", "switch to trash mode"),
+		),
 	}
 }
 
@@ -70,6 +95,7 @@ func (m listKeyMap) fullHelp() []key.Binding {
 		m.toggleHelpMenu,
 		m.toggleDisplayMode,
 		m.openNote,
+		m.rename,
 		m.changeMode,
 		m.switchToDefaultMode,
 		m.switchToArchiveMode,

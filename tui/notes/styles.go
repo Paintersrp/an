@@ -13,9 +13,8 @@ var (
 			Padding(0, 1)
 
 	inputStyle = lipgloss.NewStyle().
-			BorderForeground(lipgloss.Color("#334455")).
 			BorderStyle(lipgloss.NormalBorder()).
-			Padding(0, 1).Width(80)
+			Padding(0, 1).Width(100)
 
 	statusStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.AdaptiveColor{Light: "#0AF", Dark: "#0AF"}).
@@ -40,6 +39,8 @@ var (
 			MarginLeft(1).
 			Border(lipgloss.NormalBorder(), false, false, false, true).
 			BorderForeground(lipgloss.Color("#334455"))
+
+	textPromptStyle = previewStyle.Copy()
 
 	cursorStyle = focusedStyle.Copy()
 	textStyle   = lipgloss.NewStyle().

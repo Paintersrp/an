@@ -283,11 +283,21 @@ func StaticListFiles(
 	modeFlag string,
 ) ([]string, error) {
 	var files []string
+	baseDepth := len(strings.Split(vaultDir, string(os.PathSeparator)))
+
 	err := filepath.Walk(
 		vaultDir,
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err // exit
+			}
+
+			// Calculate the depth of the current path
+			depth := len(strings.Split(path, string(os.PathSeparator)))
+
+			// Skip files that are directly in the vaultDir
+			if depth == baseDepth+1 && !info.IsDir() {
+				return nil
 			}
 
 			// Check if the current directory is in the list of directories to exclude
@@ -317,8 +327,8 @@ func StaticListFiles(
 				return nil // skip file if hidden
 			}
 
-			// Append file if not a directory
-			if !info.IsDir() {
+			// Verify that the file has a .md extension (Markdown file)
+			if !info.IsDir() && filepath.Ext(file) == ".md" {
 				if modeFlag == "orphan" {
 					content, err := os.ReadFile(path)
 					if err != nil {
@@ -336,6 +346,7 @@ func StaticListFiles(
 					files = append(files, path)
 				}
 			}
+
 			return nil // walk on or finish
 		},
 	)
