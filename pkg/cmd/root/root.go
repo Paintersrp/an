@@ -10,6 +10,7 @@ import (
 
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/pkg/cmd/addSubdir"
+	"github.com/Paintersrp/an/pkg/cmd/archive"
 	"github.com/Paintersrp/an/pkg/cmd/day"
 	"github.com/Paintersrp/an/pkg/cmd/echo"
 	"github.com/Paintersrp/an/pkg/cmd/fleeting"
@@ -22,6 +23,10 @@ import (
 	"github.com/Paintersrp/an/pkg/cmd/symlink"
 	"github.com/Paintersrp/an/pkg/cmd/tags"
 	"github.com/Paintersrp/an/pkg/cmd/tasks"
+	"github.com/Paintersrp/an/pkg/cmd/todo"
+	"github.com/Paintersrp/an/pkg/cmd/trash"
+	"github.com/Paintersrp/an/pkg/cmd/unarchive"
+	"github.com/Paintersrp/an/pkg/cmd/untrash"
 	"github.com/Paintersrp/an/pkg/fs/templater"
 )
 
@@ -43,6 +48,8 @@ func NewCmdRoot(
               [title]  [tags]
   an new robotics "robotics science class study-notes"
   `,
+		// Run notes tui by default, or leave as help?
+		RunE: notes.NewCmdNotes(c, t).RunE,
 	}
 
 	// Validate the subdirectory flag
@@ -69,11 +76,16 @@ func NewCmdRoot(
 	cmd.AddCommand(tasks.NewCmdTasks(c, t))
 	cmd.AddCommand(day.NewCmdDay(c, t))
 	cmd.AddCommand(pin.NewCmdPin(c))
-	cmd.AddCommand(echo.NewCmdEcho(c))
+	cmd.AddCommand(echo.NewCmdEcho(c, t))
 	cmd.AddCommand(settings.NewCmdSettings(c))
 	cmd.AddCommand(symlink.NewCmdSymlink(c))
 	cmd.AddCommand(fleeting.NewCmdFleeting(c))
-	cmd.AddCommand(notes.NewCmdNotes(c))
+	cmd.AddCommand(notes.NewCmdNotes(c, t))
+	cmd.AddCommand(todo.NewCmdTodo(c))
+	cmd.AddCommand(archive.NewCmdArchive(c))
+	cmd.AddCommand(unarchive.NewCmdUnarchive(c))
+	cmd.AddCommand(trash.NewCmdTrash(c))
+	cmd.AddCommand(untrash.NewCmdUntrash(c))
 
 	return cmd, nil
 }

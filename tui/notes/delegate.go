@@ -2,22 +2,22 @@ package notes
 
 import (
 	"os"
-	"path/filepath"
 
 	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/utils"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-var currMode string
+var currView string
 
 func newItemDelegate(
 	keys *delegateKeyMap,
 	cfg *config.Config,
-	mode string,
+	view string,
 ) list.DefaultDelegate {
-	currMode = mode
+	currView = view
 	d := list.NewDefaultDelegate()
 
 	d.Styles.SelectedTitle = selectedItemStyle
@@ -40,8 +40,8 @@ func newItemDelegate(
 		case tea.KeyMsg:
 			switch {
 			case key.Matches(msg, keys.archive):
-				if currMode == "default" {
-					if err := archive(p, cfg); err != nil {
+				if currView == "default" || currView == "orphan" {
+					if err := utils.Archive(p, cfg); err != nil {
 						return m.NewStatusMessage(statusStyle("Failed to archive " + n))
 					}
 					i := m.Index()
@@ -50,7 +50,7 @@ func newItemDelegate(
 				}
 
 			case key.Matches(msg, keys.delete):
-				if currMode == "trash" { // Ensure we're in trash mode
+				if currView == "trash" { // Ensure we're in trash view
 					if err := os.Remove(p); err != nil {
 						return m.NewStatusMessage(statusStyle("Failed to delete " + n))
 					}
@@ -60,7 +60,7 @@ func newItemDelegate(
 				}
 
 			case key.Matches(msg, keys.trash):
-				if err := trash(p, cfg); err != nil {
+				if err := utils.Trash(p, cfg); err != nil {
 					return m.NewStatusMessage(statusStyle("Failed to move " + n + " to trash"))
 				}
 				i := m.Index()
@@ -68,9 +68,9 @@ func newItemDelegate(
 				return m.NewStatusMessage(statusStyle("Moved " + n + " to trash"))
 
 			case key.Matches(msg, keys.undo):
-				switch currMode {
+				switch currView {
 				case "archive":
-					if err := unarchive(p, cfg); err != nil {
+					if err := utils.Unarchive(p, cfg); err != nil {
 						return m.NewStatusMessage(statusStyle("Failed to unarchive " + n))
 					}
 					i := m.Index()
@@ -78,7 +78,7 @@ func newItemDelegate(
 					return m.NewStatusMessage(statusStyle("Restored " + n))
 
 				case "trash":
-					if err := untrash(p, cfg); err != nil {
+					if err := utils.Untrash(p, cfg); err != nil {
 						return m.NewStatusMessage(statusStyle("Failed to restore " + n))
 					}
 					i := m.Index()
@@ -92,22 +92,24 @@ func newItemDelegate(
 		return nil
 	}
 
-	var shortHelp []key.Binding
+	var (
+		longHelp  [][]key.Binding
+		shortHelp []key.Binding
+	)
 
-	switch mode {
+	switch view {
 	case "archive":
 		shortHelp = []key.Binding{keys.trash, keys.undo}
+		longHelp = [][]key.Binding{{keys.trash, keys.undo}}
 	case "orphan":
-		shortHelp = []key.Binding{keys.trash, keys.link}
+		shortHelp = []key.Binding{keys.trash, keys.archive}
+		longHelp = [][]key.Binding{{keys.trash, keys.archive}}
 	case "trash":
 		shortHelp = []key.Binding{keys.delete, keys.undo}
+		longHelp = [][]key.Binding{{keys.delete, keys.undo}}
 	default:
 		shortHelp = []key.Binding{keys.trash, keys.archive}
-	}
-
-	// should swap longhelps too probably
-	longHelp := [][]key.Binding{
-		{keys.archive, keys.undo, keys.delete, keys.trash},
+		longHelp = [][]key.Binding{{keys.trash, keys.archive}}
 	}
 
 	d.ShortHelpFunc = func() []key.Binding {
@@ -143,107 +145,8 @@ func newDelegateKeyMap() *delegateKeyMap {
 			key.WithHelp("D", "del"),
 		),
 		trash: key.NewBinding(
-			key.WithKeys("V"),
+			key.WithKeys("T"),
 			key.WithHelp("T", "trash"),
 		),
-		// for help text only really...
-		link: key.NewBinding(
-			key.WithKeys("L"),
-			key.WithHelp("L", "link"),
-		),
 	}
-}
-
-func archive(path string, cfg *config.Config) error {
-	// Get the subdirectory path relative to the vault directory
-	subDir, err := filepath.Rel(cfg.VaultDir, filepath.Dir(path))
-	if err != nil {
-		return err
-	}
-
-	// Create the archive subdirectory path
-	archiveSubDir := filepath.Join(cfg.VaultDir, "archive", subDir)
-	if _, err := os.Stat(archiveSubDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(archiveSubDir, os.ModePerm); err != nil {
-			return err
-		}
-	}
-
-	// Move the note to the archive subdirectory
-	newPath := filepath.Join(archiveSubDir, filepath.Base(path))
-	if err := os.Rename(path, newPath); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func unarchive(path string, cfg *config.Config) error {
-	// Infer the original subdirectory from the archive path
-	subDir, err := filepath.Rel(
-		filepath.Join(cfg.VaultDir, "archive"),
-		filepath.Dir(path),
-	)
-	if err != nil {
-		return err
-	}
-
-	// Define the original directory where the notes should be restored
-	originalDir := filepath.Join(cfg.VaultDir, subDir)
-
-	// Move the note from the archive directory back to the original directory
-	newPath := filepath.Join(originalDir, filepath.Base(path))
-	if err := os.Rename(path, newPath); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Function to move a note to the trash directory
-func trash(path string, cfg *config.Config) error {
-	// Get the subdirectory path relative to the vault directory
-	subDir, err := filepath.Rel(cfg.VaultDir, filepath.Dir(path))
-	if err != nil {
-		return err
-	}
-
-	// Define the trash directory path
-	trashDir := filepath.Join(cfg.VaultDir, "trash", subDir)
-	if _, err := os.Stat(trashDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(trashDir, os.ModePerm); err != nil {
-			return err
-		}
-	}
-
-	// Move the note to the trash directory
-	newPath := filepath.Join(trashDir, filepath.Base(path))
-	if err := os.Rename(path, newPath); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Function to restore a note from the trash directory
-func untrash(path string, cfg *config.Config) error {
-	// Infer the original subdirectory from the archive path
-	subDir, err := filepath.Rel(
-		filepath.Join(cfg.VaultDir, "trash"),
-		filepath.Dir(path),
-	)
-	if err != nil {
-		return err
-	}
-
-	// Define the original directory where the notes should be restored
-	originalDir := filepath.Join(cfg.VaultDir, subDir)
-
-	// Move the note from the trash directory back to the original directory
-	newPath := filepath.Join(originalDir, filepath.Base(path))
-	if err := os.Rename(path, newPath); err != nil {
-		return err
-	}
-
-	return nil
 }

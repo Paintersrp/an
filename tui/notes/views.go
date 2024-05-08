@@ -7,67 +7,62 @@ import (
 	"github.com/Paintersrp/an/pkg/fs/fzf"
 )
 
-type ModeConfig struct {
+type ViewConfig struct {
 	ExcludeDirs  []string
 	ExcludeFiles []string
 	OrphanOnly   bool
 }
 
-func GenerateModes(vaultDir string) map[string]ModeConfig {
-	modes := make(map[string]ModeConfig)
+func GenerateViews(vaultDir string) map[string]ViewConfig {
+	views := make(map[string]ViewConfig)
 
-	// Default mode configuration
-	modes["default"] = ModeConfig{
+	views["default"] = ViewConfig{
 		ExcludeDirs:  []string{"archive", "trash"},
 		ExcludeFiles: []string{},
 		OrphanOnly:   false,
 	}
 
-	// Generate archive mode configuration
-	modes["archive"] = ModeConfig{
+	views["archive"] = ViewConfig{
 		ExcludeDirs:  getSubdirectories(vaultDir, "archive"),
 		ExcludeFiles: []string{},
 		OrphanOnly:   false,
 	}
 
-	modes["orphan"] = ModeConfig{
+	views["orphan"] = ViewConfig{
 		ExcludeDirs:  []string{"archive", "trash"},
 		ExcludeFiles: []string{},
 		OrphanOnly:   true,
 	}
 
-	modes["trash"] = ModeConfig{
+	views["trash"] = ViewConfig{
 		ExcludeDirs:  getSubdirectories(vaultDir, "trash"),
 		ExcludeFiles: []string{},
 		OrphanOnly:   false,
 	}
 
-	// Add more modes as needed
-
-	return modes
+	return views
 }
 
-func getTitleForMode(modeFlag string) string {
-	var t string
-	switch modeFlag {
-	case "default":
-		t = "1. Active Notes"
+func getTitleForView(viewFlag string) string {
+	var titlePrefix string
+	switch viewFlag {
 	case "archive":
-		t = "2. Archived Notes"
+		titlePrefix = "📦 - Archive"
 	case "orphan":
-		t = "3. Orphaned Notes"
+		titlePrefix = "❓ - Orphan"
 	case "trash":
-		t = "4. Trashed Notes"
+		// second space is intentional
+		titlePrefix = "🗑️  - Trash"
 	default:
-		t = "1. Active Notes"
+		titlePrefix = "✅ - Active"
 	}
 
-	return t
+	return titlePrefix + " View"
 }
 
-func getFilesByMode(
-	modes map[string]ModeConfig,
-	modeFlag string,
+func getFilesByView(
+	views map[string]ViewConfig,
+	viewFlag string,
 	vaultDir string,
 ) ([]string, error) {
 	defaultExcludeDirs := []string{"archive"}
@@ -78,13 +73,13 @@ func getFilesByMode(
 		excludeFiles []string
 	)
 
-	m, ok := modes[modeFlag]
+	m, ok := views[viewFlag]
 	if !ok {
-		availableModes := getAvailableModes(modes)
+		availableViews := getAvailableViews(views)
 		panic(fmt.Errorf(
-			"invalid mode: %s. Available modes are: %s",
-			modeFlag,
-			availableModes,
+			"invalid view: %s. Available views are: %s",
+			viewFlag,
+			availableViews,
 		))
 
 	}
@@ -100,13 +95,13 @@ func getFilesByMode(
 		excludeDirs = m.ExcludeFiles
 	}
 
-	return fzf.StaticListFiles(vaultDir, excludeDirs, excludeFiles, modeFlag)
+	return fzf.StaticListFiles(vaultDir, excludeDirs, excludeFiles, viewFlag)
 }
 
-func getAvailableModes(modes map[string]ModeConfig) string {
+func getAvailableViews(views map[string]ViewConfig) string {
 	var l []string
-	for m := range modes {
-		l = append(l, m)
+	for v := range views {
+		l = append(l, v)
 	}
 	return strings.Join(l, ", ")
 }

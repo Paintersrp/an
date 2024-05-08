@@ -28,11 +28,15 @@ func parseNoteFiles(noteFiles []string, vaultDir string, asFileDetails bool) []l
 			string(filepath.Separator),
 		)
 
-		var n string
+		var (
+			n  string
+			sd string
+		)
 
 		if len(parts) < 2 {
 			n = parts[0]
 		} else {
+			sd = parts[0]
 			// The remaining parts joined together form the filename
 			n = strings.Join(
 				parts[1:],
@@ -64,6 +68,7 @@ func parseNoteFiles(noteFiles []string, vaultDir string, asFileDetails bool) []l
 			title:        title,
 			tags:         tags,
 			showFullPath: asFileDetails,
+			subdirectory: sd,
 		})
 	}
 	return items

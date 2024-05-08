@@ -13,8 +13,9 @@ import (
 )
 
 func NewCmdOpenPin(c *config.Config) *cobra.Command {
+	var name string
 	cmd := &cobra.Command{
-		Use:     "pin",
+		Use:     "pin -n {pin-name}",
 		Aliases: []string{"p"},
 		Short:   "Open the pinned file",
 		Long: heredoc.Doc(`
@@ -28,18 +29,31 @@ func NewCmdOpenPin(c *config.Config) *cobra.Command {
       an o p
     `),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(c)
+			return run(c, name)
 		},
 	}
+
+	cmd.Flags().StringVarP(&name, "name", "n", "", "Save as a named pin")
 	return cmd
 }
 
-func run(c *config.Config) error {
-	if c.PinnedFile == "" {
-		return errors.New("no pinned file found")
+func run(c *config.Config, name string) error {
+	var targetPin string
+	if name != "" {
+		if c.NamedPins[name] == "" {
+			return fmt.Errorf("no pinned file found")
+		}
+		targetPin = c.NamedPins[name]
+	} else {
+		if c.PinnedFile == "" {
+			return errors.New("no pinned file found")
+		}
+		targetPin = c.PinnedFile
 	}
-	if _, err := os.Stat(c.PinnedFile); os.IsNotExist(err) {
-		return fmt.Errorf("the pinned file '%s' does not exist", c.PinnedFile)
+
+	if _, err := os.Stat(targetPin); os.IsNotExist(err) {
+		return fmt.Errorf("the pinned file '%s' does not exist", targetPin)
 	}
-	return zet.OpenFromPath(c.PinnedFile)
+	return zet.OpenFromPath(targetPin)
+
 }

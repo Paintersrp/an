@@ -11,8 +11,10 @@ import (
 )
 
 func NewCmdTaskOpenPin(c *config.Config) *cobra.Command {
+	var name string
+
 	cmd := &cobra.Command{
-		Use:     "open-pin",
+		Use:     "open-pin -n {pin-name}",
 		Aliases: []string{"op", "open-p", "o-p"},
 		Short:   "Open the pinned file",
 		Long:    `OpenPin opens the user's currently pinned file for quick access and editing.`,
@@ -25,18 +27,30 @@ func NewCmdTaskOpenPin(c *config.Config) *cobra.Command {
     an tasks op
     `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(c)
+			return run(c, name)
 		},
 	}
+
+	cmd.Flags().StringVarP(&name, "name", "n", "", "Save as a named pin")
 	return cmd
 }
 
-func run(c *config.Config) error {
-	if c.PinnedTaskFile == "" {
-		return errors.New("no pinned task file found")
+func run(c *config.Config, name string) error {
+	var targetPin string
+	if name != "" {
+		if c.NamedTaskPins[name] == "" {
+			return fmt.Errorf("no pinned task file found")
+		}
+		targetPin = c.NamedTaskPins[name]
+	} else {
+		if c.PinnedTaskFile == "" {
+			return errors.New("no pinned task file found")
+		}
+		targetPin = c.PinnedTaskFile
 	}
-	if _, err := os.Stat(c.PinnedTaskFile); os.IsNotExist(err) {
-		return fmt.Errorf("the pinned task file '%s' does not exist", c.PinnedTaskFile)
+
+	if _, err := os.Stat(targetPin); os.IsNotExist(err) {
+		return fmt.Errorf("the pinned task file '%s' does not exist", targetPin)
 	}
-	return zet.OpenFromPath(c.PinnedTaskFile)
+	return zet.OpenFromPath(targetPin)
 }

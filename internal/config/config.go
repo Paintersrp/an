@@ -11,13 +11,15 @@ import (
 )
 
 type Config struct {
-	VaultDir       string   `json:"vault_dir"        yaml:"vaultdir"`
-	Editor         string   `json:"editor"           yaml:"editor"`
-	NvimArgs       string   `json:"nvim_args"        yaml:"nvimargs"`
-	SubDirs        []string `json:"sub_dirs"         yaml:"subdirs"`
-	FileSystemMode string   `json:"fs_mode"          yaml:"fsmode"`
-	PinnedFile     string   `json:"pinned_file"      yaml:"pinned_file"`
-	PinnedTaskFile string   `json:"pinned_task_file" yaml:"pinned_task_file"`
+	VaultDir       string            `json:"vault_dir"        yaml:"vaultdir"`
+	Editor         string            `json:"editor"           yaml:"editor"`
+	NvimArgs       string            `json:"nvim_args"        yaml:"nvimargs"`
+	SubDirs        []string          `json:"sub_dirs"         yaml:"subdirs"`
+	FileSystemMode string            `json:"fs_mode"          yaml:"fsmode"`
+	PinnedFile     string            `json:"pinned_file"      yaml:"pinned_file"`
+	NamedPins      map[string]string `json:"named_pins"       yaml:"named_pins"`
+	PinnedTaskFile string            `json:"pinned_task_file" yaml:"pinned_task_file"`
+	NamedTaskPins  map[string]string `json:"named_task_pins"  yaml:"named_task_pins"`
 }
 
 var ValidModes = map[string]bool{
@@ -41,6 +43,14 @@ func FromFile(path string) (*Config, error) {
 	if err := yaml.Unmarshal(cfg_file, cfg); err != nil {
 		return nil, err
 	}
+
+	if cfg.NamedPins == nil {
+		cfg.NamedPins = make(map[string]string)
+	}
+	if cfg.NamedTaskPins == nil {
+		cfg.NamedTaskPins = make(map[string]string)
+	}
+
 	return cfg, nil
 }
 
@@ -151,14 +161,22 @@ func (cfg *Config) ChangeEditor(editor string) {
 	)
 }
 
-func (cfg *Config) ChangePin(file, pinType string) {
+func (cfg *Config) ChangePin(file, pinType, pinName string) {
 	// TODO: Validation
 
 	switch pinType {
 	case "task":
-		cfg.PinnedTaskFile = file
+		if pinName == "" {
+			cfg.PinnedTaskFile = file
+		} else {
+			cfg.NamedTaskPins[pinName] = file
+		}
 	case "text":
-		cfg.PinnedFile = file
+		if pinName == "" {
+			cfg.PinnedFile = file
+		} else {
+			cfg.NamedPins[pinName] = file
+		}
 	default:
 		fmt.Println("Invalid Pin File Type. Valid options are text and task.")
 		return
@@ -171,10 +189,18 @@ func (cfg *Config) ChangePin(file, pinType string) {
 		return
 	}
 
-	fmt.Printf(
-		"Pinned File changed to '%s' and configuration saved successfully.\n",
-		file,
-	)
+	if pinName != "" {
+		fmt.Printf(
+			"Name Pinned File '%s' changed to '%s' and configuration saved successfully.\n",
+			pinName,
+			file,
+		)
+	} else {
+		fmt.Printf(
+			"Pinned File changed to '%s' and configuration saved successfully.\n",
+			file,
+		)
+	}
 }
 
 func StaticGetConfigPath(homeDir string) string {

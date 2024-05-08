@@ -1,13 +1,14 @@
 ---
 title: {{.Title}}
-tags: 
-  - type/question
 created: {{.Date}}
+modified:
+up: "[[{{.Upstream}}]]"
+tags:
+  - type/question
+{{- range .Tags}}
+  - {{.}}
+{{- end}}
 ---
-
-# {{.Title}}
-
-<!-- Detailed question from short title in front matter -->
 
 > [!Question]
 > `Question here`
@@ -15,9 +16,6 @@ created: {{.Date}}
 <!-- Answer the detailed question  -->
 
 ---
-## Terms
-<!-- Links to definition pages -->
-- 
 
 ## References
 <!-- Links to pages where the answer is used for -->

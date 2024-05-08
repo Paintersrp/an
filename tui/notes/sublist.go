@@ -1,17 +1,20 @@
+// Unused sublist model, intended to be an alternative view for linking an orphan note
+// Overall I did not like the flow of the system, nor did I find it all that useful especially
+// when factoring in all the caveats and concerns that would need to be handled for adjusting the note upstream
+// in this manner. Still, I may refine it later
 package notes
 
 import (
-	"fmt"
-
 	"github.com/Paintersrp/an/internal/config"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 type SubListModel struct {
-	modes             map[string]ModeConfig
+	views             map[string]ViewConfig
 	config            *config.Config
-	List              list.Model
+	list              list.Model
 	width             int
 	height            int
 	showAsFileDetails bool
@@ -19,22 +22,39 @@ type SubListModel struct {
 
 func NewSubListModel(
 	cfg *config.Config,
-	modes map[string]ModeConfig,
+	views map[string]ViewConfig,
 ) SubListModel {
-	files, _ := getFilesByMode(modes, "default", cfg.VaultDir)
+	files, _ := getFilesByView(views, "default", cfg.VaultDir)
 	items := parseNoteFiles(files, cfg.VaultDir, false)
-	fmt.Println(items)
 
 	// Setup list
 	d := list.NewDefaultDelegate()
 	l := list.New(items, d, 0, 0)
-	l.Title = "Picker List"
+	l.DisableQuitKeybindings()
+	l.SetFilteringEnabled(false)
+	l.Title = "Select a Note to Link (Upstream)\nUse Esc or Q to Close the Link Selection View"
 	l.Styles.Title = titleStyle
 
+	l.AdditionalShortHelpKeys = func() []key.Binding {
+		return []key.Binding{
+			key.NewBinding(
+				key.WithKeys("esc"),
+				key.WithHelp("esc", "exit link view"),
+			)}
+	}
+
+	l.AdditionalFullHelpKeys = func() []key.Binding {
+		return []key.Binding{
+			key.NewBinding(
+				key.WithKeys("esc"),
+				key.WithHelp("esc", "exit link view"),
+			)}
+	}
+
 	return SubListModel{
-		List:   l,
+		list:   l,
 		config: cfg,
-		modes:  modes,
+		views:  views,
 	}
 }
 
@@ -49,21 +69,20 @@ func (m SubListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		h, v := appStyle.GetFrameSize()
-		m.List.SetSize(msg.Width-h, msg.Height-v)
+		m.list.SetSize(msg.Width, msg.Height)
 
 	case tea.KeyMsg:
 	default:
 		return m, nil
 	}
 
-	nl, cmd := m.List.Update(msg)
-	m.List = nl
+	nl, cmd := m.list.Update(msg)
+	m.list = nl
 	cmds = append(cmds, cmd)
 
 	return m, tea.Batch(cmds...)
 }
 
 func (m SubListModel) View() string {
-	return appStyle.Render(m.List.View())
+	return m.list.View()
 }

@@ -10,16 +10,17 @@ type listKeyMap struct {
 	openNote            key.Binding
 	toggleFocus         key.Binding
 	quit                key.Binding
-	changeMode          key.Binding
+	changeView          key.Binding
 	rename              key.Binding
+	create              key.Binding
 	link                key.Binding
 	submitAltView       key.Binding
 	exitAltView         key.Binding
-	toggleDisplayMode   key.Binding
-	switchToDefaultMode key.Binding
-	switchToArchiveMode key.Binding
-	switchToOrphanMode  key.Binding
-	switchToTrashMode   key.Binding
+	toggleDisplayView   key.Binding
+	switchToDefaultView key.Binding
+	switchToArchiveView key.Binding
+	switchToOrphanView  key.Binding
+	switchToTrashView   key.Binding
 }
 
 func newListKeyMap() *listKeyMap {
@@ -40,7 +41,7 @@ func newListKeyMap() *listKeyMap {
 			key.WithKeys("H"),
 			key.WithHelp("H", "toggle help"),
 		),
-		toggleDisplayMode: key.NewBinding(
+		toggleDisplayView: key.NewBinding(
 			key.WithKeys("tab"),
 			key.WithHelp("tab", "Display"),
 		),
@@ -48,41 +49,41 @@ func newListKeyMap() *listKeyMap {
 			key.WithKeys("enter"),
 			key.WithHelp("↵", "open"),
 		),
-		changeMode: key.NewBinding(
-			key.WithKeys("M"),
-			key.WithHelp("M", "mode"),
+		changeView: key.NewBinding(
+			key.WithKeys("V"),
+			key.WithHelp("V", "view"),
 		),
 		rename: key.NewBinding(
 			key.WithKeys("R"),
 			key.WithHelp("R", "rename"),
 		),
-		link: key.NewBinding(
-			key.WithKeys("L"),
-			key.WithHelp("L", "link"),
+		create: key.NewBinding(
+			key.WithKeys("C"),
+			key.WithHelp("C", "create"),
 		),
 		submitAltView: key.NewBinding(
 			key.WithKeys("enter"),
-			key.WithHelp("enter", "submit"),
+			key.WithHelp("↵", "submit (alt view)"),
 		),
 		exitAltView: key.NewBinding(
 			key.WithKeys("esc"),
-			key.WithHelp("esc", "exit input mode"),
+			key.WithHelp("esc", "exit alt view"),
 		),
-		switchToDefaultMode: key.NewBinding(
+		switchToDefaultView: key.NewBinding(
 			key.WithKeys("1"),
-			key.WithHelp("1", "switch to default mode"),
+			key.WithHelp("1", "switch to default view"),
 		),
-		switchToArchiveMode: key.NewBinding(
+		switchToArchiveView: key.NewBinding(
 			key.WithKeys("2"),
-			key.WithHelp("2", "switch to archive mode"),
+			key.WithHelp("2", "switch to archive view"),
 		),
-		switchToOrphanMode: key.NewBinding(
+		switchToOrphanView: key.NewBinding(
 			key.WithKeys("3"),
-			key.WithHelp("3", "switch to orphan mode"),
+			key.WithHelp("3", "switch to orphan view"),
 		),
-		switchToTrashMode: key.NewBinding(
+		switchToTrashView: key.NewBinding(
 			key.WithKeys("4"),
-			key.WithHelp("4", "switch to trash mode"),
+			key.WithHelp("4", "switch to trash view"),
 		),
 	}
 }
@@ -93,12 +94,15 @@ func (m listKeyMap) fullHelp() []key.Binding {
 		m.toggleStatusBar,
 		m.togglePagination,
 		m.toggleHelpMenu,
-		m.toggleDisplayMode,
+		m.toggleDisplayView,
 		m.openNote,
 		m.rename,
-		m.changeMode,
-		m.switchToDefaultMode,
-		m.switchToArchiveMode,
-		m.switchToOrphanMode,
+		m.changeView,
+		m.switchToDefaultView,
+		m.switchToArchiveView,
+		m.switchToOrphanView,
+		m.switchToTrashView,
+		m.exitAltView,
+		m.submitAltView,
 	}
 }

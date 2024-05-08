@@ -9,7 +9,8 @@ var (
 
 	titleStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#0AF")).
-			Background(lipgloss.Color("transparent")).
+			Background(lipgloss.Color("#224")).
+			Bold(true).
 			Padding(0, 1)
 
 	inputStyle = lipgloss.NewStyle().
@@ -41,6 +42,10 @@ var (
 			BorderForeground(lipgloss.Color("#334455"))
 
 	textPromptStyle = previewStyle.Copy()
+
+	linkSelectStyle = lipgloss.NewStyle().MarginLeft(1).
+			Border(lipgloss.NormalBorder(), false, false, false, true).
+			BorderForeground(lipgloss.Color("#334455"))
 
 	cursorStyle = focusedStyle.Copy()
 	textStyle   = lipgloss.NewStyle().

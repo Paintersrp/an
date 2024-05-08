@@ -10,12 +10,20 @@ import (
 	"github.com/spf13/viper"
 )
 
-func AddTemplate(cmd *cobra.Command) {
+func AddTemplate(cmd *cobra.Command, def string) {
+	var defaultTemplate string
+
+	if def == "" {
+		defaultTemplate = "zet"
+	} else {
+		defaultTemplate = def
+	}
+
 	cmd.Flags().
 		StringP(
 			"template",
 			"t",
-			"zet",
+			defaultTemplate,
 			"Specify the template to use (default is 'zet'). Available templates: daily, roadmap, zet",
 		)
 	viper.BindPFlag(

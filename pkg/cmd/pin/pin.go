@@ -15,9 +15,10 @@ import (
 
 func NewCmdPin(c *config.Config) *cobra.Command {
 	var check bool
+	var name string
 
 	cmd := &cobra.Command{
-		Use:     "pin [query] [--path file_path] [--check]",
+		Use:     "pin [query] [--name pin_name] [--path file_path] [--check]",
 		Aliases: []string{"p"},
 		Short:   "Pin a file to be used with the echo command or check the current pin.",
 		Long: heredoc.Doc(`
@@ -35,17 +36,18 @@ func NewCmdPin(c *config.Config) *cobra.Command {
 				fmt.Println("Current pinned file:", c.PinnedFile)
 				return nil
 			}
-			return run(cmd, args, c)
+			return run(cmd, args, c, name)
 		},
 	}
 
 	cmd.Flags().BoolVarP(&check, "check", "c", false, "Check the current pinned file")
+	cmd.Flags().StringVarP(&name, "name", "n", "", "Save as a named pin")
 	flags.AddPath(cmd)
 
 	return cmd
 }
 
-func run(cmd *cobra.Command, args []string, c *config.Config) error {
+func run(cmd *cobra.Command, args []string, c *config.Config, name string) error {
 	path := flags.HandlePath(cmd)
 
 	if path == "" {
@@ -58,20 +60,20 @@ func run(cmd *cobra.Command, args []string, c *config.Config) error {
 				fmt.Printf("error fuzzyfinding note: %s", err)
 			}
 
-			c.ChangePin(choice, "text")
+			c.ChangePin(choice, "text", name)
 		} else {
 			choice, err := finder.RunWithQuery(args[0], false)
 			if err != nil {
 				fmt.Printf("error fuzzyfinding note: %s", err)
 			}
 
-			c.ChangePin(choice, "text")
+			c.ChangePin(choice, "text", name)
 		}
 	} else {
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			return errors.New("the specified file does not exist")
 		}
-		c.ChangePin(path, "text")
+		c.ChangePin(path, "text", name)
 	}
 
 	return nil

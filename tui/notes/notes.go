@@ -8,6 +8,7 @@ import (
 
 	"github.com/Paintersrp/an/internal/cache"
 	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/pkg/fs/templater"
 	"github.com/Paintersrp/an/pkg/fs/zet"
 	"github.com/Paintersrp/an/utils"
 	"github.com/charmbracelet/bubbles/key"
@@ -18,52 +19,51 @@ import (
 )
 
 // DONE: Would be nice to hold tab and see alt info like path and tertiary details
-// TODO: cache mode outputs
-// TODO: don't include files in the base vault dir in archive
+// DONE: don't include files in the base vault dir in archive
+// TODO: cache view outputs
 // TODO: Replace panics
 // TODO: Replace Magic Number (Cache Size)
+// TODO: Orphan as 2 not archive, archive as 3
 
 type NoteListModel struct {
-	modes             map[string]ModeConfig
+	views             map[string]ViewConfig
 	config            *config.Config
 	cache             *cache.Cache
 	keys              *listKeyMap
 	delegateKeys      *delegateKeyMap
 	list              list.Model
-	sublist           SubListModel
 	preview           string
 	width             int
 	height            int
-	modeFlag          string
-	orphansFlag       bool
+	viewFlag          string
 	showAsFileDetails bool
 	renaming          bool
-	linking           bool
 	input             ListInputModel
+	form              FormModel
+	creating          bool
 }
 
 func NewNoteListModel(
 	cfg *config.Config,
-	modes map[string]ModeConfig,
-	modeFlag string,
+	t *templater.Templater,
+	views map[string]ViewConfig,
+	viewFlag string,
 ) NoteListModel {
-	files, _ := getFilesByMode(modes, modeFlag, cfg.VaultDir)
+	files, _ := getFilesByView(views, viewFlag, cfg.VaultDir)
 	items := parseNoteFiles(files, cfg.VaultDir, false)
-
 	dkeys := newDelegateKeyMap()
 	lkeys := newListKeyMap()
-	t := getTitleForMode(modeFlag)
+	title := getTitleForView(viewFlag)
+	delegate := newItemDelegate(dkeys, cfg, viewFlag)
 
-	// Setup list
-	delegate := newItemDelegate(dkeys, cfg, modeFlag)
 	l := list.New(items, delegate, 0, 0)
-	l.Title = t
+	l.Title = title
 	l.Styles.Title = titleStyle
 
 	l.AdditionalShortHelpKeys = func() []key.Binding {
 		return []key.Binding{
 			lkeys.openNote,
-			lkeys.changeMode,
+			lkeys.changeView,
 		}
 	}
 
@@ -74,22 +74,21 @@ func NewNoteListModel(
 		panic(err)
 	}
 
-	// Initialize the input field
 	i := initialInputModel()
-	sl := NewSubListModel(cfg, modes)
+	f := initialFormModel(cfg, t)
 
 	return NoteListModel{
 		list:         l,
-		sublist:      sl,
 		keys:         lkeys,
 		delegateKeys: dkeys,
 		config:       cfg,
 		cache:        c,
-		modes:        modes,
-		modeFlag:     modeFlag,
+		views:        views,
+		viewFlag:     viewFlag,
 		input:        i,
+		form:         f,
 		renaming:     false,
-		linking:      false,
+		creating:     false,
 	}
 }
 
@@ -144,27 +143,16 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(cmds...)
 		}
 
-		if m.linking {
+		if m.creating {
 			// Handle exiting input mode
 			if key.Matches(msg, m.keys.exitAltView) {
-				m.linking = false
+				m.form.inputs[m.form.focused].Blur()
+				m.creating = false
 				return m, nil
 			}
 
-			// Handle the case when Enter is pressed and the input is submitted
-			if key.Matches(msg, m.keys.submitAltView) {
-				if s, ok := m.sublist.List.SelectedItem().(ListItem); ok {
-					m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Link Pick: %s", s.title)))
-				}
-
-				m.linking = false
-				return m, nil
-
-			}
-
-			// Update the text input and handle its commands
 			var cmd tea.Cmd
-			m.sublist.List, cmd = m.sublist.List.Update(msg)
+			m.form, cmd = m.form.Update(msg)
 			cmds = append(cmds, cmd)
 
 			return m, tea.Batch(cmds...)
@@ -197,33 +185,33 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.list.SetShowHelp(!m.list.ShowHelp())
 			return m, nil
 
-		case key.Matches(msg, m.keys.toggleDisplayMode):
+		case key.Matches(msg, m.keys.toggleDisplayView):
 			m.showAsFileDetails = !m.showAsFileDetails
 			cmd := m.refreshItems()
 			return m, cmd
 
-		case key.Matches(msg, m.keys.changeMode):
-			m.cycleMode()
+		case key.Matches(msg, m.keys.changeView):
+			m.cycleView()
 			cmd := m.refresh()
 			return m, cmd
 
-		case key.Matches(msg, m.keys.switchToDefaultMode):
-			m.modeFlag = "default"
+		case key.Matches(msg, m.keys.switchToDefaultView):
+			m.viewFlag = "default"
 			cmd := m.refresh()
 			return m, cmd
 
-		case key.Matches(msg, m.keys.switchToArchiveMode):
-			m.modeFlag = "archive"
+		case key.Matches(msg, m.keys.switchToArchiveView):
+			m.viewFlag = "archive"
 			cmd := m.refresh()
 			return m, cmd
 
-		case key.Matches(msg, m.keys.switchToOrphanMode):
-			m.modeFlag = "orphan"
+		case key.Matches(msg, m.keys.switchToOrphanView):
+			m.viewFlag = "orphan"
 			cmd := m.refresh()
 			return m, cmd
 
-		case key.Matches(msg, m.keys.switchToTrashMode):
-			m.modeFlag = "trash"
+		case key.Matches(msg, m.keys.switchToTrashView):
+			m.viewFlag = "trash"
 			cmd := m.refresh()
 			return m, cmd
 		}
@@ -231,15 +219,14 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if key.Matches(msg, m.keys.rename) {
 			m.renaming = true
 			m.input.Input.Focus()
-			// Optionally, prefill the input with the current item's name
 			if s, ok := m.list.SelectedItem().(ListItem); ok {
 				m.input.Input.SetValue(s.title)
 			}
 		}
-
-		if key.Matches(msg, m.keys.link) {
-			m.linking = true
+		if key.Matches(msg, m.keys.create) {
+			m.creating = true
 		}
+
 	}
 
 	nl, cmd := m.list.Update(msg)
@@ -253,6 +240,13 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m NoteListModel) View() string {
 	list := listStyle.MaxWidth(m.width / 2).Render(m.list.View())
 
+	if m.creating {
+		modelStyle := lipgloss.NewStyle().
+			Width(m.width).
+			Height(m.height).Padding(0, 1)
+		return appStyle.Render(modelStyle.Render(m.form.View()))
+	}
+
 	if m.renaming {
 		textPrompt := textPromptStyle.Render(
 			lipgloss.NewStyle().
@@ -264,14 +258,6 @@ func (m NoteListModel) View() string {
 
 		layout := lipgloss.JoinHorizontal(lipgloss.Top, list, textPrompt)
 		return appStyle.Render(layout)
-	}
-
-	if m.linking {
-
-		return appStyle.Render(m.sublist.List.View())
-
-		// layout := lipgloss.JoinHorizontal(lipgloss.Top, list, m.sublist.list.View())
-		// return appStyle.Render(layout)
 	}
 
 	preview := previewStyle.Render(
@@ -287,8 +273,9 @@ func (m NoteListModel) View() string {
 
 func Run(
 	c *config.Config,
-	modes map[string]ModeConfig,
-	modeFlag string,
+	t *templater.Templater,
+	views map[string]ViewConfig,
+	viewFlag string,
 ) error {
 	// Save the current terminal state
 	originalState, err := term.GetState(int(os.Stdin.Fd()))
@@ -304,7 +291,7 @@ func Run(
 		}
 	}()
 
-	if _, err := tea.NewProgram(NewNoteListModel(c, modes, modeFlag), tea.WithInput(os.Stdin), tea.WithAltScreen()).Run(); err != nil {
+	if _, err := tea.NewProgram(NewNoteListModel(c, t, views, viewFlag), tea.WithInput(os.Stdin), tea.WithAltScreen()).Run(); err != nil {
 		// handle error for instances where neovim/editor doesn't pass stdin back in time to close gracefully with bubbletea
 		if strings.Contains(err.Error(), "resource temporarily unavailable") {
 			os.Exit(0) // exit gracefully
@@ -355,43 +342,43 @@ func (m *NoteListModel) handlePreview() {
 }
 
 func (m *NoteListModel) refresh() tea.Cmd {
-	m.list.Title = getTitleForMode(m.modeFlag)
+	m.list.Title = getTitleForView(m.viewFlag)
 	m.refreshDelegate()
 	cmd := m.refreshItems()
 	m.handlePreview()
 	return cmd
 }
 
-// refreshes the list items based on mode conditions
+// refreshes the list items based on view conditions
 func (m *NoteListModel) refreshItems() tea.Cmd {
-	files, _ := getFilesByMode(m.modes, m.modeFlag, m.config.VaultDir)
+	files, _ := getFilesByView(m.views, m.viewFlag, m.config.VaultDir)
 	items := parseNoteFiles(files, m.config.VaultDir, m.showAsFileDetails)
 	return m.list.SetItems(items)
 }
 
 func (m *NoteListModel) refreshDelegate() {
 	dkeys := newDelegateKeyMap()
-	delegate := newItemDelegate(dkeys, m.config, m.modeFlag)
+	delegate := newItemDelegate(dkeys, m.config, m.viewFlag)
 	m.list.SetDelegate(delegate)
 }
 
-// cycles through modes
+// cycles through views
 // default -> archive
 // archive -> orphan
 // orphan -> trash
 // trash -> default -> repeat
-func (m *NoteListModel) cycleMode() {
-	switch m.modeFlag {
+func (m *NoteListModel) cycleView() {
+	switch m.viewFlag {
 	case "default":
-		m.modeFlag = "archive"
+		m.viewFlag = "archive"
 	case "archive":
-		m.modeFlag = "orphan"
+		m.viewFlag = "orphan"
 	case "orphan":
-		m.modeFlag = "trash"
+		m.viewFlag = "trash"
 	case "trash":
-		m.modeFlag = "default"
+		m.viewFlag = "default"
 	default:
-		m.modeFlag = "default"
+		m.viewFlag = "default"
 	}
 }
 

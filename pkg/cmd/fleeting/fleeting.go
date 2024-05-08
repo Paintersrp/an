@@ -1,3 +1,5 @@
+// obsolete
+// TODO: separate out textarea tui model, delete rest
 package fleeting
 
 import (

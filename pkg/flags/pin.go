@@ -15,10 +15,11 @@ func HandlePin(
 	c *config.Config,
 	note *zet.ZettelkastenNote,
 	pinType string,
+	name string,
 ) {
 	pinFlag, _ := cmd.Flags().GetBool("pin")
 
 	if pinFlag {
-		c.ChangePin(note.GetFilepath(), pinType)
+		c.ChangePin(note.GetFilepath(), pinType, name)
 	}
 }

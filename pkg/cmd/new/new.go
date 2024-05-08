@@ -37,7 +37,7 @@ func NewCmdNew(
 		},
 	}
 
-	flags.AddTemplate(cmd)
+	flags.AddTemplate(cmd, "zet")
 	flags.AddLinks(cmd)
 	flags.AddUpstream(cmd)
 	flags.AddPin(cmd)
@@ -79,7 +79,7 @@ func run(
 		return fmt.Errorf("%s", conflict)
 	}
 
-	flags.HandlePin(cmd, c, note, "text")
+	flags.HandlePin(cmd, c, note, "text", title)
 	zet.StaticHandleNoteLaunch(note, t, tmpl)
 
 	return nil // no errors

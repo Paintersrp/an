@@ -13,6 +13,8 @@ import (
 )
 
 func NewCmdTaskPin(c *config.Config) *cobra.Command {
+	var name string
+
 	cmd := &cobra.Command{
 		Use:     "pin [query] --path {file_path}",
 		Aliases: []string{"p"},
@@ -26,16 +28,18 @@ func NewCmdTaskPin(c *config.Config) *cobra.Command {
     `,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd, args, c)
+			return run(cmd, args, c, name)
 		},
 	}
 
 	flags.AddPath(cmd)
 
+	cmd.Flags().StringVarP(&name, "name", "n", "", "Save as a named pin")
+
 	return cmd
 }
 
-func run(cmd *cobra.Command, args []string, c *config.Config) error {
+func run(cmd *cobra.Command, args []string, c *config.Config, name string) error {
 	path := flags.HandlePath(cmd)
 
 	if path == "" {
@@ -48,20 +52,20 @@ func run(cmd *cobra.Command, args []string, c *config.Config) error {
 				fmt.Printf("error fuzzyfinding note: %s", err)
 			}
 
-			c.ChangePin(choice, "task")
+			c.ChangePin(choice, "task", name)
 		} else {
 			choice, err := finder.RunWithQuery(args[0], false)
 			if err != nil {
 				fmt.Printf("error fuzzyfinding note: %s", err)
 			}
 
-			c.ChangePin(choice, "task")
+			c.ChangePin(choice, "task", name)
 		}
 	} else {
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			return errors.New("the specified task echo file does not exist")
 		}
-		c.ChangePin(path, "task")
+		c.ChangePin(path, "task", name)
 	}
 
 	return nil

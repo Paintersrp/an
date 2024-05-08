@@ -1,7 +1,8 @@
 ---
 title: {{.Title}}
+created: {{.Date}}
+modified:
 up: "[[{{.Upstream}}]]"
-date: {{.Date}}
 tags:
 {{- range .Tags}}
   - {{.}}
@@ -11,13 +12,13 @@ tags:
 
 ---
 
-### **Relations**
+## **Relations**
 
 {{- range .Links}}
 [[{{.}}]]
 {{- end}}
 
-##### Prompt-like Questions for Finding Connections
+### Questions for Finding Connections
 
 - How does this idea relate to other concepts you've noted?
 - Are there any opposing viewpoints or contrasting ideas worth exploring?

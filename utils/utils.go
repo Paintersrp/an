@@ -3,10 +3,12 @@ package utils
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 
+	"github.com/Paintersrp/an/internal/config"
 	"github.com/charmbracelet/glamour"
 	"github.com/muesli/termenv"
 )
@@ -72,4 +74,98 @@ func RenderMarkdownPreview(
 
 	// Return markdown output
 	return markdown
+}
+
+func Archive(path string, cfg *config.Config) error {
+	// Get the subdirectory path relative to the vault directory
+	subDir, err := filepath.Rel(cfg.VaultDir, filepath.Dir(path))
+	if err != nil {
+		return err
+	}
+
+	// Create the archive subdirectory path, if needed
+	archiveSubDir := filepath.Join(cfg.VaultDir, "archive", subDir)
+	if _, err := os.Stat(archiveSubDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(archiveSubDir, os.ModePerm); err != nil {
+			return err
+		}
+	}
+
+	// Move the note to the archive subdirectory
+	newPath := filepath.Join(archiveSubDir, filepath.Base(path))
+	if err := os.Rename(path, newPath); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func Unarchive(path string, cfg *config.Config) error {
+	// Infer the original subdirectory from the archive path
+	subDir, err := filepath.Rel(
+		filepath.Join(cfg.VaultDir, "archive"),
+		filepath.Dir(path),
+	)
+	if err != nil {
+		return err
+	}
+
+	// Define the original directory where the notes should be restored
+	originalDir := filepath.Join(cfg.VaultDir, subDir)
+
+	// Move the note from the archive directory back to the original directory
+	newPath := filepath.Join(originalDir, filepath.Base(path))
+	if err := os.Rename(path, newPath); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Function to move a note to the trash directory
+func Trash(path string, cfg *config.Config) error {
+	// Get the subdirectory path relative to the vault directory
+	subDir, err := filepath.Rel(cfg.VaultDir, filepath.Dir(path))
+	if err != nil {
+		return err
+	}
+
+	// Define the trash directory path
+	trashDir := filepath.Join(cfg.VaultDir, "trash", subDir)
+	if _, err := os.Stat(trashDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(trashDir, os.ModePerm); err != nil {
+			return err
+		}
+	}
+
+	// Move the note to the trash directory
+	newPath := filepath.Join(trashDir, filepath.Base(path))
+	if err := os.Rename(path, newPath); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Function to restore a note from the trash directory
+func Untrash(path string, cfg *config.Config) error {
+	// Infer the original subdirectory from the archive path
+	subDir, err := filepath.Rel(
+		filepath.Join(cfg.VaultDir, "trash"),
+		filepath.Dir(path),
+	)
+	if err != nil {
+		return err
+	}
+
+	// Define the original directory where the notes should be restored
+	originalDir := filepath.Join(cfg.VaultDir, subDir)
+
+	// Move the note from the trash directory back to the original directory
+	newPath := filepath.Join(originalDir, filepath.Base(path))
+	if err := os.Rename(path, newPath); err != nil {
+		return err
+	}
+
+	return nil
 }
