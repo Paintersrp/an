@@ -45,8 +45,40 @@ func isValidInput(input string) bool {
 	return regexp.MustCompile(`^[a-zA-Z0-9-_]+$`).MatchString(input)
 }
 
-func IncrementDays(numDays int) string {
-	return time.Now().AddDate(0, 0, numDays).Format("20060102")
+// GenerateDate generates a date string based on the given type (day, week, month).
+
+func GenerateDate(numUnits int, unitType string) string {
+	var date time.Time
+	var dateFormat string
+	now := time.Now()
+
+	switch unitType {
+	case "day":
+		date = now.AddDate(0, 0, numUnits)
+		dateFormat = "20060102"
+	case "week":
+		// Find Sunday of the current week
+		offset := int(time.Sunday - now.Weekday())
+		if offset > 0 {
+			offset = -6
+		}
+		startOfWeek := now.AddDate(0, 0, offset)
+		// Add the number of weeks
+		date = startOfWeek.AddDate(0, 0, numUnits*7)
+		dateFormat = "20060102"
+	case "month":
+		// Find the first day of the current month
+		startOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+		// Add the number of months
+		date = startOfMonth.AddDate(0, numUnits, 0)
+		dateFormat = "200601"
+	default:
+		// Default to today's date
+		date = now
+		dateFormat = "20060102"
+	}
+
+	return date.Format(dateFormat)
 }
 
 func RenderMarkdownPreview(

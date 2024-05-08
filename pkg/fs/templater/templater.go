@@ -25,9 +25,10 @@ var AvailableTemplates = map[string]bool{
 	"stack":    true,
 	"question": true,
 	"version":  true,
-	"weekly":   true,
-	"monthly":  true,
+	"week":     true,
+	"month":    true,
 	"echo":     true,
+	"sum":      true,
 }
 
 // SingleTemplate represents a single template file and its associated data.

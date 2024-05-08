@@ -1,49 +1,13 @@
-// obsolete
-// TODO: separate out textarea tui model, delete rest
-package fleeting
+package textarea
 
 import (
 	"fmt"
 	"log"
 
-	"github.com/MakeNowJust/heredoc/v2"
-	"github.com/Paintersrp/an/internal/config"
 	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/spf13/cobra"
 )
-
-func NewCmdFleeting(c *config.Config) *cobra.Command {
-	var yank bool // Define a flag for yank
-
-	cmd := &cobra.Command{
-		Use:     "fleeting",
-		Aliases: []string{"fleet", "f"},
-		Short:   "",
-		Long:    heredoc.Doc(``),
-		Example: heredoc.Doc(`
-			an fleeting
-			an fleet
-			an f
-		`),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			p := tea.NewProgram(initialModel(yank)) // Pass the yank flag to initialModel
-
-			if _, err := p.Run(); err != nil {
-				log.Fatal(err)
-			}
-
-			return nil
-		},
-	}
-
-	// Add the yank flag
-	cmd.Flags().
-		BoolVarP(&yank, "yank", "y", false, "Automatically input clipboard content into the textarea")
-
-	return cmd
-}
 
 type errMsg error
 

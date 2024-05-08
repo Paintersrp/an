@@ -13,8 +13,8 @@ import (
 	"github.com/Paintersrp/an/pkg/cmd/archive"
 	"github.com/Paintersrp/an/pkg/cmd/day"
 	"github.com/Paintersrp/an/pkg/cmd/echo"
-	"github.com/Paintersrp/an/pkg/cmd/fleeting"
 	"github.com/Paintersrp/an/pkg/cmd/initialize"
+	"github.com/Paintersrp/an/pkg/cmd/journal"
 	"github.com/Paintersrp/an/pkg/cmd/new"
 	"github.com/Paintersrp/an/pkg/cmd/notes"
 	"github.com/Paintersrp/an/pkg/cmd/open"
@@ -79,13 +79,13 @@ func NewCmdRoot(
 	cmd.AddCommand(echo.NewCmdEcho(c, t))
 	cmd.AddCommand(settings.NewCmdSettings(c))
 	cmd.AddCommand(symlink.NewCmdSymlink(c))
-	cmd.AddCommand(fleeting.NewCmdFleeting(c))
 	cmd.AddCommand(notes.NewCmdNotes(c, t))
 	cmd.AddCommand(todo.NewCmdTodo(c))
 	cmd.AddCommand(archive.NewCmdArchive(c))
 	cmd.AddCommand(unarchive.NewCmdUnarchive(c))
 	cmd.AddCommand(trash.NewCmdTrash(c))
 	cmd.AddCommand(untrash.NewCmdUntrash(c))
+	cmd.AddCommand(journal.NewCmdJournal(c, t))
 
 	return cmd, nil
 }

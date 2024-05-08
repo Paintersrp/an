@@ -55,7 +55,7 @@ func run(cmd *cobra.Command, args []string, t *templater.Templater, index int) e
 	}
 
 	links := flags.HandleLinks(cmd)
-	date := utils.IncrementDays(index)
+	date := utils.GenerateDate(index, "day")
 	vaultDir := viper.GetString("vaultdir")
 
 	note := zet.NewZettelkastenNote(
