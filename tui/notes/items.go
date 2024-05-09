@@ -3,16 +3,18 @@ package notes
 import (
 	"fmt"
 	"strings"
+
+	"github.com/Paintersrp/an/internal/cache"
 )
 
 type ListItem struct {
+	tags         []string
 	size         int64
 	fileName     string
 	path         string
 	lastModified string
 	title        string
 	showFullPath bool
-	tags         []string
 	subdirectory string
 }
 
@@ -32,8 +34,8 @@ func (i ListItem) Description() string {
 	// Existing logic for showing full path or tags
 	if i.showFullPath {
 		description += fmt.Sprintf(
-			"Size: %d bytes, Last Modified: %s",
-			i.size,
+			"Size: %s, Last Modified: %s",
+			cache.ReadableSize(i.size),
 			i.lastModified,
 		)
 	} else {

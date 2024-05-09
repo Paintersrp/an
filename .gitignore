@@ -13,5 +13,7 @@ make-feature-notes
 .test-main.go
 test-main.go
 
-roadmap.md
-commit.md
+# roadmap.md
+# commit.md
+Planning v3.md
+.roadmap-bkup.md

@@ -40,6 +40,12 @@ func GenerateViews(vaultDir string) map[string]ViewConfig {
 		OrphanOnly:   false,
 	}
 
+	views["unfulfilled"] = ViewConfig{
+		ExcludeDirs:  []string{"archive", "trash"},
+		ExcludeFiles: []string{},
+		OrphanOnly:   false,
+	}
+
 	return views
 }
 
@@ -53,6 +59,8 @@ func getTitleForView(viewFlag string) string {
 	case "trash":
 		// second space is intentional
 		titlePrefix = "🗑️  - Trash"
+	case "unfulfilled":
+		titlePrefix = "⬜ - Unfulfilled"
 	default:
 		titlePrefix = "✅ - Active"
 	}

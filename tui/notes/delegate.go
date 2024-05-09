@@ -3,11 +3,12 @@ package notes
 import (
 	"os"
 
-	"github.com/Paintersrp/an/internal/config"
-	"github.com/Paintersrp/an/utils"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/utils"
 )
 
 var currView string
@@ -84,8 +85,27 @@ func newItemDelegate(
 					i := m.Index()
 					m.RemoveItem(i)
 					return m.NewStatusMessage(statusStyle("Restored " + n))
-
 				}
+
+			case key.Matches(msg, keys.keypadDelete):
+				switch currView {
+				default:
+					if err := utils.Trash(p, cfg); err != nil {
+						return m.NewStatusMessage(statusStyle("Failed to move " + n + " to trash"))
+					}
+					i := m.Index()
+					m.RemoveItem(i)
+					return m.NewStatusMessage(statusStyle("Moved " + n + " to trash"))
+
+				case "trash":
+					if err := os.Remove(p); err != nil {
+						return m.NewStatusMessage(statusStyle("Failed to delete " + n))
+					}
+					i := m.Index()
+					m.RemoveItem(i)
+					return m.NewStatusMessage(statusStyle("Deleted " + n))
+				}
+
 			}
 		}
 
@@ -100,16 +120,16 @@ func newItemDelegate(
 	switch view {
 	case "archive":
 		shortHelp = []key.Binding{keys.trash, keys.undo}
-		longHelp = [][]key.Binding{{keys.trash, keys.undo}}
+		longHelp = [][]key.Binding{{keys.trash, keys.undo, keys.keypadDelete}}
 	case "orphan":
 		shortHelp = []key.Binding{keys.trash, keys.archive}
-		longHelp = [][]key.Binding{{keys.trash, keys.archive}}
+		longHelp = [][]key.Binding{{keys.trash, keys.archive, keys.keypadDelete}}
 	case "trash":
 		shortHelp = []key.Binding{keys.delete, keys.undo}
-		longHelp = [][]key.Binding{{keys.delete, keys.undo}}
+		longHelp = [][]key.Binding{{keys.delete, keys.undo, keys.keypadDelete}}
 	default:
 		shortHelp = []key.Binding{keys.trash, keys.archive}
-		longHelp = [][]key.Binding{{keys.trash, keys.archive}}
+		longHelp = [][]key.Binding{{keys.trash, keys.archive, keys.keypadDelete}}
 	}
 
 	d.ShortHelpFunc = func() []key.Binding {
@@ -123,11 +143,11 @@ func newItemDelegate(
 }
 
 type delegateKeyMap struct {
-	archive key.Binding
-	undo    key.Binding
-	delete  key.Binding
-	trash   key.Binding
-	link    key.Binding
+	archive      key.Binding
+	undo         key.Binding
+	delete       key.Binding
+	trash        key.Binding
+	keypadDelete key.Binding
 }
 
 func newDelegateKeyMap() *delegateKeyMap {
@@ -147,6 +167,10 @@ func newDelegateKeyMap() *delegateKeyMap {
 		trash: key.NewBinding(
 			key.WithKeys("T"),
 			key.WithHelp("T", "trash"),
+		),
+		keypadDelete: key.NewBinding(
+			key.WithKeys("delete"),
+			key.WithHelp("delete", "delete (or trash)"),
 		),
 	}
 }

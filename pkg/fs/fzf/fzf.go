@@ -45,7 +45,8 @@ func (f *FuzzyFinder) RunWithQuery(query string, execute bool) (string, error) {
 }
 
 func (f *FuzzyFinder) find(query string) (int, error) {
-	files, err := f.ListFiles()
+	files, err := StaticListFiles(f.vaultDir, nil, nil, "default")
+	// files, err := f.ListFiles()
 	if err != nil {
 		return -1, fmt.Errorf("error listing files: %w", err)
 	}
@@ -151,17 +152,30 @@ func (f *FuzzyFinder) fuzzySelectFile(
 		// Read in markdown frontmatter
 		title, tags := parseFrontMatter(content)
 
-		// Format title for fuzzy finder display to include tags
-		titleWithTag := fmt.Sprintf(
-			"%s [Tags: %s] ",
-			title,
-			strings.Join(tags, ", "),
-		)
+		if title == "" {
+			title = filepath.Base(file)
+		}
+
+		titleWithTags := ""
+
+		if len(tags) == 0 {
+			titleWithTags = fmt.Sprintf(
+				"%s [No tags] ",
+				title,
+			)
+		} else {
+			titleWithTags = fmt.Sprintf(
+				"%s [Tags: %s] ",
+				title,
+				strings.Join(tags, ", "),
+			)
+
+		}
 
 		// Append to our array of files
 		filesWithTitlesAndTags = append(
 			filesWithTitlesAndTags,
-			titleWithTag,
+			titleWithTags,
 		)
 	}
 
@@ -329,20 +343,23 @@ func StaticListFiles(
 
 			// Verify that the file has a .md extension (Markdown file)
 			if !info.IsDir() && filepath.Ext(file) == ".md" {
-				if modeFlag == "orphan" {
-					content, err := os.ReadFile(path)
-					if err != nil {
-						log.Printf("Error reading file: %s, error: %v", path, err)
-						return nil // skip this file due to read error
-					}
+				content, err := os.ReadFile(path)
+				if err != nil {
+					log.Printf("Error reading file: %s, error: %v", path, err)
+					return nil // skip this file due to read error
+				}
 
-					// Only append the file if it contains note links
-					if hasNoteLinks(content) {
-						return nil
-					} else {
+				switch modeFlag {
+				case "orphan":
+					// Only append the file if it does not contain note links
+					if !hasNoteLinks(content) {
 						files = append(files, path)
 					}
-				} else {
+				case "unfulfilled":
+					if checkFulfillment(content, "false") {
+						files = append(files, path)
+					}
+				default:
 					files = append(files, path)
 				}
 			}
@@ -358,4 +375,15 @@ func StaticListFiles(
 func hasNoteLinks(content []byte) bool {
 	re := regexp.MustCompile(`\[\[.+\]\]`)
 	return re.Match(content)
+}
+
+// check = "true" for fulfilled
+// check = "false" for unfulfilled
+func checkFulfillment(content []byte, check string) bool {
+	re := regexp.MustCompile(`(?m)^fulfilled:\s*(true|false)$`)
+	matches := re.FindSubmatch(content)
+	if len(matches) > 1 {
+		return string(matches[1]) == check
+	}
+	return false
 }

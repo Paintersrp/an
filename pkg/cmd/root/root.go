@@ -75,7 +75,7 @@ func NewCmdRoot(
 	cmd.AddCommand(tags.NewCmdTags(c))
 	cmd.AddCommand(tasks.NewCmdTasks(c, t))
 	cmd.AddCommand(day.NewCmdDay(c, t))
-	cmd.AddCommand(pin.NewCmdPin(c))
+	cmd.AddCommand(pin.NewCmdPin(c, "text"))
 	cmd.AddCommand(echo.NewCmdEcho(c, t))
 	cmd.AddCommand(settings.NewCmdSettings(c))
 	cmd.AddCommand(symlink.NewCmdSymlink(c))

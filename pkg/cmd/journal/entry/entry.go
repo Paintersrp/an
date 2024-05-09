@@ -7,31 +7,32 @@ import (
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/pkg/arg"
 	"github.com/Paintersrp/an/pkg/flags"
 	"github.com/Paintersrp/an/pkg/fs/templater"
 	"github.com/Paintersrp/an/pkg/fs/zet"
 	"github.com/Paintersrp/an/utils"
+	"github.com/atotto/clipboard"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-// TODO: adding links after note already exists?
+// TODO: adding links/tags/content after note already exists?
 
 func NewCmdEntry(
 	c *config.Config,
 	t *templater.Templater,
-	templateType string, // Accepts "day", "week", or "month"
+	templateType string, // Accepts "day", "week", "month", or "year"
 ) *cobra.Command {
 	var index int
+
 	cmd := &cobra.Command{
 		Use: fmt.Sprintf(
-			"%s [tags] [--index index] [--links link1 link2 ...]",
+			"%s [tags] [content] [--index index] [--links link1 link2 ...] [--paste]",
 			templateType,
 		),
-		Aliases: []string{
-			strings.ToLower(templateType[:1]),
-		}, // Alias using the first letter (e.g., "d" for "day")
-		Short: fmt.Sprintf("Create or open a %s note.", templateType),
+		Aliases: []string{strings.ToLower(templateType[:1])},
+		Short:   fmt.Sprintf("Create or open a %s note.", templateType),
 		Long: heredoc.Doc(fmt.Sprintf(
 			`
 			This command creates or opens a %s note based on the given index.
@@ -39,10 +40,10 @@ func NewCmdEntry(
 			You can also add links to your %s note using the --links flag.
 
 			Examples:
-			  an %s --index -1  // Opens previous %s
-			  an %s --index +1  // Creates or opens the next %s
-			  an %s             // Opens current's %s (default index is 0)
-			  an %s             // Opens current's %s with links
+			  an j %s --index -1  // Opens previous %s
+			  an j %s --index +1  // Creates or opens the next %s
+			  an j %s             // Opens current's %s (default index is 0)
+			  an j %s             // Opens current's %s with links
 		`,
 			templateType,
 			templateType,
@@ -65,6 +66,8 @@ func NewCmdEntry(
 	flags.AddLinks(cmd)
 	cmd.Flags().
 		IntVarP(&index, "index", "i", 0, fmt.Sprintf("Index for the %s relative to today. Can be negative for past %ss or positive for future %ss.", templateType, templateType, templateType))
+	cmd.Flags().
+		BoolP("paste", "p", false, "Automatically paste clipboard contents as note content in placeholder.")
 	return cmd
 }
 
@@ -81,6 +84,21 @@ func run(
 		fmt.Printf("error processing tags argument: %s", err)
 		os.Exit(1)
 		return err
+	}
+
+	content := ""
+	paste, err := cmd.Flags().GetBool("paste")
+	if err != nil {
+		return err
+	}
+
+	if paste {
+		msg, err := clipboard.ReadAll()
+		if err == nil && msg != "" {
+			content = msg
+		}
+	} else {
+		content = arg.HandleContent(args)
 	}
 
 	links := flags.HandleLinks(cmd)
@@ -105,7 +123,7 @@ func run(
 		return note.Open()
 	}
 
-	_, createErr := note.Create(templateType, t)
+	_, createErr := note.Create(templateType, t, content)
 	if createErr != nil {
 		return createErr
 	}

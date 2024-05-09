@@ -48,7 +48,7 @@ func NewNoteListModel(
 	t *templater.Templater,
 	views map[string]ViewConfig,
 	viewFlag string,
-) NoteListModel {
+) (NoteListModel, *cache.Cache) {
 	files, _ := getFilesByView(views, viewFlag, cfg.VaultDir)
 	items := parseNoteFiles(files, cfg.VaultDir, false)
 	dkeys := newDelegateKeyMap()
@@ -68,7 +68,7 @@ func NewNoteListModel(
 	}
 
 	l.AdditionalFullHelpKeys = lkeys.fullHelp
-	c, err := cache.New(100)
+	c, err := cache.New(50)
 
 	if err != nil {
 		panic(err)
@@ -89,7 +89,7 @@ func NewNoteListModel(
 		form:         f,
 		renaming:     false,
 		creating:     false,
-	}
+	}, c
 }
 
 func (m NoteListModel) Init() tea.Cmd {
@@ -214,6 +214,11 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.viewFlag = "trash"
 			cmd := m.refresh()
 			return m, cmd
+
+		case key.Matches(msg, m.keys.switchToUnfulfillView):
+			m.viewFlag = "unfulfilled"
+			cmd := m.refresh()
+			return m, cmd
 		}
 
 		if key.Matches(msg, m.keys.rename) {
@@ -233,6 +238,9 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.list = nl
 	cmds = append(cmds, cmd)
 
+	// we need to asyncronously generate the markdown preview, then
+	// once we have the preview we update it which should update the display
+	// while waiting, could just show preview as blank for now
 	m.handlePreview()
 	return m, tea.Batch(cmds...)
 }
@@ -291,7 +299,9 @@ func Run(
 		}
 	}()
 
-	if _, err := tea.NewProgram(NewNoteListModel(c, t, views, viewFlag), tea.WithInput(os.Stdin), tea.WithAltScreen()).Run(); err != nil {
+	m, mCache := NewNoteListModel(c, t, views, viewFlag)
+
+	if _, err := tea.NewProgram(m, tea.WithInput(os.Stdin), tea.WithAltScreen()).Run(); err != nil {
 		// handle error for instances where neovim/editor doesn't pass stdin back in time to close gracefully with bubbletea
 		if strings.Contains(err.Error(), "resource temporarily unavailable") {
 			os.Exit(0) // exit gracefully
@@ -300,12 +310,15 @@ func Run(
 		}
 	}
 
+	fmt.Printf("Cache size: %s\n", cache.ReadableSize(int64(mCache.SizeOf())))
+	fmt.Printf("Cache size: %d\n", mCache.SizeOf())
+
 	// ran with no errors*, terminal gracefully
 	return nil
 }
 
 // handles markdown preview generation for selected (highlighted) items
-// caches up to 100 previews to avoid reprocessing when navigating the list
+// caches up to 50mb of previews to avoid reprocessing when navigating the list
 func (m *NoteListModel) handlePreview() {
 	if s, ok := m.list.SelectedItem().(ListItem); ok {
 		// check if the preview is already in the cache

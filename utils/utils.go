@@ -45,8 +45,7 @@ func isValidInput(input string) bool {
 	return regexp.MustCompile(`^[a-zA-Z0-9-_]+$`).MatchString(input)
 }
 
-// GenerateDate generates a date string based on the given type (day, week, month).
-
+// GenerateDate generates a date string based on the given type (day, week, month, year).
 func GenerateDate(numUnits int, unitType string) string {
 	var date time.Time
 	var dateFormat string
@@ -72,6 +71,12 @@ func GenerateDate(numUnits int, unitType string) string {
 		// Add the number of months
 		date = startOfMonth.AddDate(0, numUnits, 0)
 		dateFormat = "200601"
+	case "year":
+		// Find the first day of the current year
+		startOfYear := time.Date(now.Year(), 1, 1, 0, 0, 0, 0, now.Location())
+		// Add the number of years
+		date = startOfYear.AddDate(numUnits, 0, 0)
+		dateFormat = "2006"
 	default:
 		// Default to today's date
 		date = now
@@ -85,10 +90,17 @@ func RenderMarkdownPreview(
 	path string,
 	w, h int,
 ) string {
+	const cutoff = 1000
+
 	// Read file from system
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return "Error reading file"
+	}
+
+	// Check if the content exceeds the cutoff and trim if necessary
+	if len(content) > cutoff {
+		content = content[:cutoff]
 	}
 
 	// Initiate glamour renderer to add colors to our markdown preview
@@ -200,4 +212,16 @@ func Untrash(path string, cfg *config.Config) error {
 	}
 
 	return nil
+}
+
+// converts bytes to a human-readable format.
+func FormatBytes(size int64) string {
+	var units = []string{"B", "KB", "MB", "GB", "TB", "PB", "EB"}
+	var mod int64 = 1024
+	var i int
+	for size >= mod {
+		size /= mod
+		i++
+	}
+	return fmt.Sprintf("%d %s", size, units[i])
 }

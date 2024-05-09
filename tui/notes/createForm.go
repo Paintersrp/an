@@ -316,7 +316,8 @@ func (m FormModel) handleSubmit() FormModel {
 		return m
 	}
 
-	zet.StaticHandleNoteLaunch(note, m.t, tmpl)
+	// TODO: Content instead of "" ?
+	zet.StaticHandleNoteLaunch(note, m.t, tmpl, "")
 
 	return m
 }

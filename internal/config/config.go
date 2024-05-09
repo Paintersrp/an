@@ -60,7 +60,7 @@ func (cfg *Config) ToFile() error {
 		return err
 	}
 	p := cfg.GetConfigPath()
-	fmt.Println(p)
+
 	d := path.Dir(p)
 	if _, err := os.Stat(d); errors.Is(
 		err,
@@ -201,6 +201,153 @@ func (cfg *Config) ChangePin(file, pinType, pinName string) {
 			file,
 		)
 	}
+}
+
+func (cfg *Config) DeleteNamedPin(pinName string, pinType string, verbose bool) error {
+	switch pinType {
+	case "task":
+		if _, exists := cfg.NamedTaskPins[pinName]; exists {
+			delete(cfg.NamedTaskPins, pinName)
+			if verbose {
+				fmt.Printf("Task pin '%s' deleted successfully.\n", pinName)
+			}
+		} else {
+			return fmt.Errorf("task pin '%s' does not exist", pinName)
+		}
+	case "text":
+		if _, exists := cfg.NamedPins[pinName]; exists {
+			delete(cfg.NamedPins, pinName)
+			if verbose {
+				fmt.Printf("Text pin '%s' deleted successfully.\n", pinName)
+			}
+		} else {
+			return fmt.Errorf("text pin '%s' does not exist", pinName)
+		}
+	default:
+		return fmt.Errorf(
+			"invalid pin type: %s. Valid options are 'text' and 'task'",
+			pinType,
+		)
+	}
+
+	// Save the updated configuration to file
+	if err := cfg.ToFile(); err != nil {
+		return fmt.Errorf("error saving the configuration: %s", err)
+	}
+
+	return nil
+}
+
+func (cfg *Config) ClearPinnedFile(pinType string, verbose bool) error {
+	switch pinType {
+	case "task":
+		cfg.PinnedTaskFile = ""
+		if verbose {
+			fmt.Println("Pinned task file cleared successfully.")
+		}
+	case "text":
+		cfg.PinnedFile = ""
+		if verbose {
+			fmt.Println("Pinned text file cleared successfully.")
+		}
+	default:
+		return fmt.Errorf(
+			"invalid pin type: %s. Valid options are 'text' and 'task'",
+			pinType,
+		)
+	}
+
+	// Save the updated configuration to file
+	if err := cfg.ToFile(); err != nil {
+		return fmt.Errorf("error saving the configuration: %s", err)
+	}
+
+	return nil
+}
+
+func (cfg *Config) RenamePin(
+	oldName, newName, pinType string,
+	verbose bool,
+) error {
+	// Validate input
+	if oldName == "" || newName == "" {
+		return fmt.Errorf("old name and new name must be provided")
+	}
+	if oldName == newName {
+		return fmt.Errorf("new name is the same as old name")
+	}
+
+	var pinMap map[string]string
+
+	// Select the appropriate pin map based on pin type
+	switch pinType {
+	case "task":
+		pinMap = cfg.NamedTaskPins
+	case "text":
+		pinMap = cfg.NamedPins
+	default:
+		return fmt.Errorf(
+			"invalid pin type: %s. Valid options are 'text' and 'task'",
+			pinType,
+		)
+	}
+
+	// Check if the old pin name exists
+	if _, exists := pinMap[oldName]; !exists {
+		return fmt.Errorf("%s pin '%s' does not exist", pinType, oldName)
+	}
+
+	// Rename the pin
+	pinMap[newName] = pinMap[oldName]
+
+	// Delete the old pin
+	delete(pinMap, oldName)
+
+	// Save the updated configuration to file
+	if err := cfg.ToFile(); err != nil {
+		return fmt.Errorf("error saving the configuration: %s", err)
+	}
+
+	if verbose {
+		fmt.Printf("%s pin '%s' renamed to '%s'", pinType, oldName, newName)
+		fmt.Println(" and configuration saved successfully.")
+	}
+
+	return nil
+}
+
+func (cfg *Config) ListPins(pinType string) error {
+	var pins map[string]string
+	var defaultPin string
+
+	switch pinType {
+	case "task":
+		pins = cfg.NamedTaskPins
+		defaultPin = cfg.PinnedTaskFile
+	case "text":
+		pins = cfg.NamedPins
+		defaultPin = cfg.PinnedFile
+	default:
+		return fmt.Errorf(
+			"invalid pin type: %s. Valid options are 'text' and 'task'",
+			pinType,
+		)
+	}
+
+	if defaultPin != "" {
+		fmt.Printf("  Default: \n    - %s\n  Named:\n", defaultPin)
+	}
+
+	if len(pins) == 0 {
+		fmt.Println("  No named pins available.")
+		return nil
+	}
+
+	for name, file := range pins {
+		fmt.Printf("    - %s: %s\n", name, file)
+	}
+
+	return nil
 }
 
 func StaticGetConfigPath(homeDir string) string {

@@ -2,6 +2,7 @@
 title: {{.Title}}
 created: {{.Date}}
 modified:
+fulfilled: {{.Fulfilled}}
 up: "[[{{.Upstream}}]]"
 tags:
 {{- range .Tags}}
@@ -9,6 +10,7 @@ tags:
 {{- end}}
 ---
 
+{{.Content}}
 
 ---
 
@@ -17,10 +19,3 @@ tags:
 {{- range .Links}}
 [[{{.}}]]
 {{- end}}
-
-### Questions for Finding Connections
-
-- How does this idea relate to other concepts you've noted?
-- Are there any opposing viewpoints or contrasting ideas worth exploring?
-- Can you draw parallels between this idea and real-life experiences?
-- Are there any unanswered questions or areas for further exploration sparked by this note?

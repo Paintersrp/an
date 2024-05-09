@@ -76,7 +76,8 @@ func run(cmd *cobra.Command, args []string, t *templater.Templater, index int) e
 		return note.Open()
 	}
 
-	_, createErr := note.Create("day", t)
+	// TODO: Content instead of "" ?
+	_, createErr := note.Create("day", t, "")
 	if createErr != nil {
 		return createErr
 	}

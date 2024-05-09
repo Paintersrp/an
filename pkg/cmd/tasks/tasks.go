@@ -29,8 +29,8 @@ func NewCmdTasks(c *config.Config, t *templater.Templater) *cobra.Command {
 	}
 
 	cmd.AddCommand(taskEcho.NewCmdTaskEcho(c))
-	cmd.AddCommand(taskPin.NewCmdTaskPin(c))
 	cmd.AddCommand(taskList.NewCmdTasksList(c))
+	cmd.AddCommand(taskPin.NewCmdTaskPin(c))
 	cmd.AddCommand(taskNewEchoFile.NewCmdNewEchoFile(c, t))
 	cmd.AddCommand(taskOpenPin.NewCmdTaskOpenPin(c))
 

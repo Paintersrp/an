@@ -1,80 +1,45 @@
 package pin
 
 import (
-	"errors"
 	"fmt"
-	"os"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/Paintersrp/an/internal/config"
-	"github.com/Paintersrp/an/pkg/flags"
-	"github.com/Paintersrp/an/pkg/fs/fzf"
+	"github.com/Paintersrp/an/pkg/cmd/pin/pinAdd"
+	"github.com/Paintersrp/an/pkg/cmd/pin/pinList"
+	"github.com/Paintersrp/an/pkg/cmd/pin/pinRemove"
+	"github.com/Paintersrp/an/pkg/cmd/pin/pinTable"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
-func NewCmdPin(c *config.Config) *cobra.Command {
-	var check bool
-	var name string
+func NewCmdPin(c *config.Config, pinType string) *cobra.Command {
+	pinCommand := ""
+
+	switch pinType {
+	case "task":
+		pinCommand = "tasks pin"
+	case "text":
+		pinCommand = "pin"
+	}
 
 	cmd := &cobra.Command{
-		Use:     "pin [query] [--name pin_name] [--path file_path] [--check]",
+		Use:     "pin",
 		Aliases: []string{"p"},
-		Short:   "Pin a file to be used with the echo command or check the current pin.",
-		Long: heredoc.Doc(`
-			The pin command allows you to specify a file that can be used with the echo command,
-			or check the currently pinned file. The path to the pinned file is saved in the configuration.
+		Short:   "Manage your pinned items.",
+		Long: heredoc.Doc(fmt.Sprintf(`
+			The pin command group provides a set of subcommands to manage pins, which are references to files or tasks that you can quickly access and manipulate within the application. You can add, list, and remove pins using the respective subcommands.
 
 			Examples:
-			  an pin --path /path/to/myfile.txt
-			  an pin my-note
-			  an pin --check
-		`),
-		Args: cobra.MaximumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if check {
-				fmt.Println("Current pinned file:", c.PinnedFile)
-				return nil
-			}
-			return run(cmd, args, c, name)
-		},
+			  an %s add --name my-note
+			  an %s list
+			  an %s remove --name my-note
+		`, pinCommand, pinCommand, pinCommand)),
 	}
 
-	cmd.Flags().BoolVarP(&check, "check", "c", false, "Check the current pinned file")
-	cmd.Flags().StringVarP(&name, "name", "n", "", "Save as a named pin")
-	flags.AddPath(cmd)
+	cmd.AddCommand(pinAdd.Command(c, pinType))
+	cmd.AddCommand(pinRemove.Command(c, pinType))
+	cmd.AddCommand(pinList.Command(c, pinType))
+	cmd.AddCommand(pinTable.Command(c, pinType))
 
 	return cmd
-}
-
-func run(cmd *cobra.Command, args []string, c *config.Config, name string) error {
-	path := flags.HandlePath(cmd)
-
-	if path == "" {
-		vaultDir := viper.GetString("vaultDir")
-		finder := fzf.NewFuzzyFinder(vaultDir, "Select file to pin.")
-
-		if len(args) == 0 {
-			choice, err := finder.Run(false)
-			if err != nil {
-				fmt.Printf("error fuzzyfinding note: %s", err)
-			}
-
-			c.ChangePin(choice, "text", name)
-		} else {
-			choice, err := finder.RunWithQuery(args[0], false)
-			if err != nil {
-				fmt.Printf("error fuzzyfinding note: %s", err)
-			}
-
-			c.ChangePin(choice, "text", name)
-		}
-	} else {
-		if _, err := os.Stat(path); os.IsNotExist(err) {
-			return errors.New("the specified file does not exist")
-		}
-		c.ChangePin(path, "text", name)
-	}
-
-	return nil
 }

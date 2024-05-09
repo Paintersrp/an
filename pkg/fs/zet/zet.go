@@ -26,6 +26,7 @@ type ZettelkastenNote struct {
 	Upstream      string   `json:"upstream"       yaml:"upstream"`
 }
 
+// errors?
 func NewZettelkastenNote(
 	vaultDir string,
 	subDir string,
@@ -104,6 +105,7 @@ func (note *ZettelkastenNote) FileExists() (bool, string, error) {
 func (note *ZettelkastenNote) Create(
 	tmplName string,
 	t *templater.Templater,
+	content string,
 ) (bool, error) {
 	// Verify the directories up to the new note
 	path, err := note.EnsurePath()
@@ -120,11 +122,13 @@ func (note *ZettelkastenNote) Create(
 	// Setup template metadata
 	zetTime, tags := t.GenerateTagsAndDate(tmplName)
 	data := templater.TemplateData{
-		Title:    note.Filename,
-		Date:     zetTime,
-		Tags:     append(note.OriginalTags, tags...),
-		Links:    note.OriginalLinks,
-		Upstream: note.Upstream,
+		Title:     note.Filename,
+		Date:      zetTime,
+		Tags:      append(note.OriginalTags, tags...),
+		Links:     note.OriginalLinks,
+		Upstream:  note.Upstream,
+		Content:   content,
+		Fulfilled: false,
 	}
 
 	// Execute the template and return the rendered output
@@ -213,8 +217,17 @@ func StaticHandleNoteLaunch(
 	note *ZettelkastenNote,
 	t *templater.Templater,
 	tmpl string,
+	content string,
 ) {
-	_, err := note.Create(tmpl, t)
+	var cnt string
+
+	if content == "" {
+		cnt = "Placeholder"
+	} else {
+		cnt = content
+	}
+
+	_, err := note.Create(tmpl, t, cnt)
 	if err != nil {
 		fmt.Printf("error creating note file: %s", err)
 		os.Exit(1)

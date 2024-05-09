@@ -63,7 +63,7 @@ func run(
 
 	flags.HandlePin(cmd, c, note, "task", nextTitle)
 
-	zet.StaticHandleNoteLaunch(note, t, "task-echo")
+	zet.StaticHandleNoteLaunch(note, t, "task-echo", "")
 
 	return nil // no errors
 }
