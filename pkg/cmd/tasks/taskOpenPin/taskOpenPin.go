@@ -8,10 +8,10 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/Paintersrp/an/fs/zet"
-	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/internal/state"
 )
 
-func NewCmdTaskOpenPin(c *config.Config) *cobra.Command {
+func NewCmdTaskOpenPin(s *state.State) *cobra.Command {
 	var name string
 
 	cmd := &cobra.Command{
@@ -28,7 +28,7 @@ func NewCmdTaskOpenPin(c *config.Config) *cobra.Command {
     an tasks op
     `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(c, name)
+			return run(s, name)
 		},
 	}
 
@@ -36,18 +36,18 @@ func NewCmdTaskOpenPin(c *config.Config) *cobra.Command {
 	return cmd
 }
 
-func run(c *config.Config, name string) error {
+func run(s *state.State, name string) error {
 	var targetPin string
 	if name != "" {
-		if c.NamedTaskPins[name] == "" {
+		if s.Config.NamedTaskPins[name] == "" {
 			return fmt.Errorf("no pinned task file found")
 		}
-		targetPin = c.NamedTaskPins[name]
+		targetPin = s.Config.NamedTaskPins[name]
 	} else {
-		if c.PinnedTaskFile == "" {
+		if s.Config.PinnedTaskFile == "" {
 			return errors.New("no pinned task file found")
 		}
-		targetPin = c.PinnedTaskFile
+		targetPin = s.Config.PinnedTaskFile
 	}
 
 	if _, err := os.Stat(targetPin); os.IsNotExist(err) {

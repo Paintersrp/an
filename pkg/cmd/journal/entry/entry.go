@@ -12,7 +12,7 @@ import (
 
 	"github.com/Paintersrp/an/fs/templater"
 	"github.com/Paintersrp/an/fs/zet"
-	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/internal/state"
 	"github.com/Paintersrp/an/pkg/arg"
 	"github.com/Paintersrp/an/pkg/flags"
 	"github.com/Paintersrp/an/utils"
@@ -21,8 +21,7 @@ import (
 // TODO: adding links/tags/content after note already exists?
 
 func NewCmdEntry(
-	c *config.Config,
-	t *templater.Templater,
+	s *state.State,
 	templateType string, // Accepts "day", "week", "month", or "year"
 ) *cobra.Command {
 	var index int
@@ -60,7 +59,7 @@ func NewCmdEntry(
 			templateType,
 		)),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd, args, t, index, templateType)
+			return run(cmd, args, s.Templater, index, templateType)
 		},
 	}
 

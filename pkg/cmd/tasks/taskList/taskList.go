@@ -6,10 +6,10 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/Paintersrp/an/fs/parser"
-	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/internal/state"
 )
 
-func NewCmdTasksList(c *config.Config) *cobra.Command {
+func NewCmdTasksList(s *state.State) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"l"},
@@ -20,15 +20,15 @@ func NewCmdTasksList(c *config.Config) *cobra.Command {
     an-cli tasks list
     `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(c)
+			return run(s)
 		},
 	}
 
 	return cmd
 }
 
-func run(c *config.Config) error {
-	p := parser.NewParser(c.VaultDir)
+func run(s *state.State) error {
+	p := parser.NewParser(s.Vault)
 
 	if err := p.Walk(); err != nil {
 		fmt.Println("Error:", err)

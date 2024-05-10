@@ -16,42 +16,43 @@ limitations under the License.
 package cmd
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
-	"github.com/Paintersrp/an/fs/templater"
-	"github.com/Paintersrp/an/internal/config"
-	"github.com/Paintersrp/an/internal/constants"
+	"github.com/Paintersrp/an/internal/state"
 	"github.com/Paintersrp/an/pkg/cmd/root"
 )
 
 func Execute() {
-	// Get Home Directory for locating config files
-	home, err := os.UserHomeDir()
+	// // Get Home Directory for locating config files
+	// home, err := os.UserHomeDir()
+	// cobra.CheckErr(err)
+	//
+	// // Eventually will factor out Viper entirely
+	// viper.AddConfigPath(home + constants.ConfigDir)
+	// viper.SetConfigName(constants.ConfigFile)
+	// viper.SetConfigType(constants.ConfigFileType)
+	// viper.ReadInConfig()
+	//
+	// config.EnsureConfigExists(home)
+	// cfg, cfgErr := config.FromFile(config.StaticGetConfigPath(home))
+	// if cfgErr != nil {
+	// 	return // exit?
+	// }
+	//
+	// templater, templaterErr := templater.NewTemplater()
+	// if templaterErr != nil {
+	// 	fmt.Printf("failed to create templater: %v", templaterErr)
+	// 	cobra.CheckErr(templaterErr)
+	// }
+	//
+	// hndlr := handler.NewFileHandler(cfg.VaultDir)
+
+	s, err := state.NewState()
 	cobra.CheckErr(err)
 
-	// Eventually will factor out Viper entirely
-	viper.AddConfigPath(home + constants.ConfigDir)
-	viper.SetConfigName(constants.ConfigFile)
-	viper.SetConfigType(constants.ConfigFileType)
-	viper.ReadInConfig()
-
-	config.EnsureConfigExists(home)
-	cfg, cfgErr := config.FromFile(config.StaticGetConfigPath(home))
-	if cfgErr != nil {
-		return // exit?
-	}
-
-	templater, templaterErr := templater.NewTemplater()
-	if templaterErr != nil {
-		fmt.Printf("failed to create templater: %v", templaterErr)
-		cobra.CheckErr(templaterErr)
-	}
-
-	rootCmd, rootErr := root.NewCmdRoot(cfg, templater)
+	rootCmd, rootErr := root.NewCmdRoot(s)
 	if rootErr != nil {
 		return // exit?
 	}

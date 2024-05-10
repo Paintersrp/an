@@ -12,10 +12,9 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"golang.org/x/term"
 
-	"github.com/Paintersrp/an/fs/templater"
 	"github.com/Paintersrp/an/fs/zet"
 	"github.com/Paintersrp/an/internal/cache"
-	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/internal/state"
 	v "github.com/Paintersrp/an/internal/views"
 	"github.com/Paintersrp/an/tui/notes/submodels"
 	"github.com/Paintersrp/an/utils"
@@ -29,12 +28,11 @@ var maxCacheSizeMb int64 = 50
 
 type NoteListModel struct {
 	list         list.Model
-	templater    *templater.Templater
 	views        map[string]v.View
 	cache        *cache.Cache
 	keys         *listKeyMap
 	delegateKeys *delegateKeyMap
-	config       *config.Config
+	state        *state.State
 	preview      string
 	viewName     string
 	formModel    submodels.FormModel
@@ -47,21 +45,20 @@ type NoteListModel struct {
 }
 
 func NewNoteListModel(
-	cfg *config.Config,
-	t *templater.Templater,
+	s *state.State,
 	views map[string]v.View,
 	viewName string,
 ) (*NoteListModel, error) {
-	files, err := v.GetFilesByView(views, viewName, cfg.VaultDir)
+	files, err := v.GetFilesByView(views, viewName, s.Vault)
 	if err != nil {
 		return nil, err
 	}
 
-	items := ParseNoteFiles(files, cfg.VaultDir, false)
+	items := ParseNoteFiles(files, s.Vault, false)
 	dkeys := newDelegateKeyMap()
 	lkeys := newListKeyMap()
 	title := v.GetTitleForView(viewName)
-	delegate := newItemDelegate(dkeys, cfg, viewName)
+	delegate := newItemDelegate(dkeys, s.Handler, viewName)
 
 	l := list.New(items, delegate, 0, 0)
 	l.Title = title
@@ -82,11 +79,10 @@ func NewNoteListModel(
 	}
 
 	i := submodels.NewInputModel()
-	f := submodels.NewFormModel(cfg, t)
+	f := submodels.NewFormModel(s)
 
 	return &NoteListModel{
-		config:       cfg,
-		templater:    t,
+		state:        s,
 		views:        views,
 		cache:        c,
 		list:         l,
@@ -259,8 +255,7 @@ func (m NoteListModel) View() string {
 }
 
 func Run(
-	c *config.Config,
-	t *templater.Templater,
+	s *state.State,
 	views map[string]v.View,
 	viewFlag string,
 ) error {
@@ -278,7 +273,7 @@ func Run(
 		}
 	}()
 
-	m, err := NewNoteListModel(c, t, views, viewFlag)
+	m, err := NewNoteListModel(s, views, viewFlag)
 	if err != nil {
 		return err
 	}
@@ -333,14 +328,14 @@ func (m *NoteListModel) refresh() tea.Cmd {
 
 // refreshes the list items based on view conditions
 func (m *NoteListModel) refreshItems() tea.Cmd {
-	files, _ := v.GetFilesByView(m.views, m.viewName, m.config.VaultDir)
-	items := ParseNoteFiles(files, m.config.VaultDir, m.showDetails)
+	files, _ := v.GetFilesByView(m.views, m.viewName, m.state.Vault)
+	items := ParseNoteFiles(files, m.state.Vault, m.showDetails)
 	return m.list.SetItems(items)
 }
 
 func (m *NoteListModel) refreshDelegate() {
 	dkeys := newDelegateKeyMap()
-	delegate := newItemDelegate(dkeys, m.config, m.viewName)
+	delegate := newItemDelegate(dkeys, m.state.Handler, m.viewName)
 	m.list.SetDelegate(delegate)
 }
 

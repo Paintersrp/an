@@ -14,7 +14,6 @@ import (
 )
 
 func NewCmdTodo(c *config.Config) *cobra.Command {
-
 	cmd := &cobra.Command{
 		Use:     "todo",
 		Aliases: []string{"td"},

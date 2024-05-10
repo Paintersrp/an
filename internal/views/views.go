@@ -135,7 +135,9 @@ func GetFilesByView(
 		excludeDirs = m.ExcludeFiles
 	}
 
-	return handler.WalkFiles(vaultDir, excludeDirs, excludeFiles, viewFlag)
+	h := handler.NewFileHandler(vaultDir)
+
+	return h.WalkFiles(excludeDirs, excludeFiles, viewFlag)
 }
 
 func getAvailableViews(views map[string]View) string {

@@ -11,7 +11,7 @@ import (
 
 	"github.com/Paintersrp/an/fs/templater"
 	"github.com/Paintersrp/an/fs/zet"
-	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/internal/state"
 	"github.com/Paintersrp/an/internal/views"
 	"github.com/Paintersrp/an/utils"
 )
@@ -44,8 +44,7 @@ var (
 )
 
 type FormModel struct {
-	cfg                  *config.Config
-	t                    *templater.Templater
+	state                *state.State
 	availableTemplates   string
 	availableSubdirNames string
 	Inputs               []textinput.Model
@@ -54,7 +53,7 @@ type FormModel struct {
 	btn                  SubmitButton
 }
 
-func NewFormModel(cfg *config.Config, t *templater.Templater) FormModel {
+func NewFormModel(s *state.State) FormModel {
 	var inputs = make([]textinput.Model, 5)
 	inputs[title] = textinput.New()
 	inputs[title].Placeholder = "Title"
@@ -95,7 +94,7 @@ func NewFormModel(cfg *config.Config, t *templater.Templater) FormModel {
 	// Join the template names into a single string separated by commas.
 	availableTemplateNames := strings.Join(templateNames, ", ")
 
-	availableSubdirs := views.GetSubdirectories(cfg.VaultDir, "")
+	availableSubdirs := views.GetSubdirectories(s.Vault, "")
 	var visibleSubdirs []string
 	for _, subdir := range availableSubdirs {
 		if !strings.HasPrefix(subdir, ".") {
@@ -109,8 +108,7 @@ func NewFormModel(cfg *config.Config, t *templater.Templater) FormModel {
 	return FormModel{
 		Inputs:               inputs,
 		Focused:              0,
-		cfg:                  cfg,
-		t:                    t,
+		state:                s,
 		availableTemplates:   availableTemplateNames,
 		availableSubdirs:     availableSubdirs,
 		availableSubdirNames: availableSubdirNames,
@@ -304,7 +302,7 @@ func (m FormModel) handleSubmit() FormModel {
 	}
 
 	note := zet.NewZettelkastenNote(
-		m.cfg.VaultDir,
+		m.state.Vault,
 		subDir,
 		title,
 		tags,
@@ -319,7 +317,7 @@ func (m FormModel) handleSubmit() FormModel {
 	}
 
 	// TODO: Content instead of "" ?
-	zet.StaticHandleNoteLaunch(note, m.t, tmpl, "")
+	zet.StaticHandleNoteLaunch(note, m.state.Templater, tmpl, "")
 
 	return m
 }

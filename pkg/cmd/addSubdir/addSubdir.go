@@ -6,9 +6,8 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/Paintersrp/an/internal/state"
 	"github.com/spf13/cobra"
-
-	"github.com/Paintersrp/an/internal/config"
 )
 
 func isValidDirName(name string) error {
@@ -24,7 +23,7 @@ func isValidDirName(name string) error {
 	return nil
 }
 
-func NewCmdAddSubdir(c *config.Config) *cobra.Command {
+func NewCmdAddSubdir(s *state.State) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "add-subdir [name]",
 		Aliases: []string{"as", "add-s", "a-s"},
@@ -44,7 +43,7 @@ func NewCmdAddSubdir(c *config.Config) *cobra.Command {
 				cmd.Println("Error:", err)
 				return
 			}
-			c.AddSubdir(name)
+			s.Config.AddSubdir(name)
 		},
 	}
 

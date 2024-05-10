@@ -7,19 +7,43 @@ import (
 	"strings"
 
 	"github.com/Paintersrp/an/fs/parser"
+	"github.com/Paintersrp/an/utils"
 )
 
-func WalkFiles(
-	vaultDir string,
+type FileHandler struct {
+	vaultDir string
+}
+
+func NewFileHandler(vaultDir string) *FileHandler {
+	return &FileHandler{vaultDir: vaultDir}
+}
+
+func (h *FileHandler) Archive(path string) error {
+	return utils.Archive(path, h.vaultDir)
+}
+
+func (h *FileHandler) Unarchive(path string) error {
+	return utils.Unarchive(path, h.vaultDir)
+}
+
+func (h *FileHandler) Trash(path string) error {
+	return utils.Trash(path, h.vaultDir)
+}
+
+func (h *FileHandler) Untrash(path string) error {
+	return utils.Untrash(path, h.vaultDir)
+}
+
+func (h *FileHandler) WalkFiles(
 	excludeDirs []string,
 	excludeFiles []string,
 	modeFlag string,
 ) ([]string, error) {
 	var files []string
-	baseDepth := len(strings.Split(vaultDir, string(os.PathSeparator)))
+	baseDepth := len(strings.Split(h.vaultDir, string(os.PathSeparator)))
 
 	err := filepath.Walk(
-		vaultDir,
+		h.vaultDir,
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err // exit
@@ -36,7 +60,7 @@ func WalkFiles(
 			// Check if the current directory is in the list of directories to exclude
 			dir := filepath.Dir(path)
 			for _, d := range excludeDirs {
-				if dir == filepath.Join(vaultDir, d) {
+				if dir == filepath.Join(h.vaultDir, d) {
 					if info.IsDir() {
 						return filepath.SkipDir // skip the entire directory
 					}

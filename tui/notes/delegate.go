@@ -7,15 +7,14 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/Paintersrp/an/internal/config"
-	"github.com/Paintersrp/an/utils"
+	"github.com/Paintersrp/an/fs/handler"
 )
 
 var currView string
 
 func newItemDelegate(
 	keys *delegateKeyMap,
-	cfg *config.Config,
+	h *handler.FileHandler,
 	view string,
 ) list.DefaultDelegate {
 	currView = view
@@ -42,7 +41,7 @@ func newItemDelegate(
 			switch {
 			case key.Matches(msg, keys.archive):
 				if currView == "default" || currView == "orphan" {
-					if err := utils.Archive(p, cfg); err != nil {
+					if err := h.Archive(p); err != nil {
 						return m.NewStatusMessage(statusStyle("Failed to archive " + n))
 					}
 					i := m.Index()
@@ -61,7 +60,7 @@ func newItemDelegate(
 				}
 
 			case key.Matches(msg, keys.trash):
-				if err := utils.Trash(p, cfg); err != nil {
+				if err := h.Trash(p); err != nil {
 					return m.NewStatusMessage(statusStyle("Failed to move " + n + " to trash"))
 				}
 				i := m.Index()
@@ -71,7 +70,7 @@ func newItemDelegate(
 			case key.Matches(msg, keys.undo):
 				switch currView {
 				case "archive":
-					if err := utils.Unarchive(p, cfg); err != nil {
+					if err := h.Unarchive(p); err != nil {
 						return m.NewStatusMessage(statusStyle("Failed to unarchive " + n))
 					}
 					i := m.Index()
@@ -79,7 +78,7 @@ func newItemDelegate(
 					return m.NewStatusMessage(statusStyle("Restored " + n))
 
 				case "trash":
-					if err := utils.Untrash(p, cfg); err != nil {
+					if err := h.Untrash(p); err != nil {
 						return m.NewStatusMessage(statusStyle("Failed to restore " + n))
 					}
 					i := m.Index()
@@ -90,7 +89,7 @@ func newItemDelegate(
 			case key.Matches(msg, keys.keypadDelete):
 				switch currView {
 				default:
-					if err := utils.Trash(p, cfg); err != nil {
+					if err := h.Trash(p); err != nil {
 						return m.NewStatusMessage(statusStyle("Failed to move " + n + " to trash"))
 					}
 					i := m.Index()

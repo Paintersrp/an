@@ -11,15 +11,12 @@ import (
 
 	"github.com/Paintersrp/an/fs/templater"
 	"github.com/Paintersrp/an/fs/zet"
-	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/internal/state"
 	"github.com/Paintersrp/an/pkg/flags"
 	"github.com/Paintersrp/an/utils"
 )
 
-func NewCmdDay(
-	c *config.Config,
-	t *templater.Templater,
-) *cobra.Command {
+func NewCmdDay(s *state.State) *cobra.Command {
 	var index int
 	cmd := &cobra.Command{
 		Use:     "day [tags] [--index index] [--links link1 link2 ...]",
@@ -36,7 +33,7 @@ func NewCmdDay(
 			  an day             // Opens today's note (default index is 0)
 			  an day --links 'Vacation' // Opens today's note with links
 		`), RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd, args, t, index)
+			return run(cmd, args, s.Templater, index)
 		},
 	}
 

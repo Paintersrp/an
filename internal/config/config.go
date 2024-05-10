@@ -360,6 +360,7 @@ func StaticGetConfigPath(homeDir string) string {
 		constants.ConfigFileType,
 	)
 }
+
 func EnsureConfigExists(home string) {
 	// Get the directory path of the file and absolute file path
 	dir := fmt.Sprintf("%s/%s", home, constants.ConfigDir)

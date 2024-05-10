@@ -8,8 +8,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/Paintersrp/an/fs/templater"
 	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/internal/state"
 	"github.com/Paintersrp/an/pkg/cmd/addSubdir"
 	"github.com/Paintersrp/an/pkg/cmd/archive"
 	"github.com/Paintersrp/an/pkg/cmd/day"
@@ -35,8 +35,7 @@ var (
 )
 
 func NewCmdRoot(
-	c *config.Config,
-	t *templater.Templater,
+	s *state.State,
 ) (*cobra.Command, error) {
 	cmd := &cobra.Command{
 		Use:     "atomic",
@@ -49,7 +48,7 @@ func NewCmdRoot(
   an new robotics "robotics science class study-notes"
   `,
 		// Run notes tui by default, or leave as help?
-		RunE: notes.NewCmdNotes(c, t).RunE,
+		RunE: notes.NewCmdNotes(s).RunE,
 	}
 
 	// Validate the subdirectory flag
@@ -65,27 +64,27 @@ func NewCmdRoot(
 	viper.BindPFlag("subdir", cmd.PersistentFlags().Lookup("subdir"))
 
 	// TODO: Subdirectory creation is being asked even on the init command, should prob find a way to avoid that
-	handleSubdirs(c)
+	handleSubdirs(s.Config)
 
 	// Add Child Commands to Root
-	cmd.AddCommand(initialize.NewCmdInit(c))
-	cmd.AddCommand(addSubdir.NewCmdAddSubdir(c))
-	cmd.AddCommand(new.NewCmdNew(c, t))
-	cmd.AddCommand(open.NewCmdOpen(c))
-	cmd.AddCommand(tags.NewCmdTags(c))
-	cmd.AddCommand(tasks.NewCmdTasks(c, t))
-	cmd.AddCommand(day.NewCmdDay(c, t))
-	cmd.AddCommand(pin.NewCmdPin(c, "text"))
-	cmd.AddCommand(echo.NewCmdEcho(c, t))
-	cmd.AddCommand(settings.NewCmdSettings(c))
-	cmd.AddCommand(symlink.NewCmdSymlink(c))
-	cmd.AddCommand(notes.NewCmdNotes(c, t))
-	cmd.AddCommand(todo.NewCmdTodo(c))
-	cmd.AddCommand(archive.NewCmdArchive(c))
-	cmd.AddCommand(unarchive.NewCmdUnarchive(c))
-	cmd.AddCommand(trash.NewCmdTrash(c))
-	cmd.AddCommand(untrash.NewCmdUntrash(c))
-	cmd.AddCommand(journal.NewCmdJournal(c, t))
+	cmd.AddCommand(initialize.NewCmdInit(s))
+	cmd.AddCommand(addSubdir.NewCmdAddSubdir(s))
+	cmd.AddCommand(new.NewCmdNew(s))
+	cmd.AddCommand(open.NewCmdOpen(s.Config))
+	cmd.AddCommand(tags.NewCmdTags(s.Config))
+	cmd.AddCommand(tasks.NewCmdTasks(s))
+	cmd.AddCommand(day.NewCmdDay(s))
+	cmd.AddCommand(pin.NewCmdPin(s, "text"))
+	cmd.AddCommand(echo.NewCmdEcho(s))
+	cmd.AddCommand(settings.NewCmdSettings(s.Config))
+	cmd.AddCommand(symlink.NewCmdSymlink(s.Config))
+	cmd.AddCommand(notes.NewCmdNotes(s))
+	cmd.AddCommand(todo.NewCmdTodo(s.Config))
+	cmd.AddCommand(archive.NewCmdArchive(s))
+	cmd.AddCommand(unarchive.NewCmdUnarchive(s))
+	cmd.AddCommand(trash.NewCmdTrash(s))
+	cmd.AddCommand(untrash.NewCmdUntrash(s))
+	cmd.AddCommand(journal.NewCmdJournal(s))
 
 	return cmd, nil
 }

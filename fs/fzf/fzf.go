@@ -17,13 +17,15 @@ import (
 
 // FuzzyFinder encapsulates the fuzzy finder functionality
 type FuzzyFinder struct {
+	handler  *handler.FileHandler
 	vaultDir string
 	Header   string
 	files    []string
 }
 
 func NewFuzzyFinder(vaultDir, header string) *FuzzyFinder {
-	return &FuzzyFinder{vaultDir: vaultDir, Header: header}
+	h := handler.NewFileHandler(vaultDir)
+	return &FuzzyFinder{vaultDir: vaultDir, Header: header, handler: h}
 }
 
 func (f *FuzzyFinder) Run(execute bool) (string, error) {
@@ -45,7 +47,7 @@ func (f *FuzzyFinder) RunWithQuery(query string, execute bool) (string, error) {
 }
 
 func (f *FuzzyFinder) find(query string) (int, error) {
-	files, err := handler.WalkFiles(f.vaultDir, nil, nil, "default")
+	files, err := f.handler.WalkFiles(nil, nil, "default")
 
 	if err != nil {
 		return -1, fmt.Errorf("error listing files: %w", err)

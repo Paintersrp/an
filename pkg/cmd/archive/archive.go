@@ -4,16 +4,12 @@ import (
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/Paintersrp/an/internal/state"
 	"github.com/spf13/cobra"
-
-	"github.com/Paintersrp/an/internal/config"
-	"github.com/Paintersrp/an/utils"
 )
 
 // Not very useful on it's own, but quite handy for scripting
-func NewCmdArchive(
-	c *config.Config,
-) *cobra.Command {
+func NewCmdArchive(s *state.State) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "archive [path]",
 		Short: "Archive a note.",
@@ -30,7 +26,7 @@ func NewCmdArchive(
 				return nil
 			}
 			path := args[0]
-			return utils.Archive(path, c)
+			return s.Handler.Archive(path)
 		},
 	}
 

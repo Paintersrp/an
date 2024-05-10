@@ -10,8 +10,6 @@ import (
 
 	"github.com/charmbracelet/glamour"
 	"github.com/muesli/termenv"
-
-	"github.com/Paintersrp/an/internal/config"
 )
 
 func AppendIfNotExists(slice []string, value string) []string {
@@ -121,15 +119,15 @@ func RenderMarkdownPreview(
 	return markdown
 }
 
-func Archive(path string, cfg *config.Config) error {
+func Archive(path string, vaultDir string) error {
 	// Get the subdirectory path relative to the vault directory
-	subDir, err := filepath.Rel(cfg.VaultDir, filepath.Dir(path))
+	subDir, err := filepath.Rel(vaultDir, filepath.Dir(path))
 	if err != nil {
 		return err
 	}
 
 	// Create the archive subdirectory path, if needed
-	archiveSubDir := filepath.Join(cfg.VaultDir, "archive", subDir)
+	archiveSubDir := filepath.Join(vaultDir, "archive", subDir)
 	if _, err := os.Stat(archiveSubDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(archiveSubDir, os.ModePerm); err != nil {
 			return err
@@ -145,10 +143,10 @@ func Archive(path string, cfg *config.Config) error {
 	return nil
 }
 
-func Unarchive(path string, cfg *config.Config) error {
+func Unarchive(path string, vaultDir string) error {
 	// Infer the original subdirectory from the archive path
 	subDir, err := filepath.Rel(
-		filepath.Join(cfg.VaultDir, "archive"),
+		filepath.Join(vaultDir, "archive"),
 		filepath.Dir(path),
 	)
 	if err != nil {
@@ -156,7 +154,7 @@ func Unarchive(path string, cfg *config.Config) error {
 	}
 
 	// Define the original directory where the notes should be restored
-	originalDir := filepath.Join(cfg.VaultDir, subDir)
+	originalDir := filepath.Join(vaultDir, subDir)
 
 	// Move the note from the archive directory back to the original directory
 	newPath := filepath.Join(originalDir, filepath.Base(path))
@@ -168,15 +166,15 @@ func Unarchive(path string, cfg *config.Config) error {
 }
 
 // Function to move a note to the trash directory
-func Trash(path string, cfg *config.Config) error {
+func Trash(path string, vaultDir string) error {
 	// Get the subdirectory path relative to the vault directory
-	subDir, err := filepath.Rel(cfg.VaultDir, filepath.Dir(path))
+	subDir, err := filepath.Rel(vaultDir, filepath.Dir(path))
 	if err != nil {
 		return err
 	}
 
 	// Define the trash directory path
-	trashDir := filepath.Join(cfg.VaultDir, "trash", subDir)
+	trashDir := filepath.Join(vaultDir, "trash", subDir)
 	if _, err := os.Stat(trashDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(trashDir, os.ModePerm); err != nil {
 			return err
@@ -193,10 +191,10 @@ func Trash(path string, cfg *config.Config) error {
 }
 
 // Function to restore a note from the trash directory
-func Untrash(path string, cfg *config.Config) error {
+func Untrash(path string, vaultDir string) error {
 	// Infer the original subdirectory from the archive path
 	subDir, err := filepath.Rel(
-		filepath.Join(cfg.VaultDir, "trash"),
+		filepath.Join(vaultDir, "trash"),
 		filepath.Dir(path),
 	)
 	if err != nil {
@@ -204,7 +202,7 @@ func Untrash(path string, cfg *config.Config) error {
 	}
 
 	// Define the original directory where the notes should be restored
-	originalDir := filepath.Join(cfg.VaultDir, subDir)
+	originalDir := filepath.Join(vaultDir, subDir)
 
 	// Move the note from the trash directory back to the original directory
 	newPath := filepath.Join(originalDir, filepath.Base(path))

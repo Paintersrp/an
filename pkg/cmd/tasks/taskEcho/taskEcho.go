@@ -8,12 +8,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/internal/state"
 )
 
 // TODO: Clean
 
-func NewCmdTaskEcho(c *config.Config) *cobra.Command {
+func NewCmdTaskEcho(s *state.State) *cobra.Command {
 	var priority string
 	var target string
 
@@ -29,7 +29,7 @@ It allows for tasks to be categorized under high, medium, or low priority sectio
     `,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(args, c, priority, target)
+			return run(args, s, priority, target)
 		},
 	}
 
@@ -41,26 +41,26 @@ It allows for tasks to be categorized under high, medium, or low priority sectio
 	return cmd
 }
 
-func run(args []string, c *config.Config, priority string, target string) error {
+func run(args []string, s *state.State, priority string, target string) error {
 	task := strings.Join(args, " ")
 	taskEntry := fmt.Sprintf("- [ ] %s\n", task)
 	var targetPin string
 
 	if target != "" {
-		if c.NamedTaskPins[target] == "" {
+		if s.Config.NamedTaskPins[target] == "" {
 			return fmt.Errorf(
 				"no task file pinned for named task pin '%s'. Use the task-pin command to pin a task-file first",
 				target,
 			)
 		}
-		targetPin = c.NamedTaskPins[target]
+		targetPin = s.Config.NamedTaskPins[target]
 	} else {
-		if c.PinnedTaskFile == "" {
+		if s.Config.PinnedTaskFile == "" {
 			return errors.New(
 				"no task file pinned. Use the task-pin command to pin a task-file first",
 			)
 		}
-		targetPin = c.PinnedTaskFile
+		targetPin = s.Config.PinnedTaskFile
 	}
 
 	// Read the entire file into memory
