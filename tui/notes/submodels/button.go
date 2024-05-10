@@ -1,4 +1,4 @@
-package notes
+package submodels
 
 import (
 	tea "github.com/charmbracelet/bubbletea"

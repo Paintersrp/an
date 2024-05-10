@@ -151,7 +151,6 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 				inputValue := m.configInput.Input.Value()
-				// Set the inputValue to the correct setting in the config
 				switch title {
 				case "VaultDir":
 					m.config.VaultDir = inputValue

@@ -1,4 +1,4 @@
-package notes
+package submodels
 
 import (
 	"strings"
@@ -6,6 +6,16 @@ import (
 	"github.com/charmbracelet/bubbles/cursor"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+)
+
+var (
+	focusedStyle = lipgloss.NewStyle().
+			Bold(true).
+			Background(lipgloss.Color("#0AF")).
+			Foreground(lipgloss.Color("#FFF"))
+
+	cursorStyle = focusedStyle.Copy()
 )
 
 type InputModel struct {

@@ -12,6 +12,7 @@ import (
 	v "github.com/Paintersrp/an/internal/views"
 	"github.com/Paintersrp/an/pkg/fs/templater"
 	"github.com/Paintersrp/an/pkg/fs/zet"
+	"github.com/Paintersrp/an/tui/notes/submodels"
 	"github.com/Paintersrp/an/utils"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
@@ -37,8 +38,8 @@ type NoteListModel struct {
 	viewName     string
 	showDetails  bool
 	renaming     bool
-	inputModel   InputModel
-	formModel    FormModel
+	inputModel   submodels.InputModel
+	formModel    submodels.FormModel
 	creating     bool
 }
 
@@ -77,8 +78,8 @@ func NewNoteListModel(
 		panic(err)
 	}
 
-	i := NewInputModel()
-	f := NewFormModel(cfg, t)
+	i := submodels.NewInputModel()
+	f := submodels.NewFormModel(cfg, t)
 
 	return &NoteListModel{
 		config:       cfg,
@@ -417,10 +418,10 @@ func (m *NoteListModel) toggleRename() {
 // clear?
 func (m *NoteListModel) toggleCreation() {
 	if !m.creating {
-		m.formModel.inputs[m.formModel.focused].Focus()
+		m.formModel.Inputs[m.formModel.Focused].Focus()
 		m.creating = true
 	} else {
-		m.formModel.inputs[m.formModel.focused].Blur()
+		m.formModel.Inputs[m.formModel.Focused].Blur()
 		m.creating = false
 	}
 }

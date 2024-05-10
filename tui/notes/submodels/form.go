@@ -1,4 +1,4 @@
-package notes
+package submodels
 
 import (
 	"fmt"
@@ -43,8 +43,8 @@ var (
 )
 
 type FormModel struct {
-	inputs               []textinput.Model
-	focused              int
+	Inputs               []textinput.Model
+	Focused              int
 	cfg                  *config.Config
 	t                    *templater.Templater
 	availableTemplates   string
@@ -106,8 +106,8 @@ func NewFormModel(cfg *config.Config, t *templater.Templater) FormModel {
 	b := NewSubmitButton()
 
 	return FormModel{
-		inputs:               inputs,
-		focused:              0,
+		Inputs:               inputs,
+		Focused:              0,
 		cfg:                  cfg,
 		t:                    t,
 		availableTemplates:   availableTemplateNames,
@@ -122,7 +122,7 @@ func (m FormModel) Init() tea.Cmd {
 }
 
 func (m FormModel) Update(msg tea.Msg) (FormModel, tea.Cmd) {
-	var cmds = make([]tea.Cmd, len(m.inputs)+1) // +1 for the submit button
+	var cmds = make([]tea.Cmd, len(m.Inputs)+1) // +1 for the submit button
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -143,14 +143,14 @@ func (m FormModel) Update(msg tea.Msg) (FormModel, tea.Cmd) {
 		}
 
 		// Blur all inputs and the submit button
-		for i := range m.inputs {
-			m.inputs[i].Blur()
+		for i := range m.Inputs {
+			m.Inputs[i].Blur()
 		}
 		m.btn.Blur()
 
 		// Focus the current input or the submit button
-		if m.focused < len(m.inputs) {
-			m.inputs[m.focused].Focus()
+		if m.Focused < len(m.Inputs) {
+			m.Inputs[m.Focused].Focus()
 		} else {
 			m.btn.Focus()
 		}
@@ -162,8 +162,8 @@ func (m FormModel) Update(msg tea.Msg) (FormModel, tea.Cmd) {
 	}
 
 	// Update all text inputs
-	for i := range m.inputs {
-		m.inputs[i], cmds[i] = m.inputs[i].Update(msg)
+	for i := range m.Inputs {
+		m.Inputs[i], cmds[i] = m.Inputs[i].Update(msg)
 	}
 
 	// Update the submit button
@@ -216,63 +216,63 @@ func (m FormModel) View() string {
 		continueStyle.Render("Available Subdirectories:"),
 		continueStyle.Width(50).Render(m.availableSubdirNames),
 		formInputStyle.Width(50).Render("Title"),
-		m.inputs[title].View(),
+		m.Inputs[title].View(),
 		formInputStyle.Width(50).Render("Tags (space separated)"),
-		m.inputs[tags].View(),
+		m.Inputs[tags].View(),
 		formInputStyle.Width(50).Render("Note Links (space separated)"),
-		m.inputs[links].View(),
+		m.Inputs[links].View(),
 		formInputStyle.Width(50).Render("Template"),
-		m.inputs[template].View(),
+		m.Inputs[template].View(),
 		formInputStyle.Width(50).Render("Subdirectory"),
-		m.inputs[subdirectory].View(),
+		m.Inputs[subdirectory].View(),
 		btnView,
 	) + "\n"
 }
 
 // nextInput focuses the next input field
 func (m *FormModel) nextInput() {
-	if m.focused == len(m.inputs) {
+	if m.Focused == len(m.Inputs) {
 		// if btn already focused
 		if m.btn.focused {
 			m.btn.Blur()
-			m.focused = 0 // wrap to start
+			m.Focused = 0 // wrap to start
 		}
 
 		// Assuming len(m.inputs) is the index before the submit button
 		m.btn.Focus()
 	} else {
-		m.focused = (m.focused + 1) % (len(m.inputs) + 1) // +1 to include the submit button
+		m.Focused = (m.Focused + 1) % (len(m.Inputs) + 1) // +1 to include the submit button
 	}
 }
 
 // prevInput focuses the previous input field
 func (m *FormModel) prevInput() {
-	m.focused--
+	m.Focused--
 
-	if m.focused == len(m.inputs) {
+	if m.Focused == len(m.Inputs) {
 		m.btn.Blur()
 	}
 	// Wrap around
-	if m.focused < 0 {
-		m.focused = len(m.inputs) + 1 - 1
+	if m.Focused < 0 {
+		m.Focused = len(m.Inputs) + 1 - 1
 	}
 }
 
 func (m FormModel) handleSubmit() FormModel {
 	// Validate Title Exists
-	title := m.inputs[title].Value()
+	title := m.Inputs[title].Value()
 
 	if title == "" {
 		return m
 	}
 
 	// Validate Tags + Make an Array
-	tags, err := utils.ValidateInput(m.inputs[tags].Value())
+	tags, err := utils.ValidateInput(m.Inputs[tags].Value())
 	if err != nil {
 		return m
 	}
 
-	tmpl := m.inputs[template].Value()
+	tmpl := m.Inputs[template].Value()
 
 	if _, ok := templater.AvailableTemplates[tmpl]; !ok {
 		var templateNames []string
@@ -289,12 +289,12 @@ func (m FormModel) handleSubmit() FormModel {
 	}
 
 	// Same for Links
-	links, err := utils.ValidateInput(m.inputs[links].Value())
+	links, err := utils.ValidateInput(m.Inputs[links].Value())
 	if err != nil {
 		return m
 	}
 
-	subDir := m.inputs[subdirectory].Value()
+	subDir := m.Inputs[subdirectory].Value()
 
 	// Validate subDir exists in availableSubdirs
 	if !m.subdirectoryExists(subDir) {
