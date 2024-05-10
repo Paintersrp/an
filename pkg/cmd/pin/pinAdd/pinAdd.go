@@ -10,12 +10,12 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/Paintersrp/an/fs/fzf"
-	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/internal/state"
 	"github.com/Paintersrp/an/pkg/flags"
 )
 
 // Pin Type is for using the same command with the task variant of pin
-func Command(c *config.Config, pinType string) *cobra.Command {
+func Command(s *state.State, pinType string) *cobra.Command {
 	var check bool
 	var name string
 
@@ -35,10 +35,10 @@ func Command(c *config.Config, pinType string) *cobra.Command {
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if check {
-				fmt.Println("Current pinned file:", c.PinnedFile)
+				fmt.Println("Current pinned file:", s.Config.PinnedFile)
 				return nil
 			}
-			return run(cmd, args, c, name, pinType)
+			return run(cmd, args, s, name, pinType)
 		},
 	}
 
@@ -52,7 +52,7 @@ func Command(c *config.Config, pinType string) *cobra.Command {
 func run(
 	cmd *cobra.Command,
 	args []string,
-	c *config.Config,
+	s *state.State,
 	name string,
 	pinType string,
 ) error {
@@ -68,20 +68,20 @@ func run(
 				fmt.Printf("error fuzzyfinding note: %s", err)
 			}
 
-			c.ChangePin(choice, pinType, name)
+			s.Config.ChangePin(choice, pinType, name)
 		} else {
 			choice, err := finder.RunWithQuery(args[0], false)
 			if err != nil {
 				fmt.Printf("error fuzzyfinding note: %s", err)
 			}
 
-			c.ChangePin(choice, pinType, name)
+			s.Config.ChangePin(choice, pinType, name)
 		}
 	} else {
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			return errors.New("the specified file does not exist")
 		}
-		c.ChangePin(path, pinType, name)
+		s.Config.ChangePin(path, pinType, name)
 	}
 
 	return nil

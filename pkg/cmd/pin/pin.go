@@ -37,10 +37,10 @@ func NewCmdPin(s *state.State, pinType string) *cobra.Command {
 		`, pinCommand, pinCommand, pinCommand)),
 	}
 
-	cmd.AddCommand(pinAdd.Command(s.Config, pinType))
-	cmd.AddCommand(pinRemove.Command(s.Config, pinType))
-	cmd.AddCommand(pinList.Command(s.Config, pinType))
-	cmd.AddCommand(pinTable.Command(s.Config, pinType))
+	cmd.AddCommand(pinAdd.Command(s, pinType))
+	cmd.AddCommand(pinRemove.Command(s, pinType))
+	cmd.AddCommand(pinList.Command(s, pinType))
+	cmd.AddCommand(pinTable.Command(s, pinType))
 
 	return cmd
 }

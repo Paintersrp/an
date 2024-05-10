@@ -12,7 +12,6 @@ import (
 	"github.com/Paintersrp/an/fs/templater"
 	"github.com/Paintersrp/an/fs/zet"
 	"github.com/Paintersrp/an/internal/state"
-	"github.com/Paintersrp/an/internal/views"
 	"github.com/Paintersrp/an/utils"
 )
 
@@ -94,7 +93,7 @@ func NewFormModel(s *state.State) FormModel {
 	// Join the template names into a single string separated by commas.
 	availableTemplateNames := strings.Join(templateNames, ", ")
 
-	availableSubdirs := views.GetSubdirectories(s.Vault, "")
+	availableSubdirs := s.Handler.GetSubdirectories(s.Vault, "")
 	var visibleSubdirs []string
 	for _, subdir := range availableSubdirs {
 		if !strings.HasPrefix(subdir, ".") {

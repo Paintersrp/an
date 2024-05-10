@@ -28,7 +28,6 @@ var maxCacheSizeMb int64 = 50
 
 type NoteListModel struct {
 	list         list.Model
-	views        map[string]v.View
 	cache        *cache.Cache
 	keys         *listKeyMap
 	delegateKeys *delegateKeyMap
@@ -46,10 +45,9 @@ type NoteListModel struct {
 
 func NewNoteListModel(
 	s *state.State,
-	views map[string]v.View,
 	viewName string,
 ) (*NoteListModel, error) {
-	files, err := v.GetFilesByView(views, viewName, s.Vault)
+	files, err := s.ViewManager.GetFilesByView(viewName, s.Vault)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +81,6 @@ func NewNoteListModel(
 
 	return &NoteListModel{
 		state:        s,
-		views:        views,
 		cache:        c,
 		list:         l,
 		viewName:     viewName,
@@ -273,7 +270,7 @@ func Run(
 		}
 	}()
 
-	m, err := NewNoteListModel(s, views, viewFlag)
+	m, err := NewNoteListModel(s, viewFlag)
 	if err != nil {
 		return err
 	}
@@ -328,7 +325,7 @@ func (m *NoteListModel) refresh() tea.Cmd {
 
 // refreshes the list items based on view conditions
 func (m *NoteListModel) refreshItems() tea.Cmd {
-	files, _ := v.GetFilesByView(m.views, m.viewName, m.state.Vault)
+	files, _ := m.state.ViewManager.GetFilesByView(m.viewName, m.state.Vault)
 	items := ParseNoteFiles(files, m.state.Vault, m.showDetails)
 	return m.list.SetItems(items)
 }

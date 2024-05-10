@@ -10,6 +10,7 @@ import (
 
 	"github.com/Paintersrp/an/fs/zet"
 	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/internal/state"
 	"github.com/Paintersrp/an/tui/notes"
 	"github.com/Paintersrp/an/tui/pinList/nameInput"
 	"github.com/Paintersrp/an/tui/pinList/sublist"
@@ -19,7 +20,7 @@ type PinListModel struct {
 	list         list.Model
 	keys         *listKeyMap
 	delegateKeys *delegateKeyMap
-	cfg          *config.Config
+	state        *state.State
 	pinType      string
 	findingFor   string
 	renamingFor  string
@@ -30,31 +31,31 @@ type PinListModel struct {
 	adding       bool
 }
 
-func NewPinListModel(cfg *config.Config, pinType string) PinListModel {
+func NewPinListModel(s *state.State, pinType string) PinListModel {
 	var (
 		delegateKeys = newDelegateKeyMap()
 		listKeys     = newListKeyMap()
 	)
 
-	delegate := newItemDelegate(delegateKeys, cfg)
+	delegate := newItemDelegate(delegateKeys, s.Config)
 	l := list.New(nil, delegate, 0, 0)
 	l.Title = getTitleByType(pinType)
 	l.Styles.Title = titleStyle
 	l.AdditionalFullHelpKeys = func() []key.Binding { return fullHelp(listKeys) }
 	l.AdditionalShortHelpKeys = func() []key.Binding { return shortHelp(listKeys) }
 
-	items := getItemsByType(cfg, pinType)
+	items := getItemsByType(s.Config, pinType)
 	l.SetItems(items)
 	l.SetHeight(20)
 
-	sl := sublist.NewSubListModel(cfg)
+	sl := sublist.NewSubListModel(s)
 	i := nameInput.NewNameInput()
 
 	return PinListModel{
 		list:         l,
 		keys:         listKeys,
 		delegateKeys: delegateKeys,
-		cfg:          cfg,
+		state:        s,
 		pinType:      pinType,
 		sublist:      sl,
 		input:        i,
@@ -169,7 +170,7 @@ func (m PinListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, m.list.NewStatusMessage("new name and old name matched.")
 				}
 
-				m.cfg.RenamePin(m.renamingFor, nv, m.pinType, false)
+				m.state.Config.RenamePin(m.renamingFor, nv, m.pinType, false)
 				m.input.Input.Blur()
 				m.renaming = false
 
@@ -184,7 +185,7 @@ func (m PinListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Handle exiting input mode
 			if key.Matches(msg, m.keys.findSelect) {
 				if i, ok := m.sublist.List.SelectedItem().(notes.ListItem); ok {
-					m.cfg.ChangePin(i.Path(), m.pinType, m.findingFor)
+					m.state.Config.ChangePin(i.Path(), m.pinType, m.findingFor)
 					m.finding = false
 					return m, m.refreshItems(m.pinType)
 				} else {
@@ -300,8 +301,8 @@ func (m PinListModel) View() string {
 	return appStyle.Render(list)
 }
 
-func Run(cfg *config.Config, pinType string) tea.Model {
-	m, err := tea.NewProgram(NewPinListModel(cfg, pinType), tea.WithAltScreen()).Run()
+func Run(s *state.State, pinType string) tea.Model {
+	m, err := tea.NewProgram(NewPinListModel(s, pinType), tea.WithAltScreen()).Run()
 
 	if err != nil {
 		fmt.Println("Error running program:", err)
@@ -331,7 +332,7 @@ func (m *PinListModel) openNote() bool {
 }
 
 func (m *PinListModel) refreshItems(pinType string) tea.Cmd {
-	items := getItemsByType(m.cfg, pinType)
+	items := getItemsByType(m.state.Config, pinType)
 	title := getTitleByType(pinType)
 	m.list.Title = title
 	return m.list.SetItems(items)

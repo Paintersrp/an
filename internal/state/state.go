@@ -8,15 +8,18 @@ import (
 	"github.com/Paintersrp/an/fs/templater"
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/internal/constants"
+	"github.com/Paintersrp/an/internal/views"
 	"github.com/spf13/viper"
 )
 
 type State struct {
-	Config    *config.Config
-	Templater *templater.Templater
-	Handler   *handler.FileHandler
-	Home      string
-	Vault     string
+	Config      *config.Config
+	Templater   *templater.Templater
+	Handler     *handler.FileHandler
+	ViewManager *views.ViewManager
+	Views       map[string]views.View
+	Home        string
+	Vault       string
 }
 
 func NewState() (*State, error) {
@@ -38,13 +41,16 @@ func NewState() (*State, error) {
 	}
 
 	h := handler.NewFileHandler(cfg.VaultDir)
+	vm := views.NewViewManager(h, cfg.VaultDir)
 
 	return &State{
-		Config:    cfg,
-		Templater: t,
-		Handler:   h,
-		Home:      home,
-		Vault:     cfg.VaultDir,
+		Config:      cfg,
+		Templater:   t,
+		Handler:     h,
+		ViewManager: vm,
+		Views:       vm.Views,
+		Home:        home,
+		Vault:       cfg.VaultDir,
 	}, nil
 }
 

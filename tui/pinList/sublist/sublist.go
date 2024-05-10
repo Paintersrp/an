@@ -9,7 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/Paintersrp/an/internal/config"
-	v "github.com/Paintersrp/an/internal/views"
+	"github.com/Paintersrp/an/internal/state"
 	"github.com/Paintersrp/an/tui/notes"
 )
 
@@ -17,36 +17,34 @@ type SubListModel struct {
 	List         list.Model
 	keys         *listKeyMap
 	delegateKeys *delegateKeyMap
+	state        *state.State
 	cfg          *config.Config
 	width        int
 	height       int
 }
 
-func NewSubListModel(cfg *config.Config) SubListModel {
+func NewSubListModel(s *state.State) SubListModel {
 	var (
 		delegateKeys = newDelegateKeyMap()
 		listKeys     = newListKeyMap()
 	)
 
-	delegate := newItemDelegate(delegateKeys, cfg)
+	delegate := newItemDelegate(delegateKeys, s.Config)
 	l := list.New(nil, delegate, 0, 0)
 	l.Title = "Sublist"
-	// l.SetHeight(40)
-	// l.SetWidth(40)
 	l.Styles.Title = titleStyle
 	// l.DisableQuitKeybindings()
 	l.AdditionalFullHelpKeys = func() []key.Binding { return fullHelp(listKeys) }
 
-	views := v.GenerateViews(cfg.VaultDir)
-	files, _ := v.GetFilesByView(views, "default", cfg.VaultDir)
-	items := notes.ParseNoteFiles(files, cfg.VaultDir, false)
+	files, _ := s.ViewManager.GetFilesByView("default", s.Vault)
+	items := notes.ParseNoteFiles(files, s.Vault, false)
 	l.SetItems(items)
 
 	return SubListModel{
 		List:         l,
 		keys:         listKeys,
 		delegateKeys: delegateKeys,
-		cfg:          cfg,
+		state:        s,
 	}
 }
 
@@ -98,8 +96,8 @@ func (m SubListModel) View() string {
 	return m.List.View()
 }
 
-func Run(cfg *config.Config) tea.Model {
-	m, err := tea.NewProgram(NewSubListModel(cfg), tea.WithAltScreen()).Run()
+func Run(s *state.State) tea.Model {
+	m, err := tea.NewProgram(NewSubListModel(s), tea.WithAltScreen()).Run()
 
 	if err != nil {
 		fmt.Println("Error running program:", err)

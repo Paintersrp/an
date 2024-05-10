@@ -114,3 +114,24 @@ func (h *FileHandler) WalkFiles(
 	// Return files and any errors
 	return files, err
 }
+
+func (h *FileHandler) GetSubdirectories(directory, excludeDir string) []string {
+	files, err := os.ReadDir(directory)
+	if err != nil {
+		log.Fatalf("Failed to read directory: %v", err)
+	}
+
+	var subDirs []string
+	for _, f := range files {
+		if f.IsDir() && f.Name() != excludeDir {
+
+			subDir := strings.TrimPrefix(filepath.Join(directory, f.Name()), directory)
+			subDir = strings.TrimPrefix(
+				subDir,
+				string(os.PathSeparator),
+			)
+			subDirs = append(subDirs, subDir)
+		}
+	}
+	return subDirs
+}

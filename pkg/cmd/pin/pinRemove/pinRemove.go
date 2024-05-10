@@ -4,12 +4,11 @@ import (
 	"errors"
 
 	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/Paintersrp/an/internal/state"
 	"github.com/spf13/cobra"
-
-	"github.com/Paintersrp/an/internal/config"
 )
 
-func Command(c *config.Config, pinType string) *cobra.Command {
+func Command(s *state.State, pinType string) *cobra.Command {
 	var name string
 
 	cmd := &cobra.Command{
@@ -29,7 +28,7 @@ func Command(c *config.Config, pinType string) *cobra.Command {
 				return errors.New("you must specify a name for the pin to unpin")
 			}
 
-			return c.DeleteNamedPin(name, pinType, true)
+			return s.Config.DeleteNamedPin(name, pinType, true)
 		},
 	}
 

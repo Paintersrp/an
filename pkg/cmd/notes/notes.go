@@ -13,7 +13,6 @@ import (
 
 func NewCmdNotes(s *state.State) *cobra.Command {
 	var viewFlag string
-	views := v.GenerateViews(s.Vault)
 
 	cmd := &cobra.Command{
 		Use:     "notes",
@@ -21,7 +20,7 @@ func NewCmdNotes(s *state.State) *cobra.Command {
 		Short:   "",
 		Long:    heredoc.Doc(``),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(s, views, viewFlag)
+			return run(s, s.Views, viewFlag)
 		},
 	}
 
