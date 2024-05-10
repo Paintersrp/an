@@ -3,6 +3,7 @@ package notes
 import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/Paintersrp/an/internal/config"
+	v "github.com/Paintersrp/an/internal/views"
 	"github.com/Paintersrp/an/pkg/fs/templater"
 	"github.com/Paintersrp/an/tui/notes"
 	"github.com/spf13/cobra"
@@ -12,7 +13,7 @@ import (
 
 func NewCmdNotes(c *config.Config, t *templater.Templater) *cobra.Command {
 	var viewFlag string
-	views := notes.GenerateViews(c.VaultDir)
+	views := v.GenerateViews(c.VaultDir)
 
 	cmd := &cobra.Command{
 		Use:     "notes",
@@ -31,7 +32,7 @@ func NewCmdNotes(c *config.Config, t *templater.Templater) *cobra.Command {
 func run(
 	c *config.Config,
 	t *templater.Templater,
-	views map[string]notes.ViewConfig,
+	views map[string]v.View,
 	viewFlag string,
 ) error {
 	// Pass modeConfig to your list model or wherever it's needed

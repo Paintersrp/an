@@ -1,3 +1,4 @@
+// Package note handles the core note management functionality.
 package notes
 
 import (
@@ -8,6 +9,7 @@ import (
 
 	"github.com/Paintersrp/an/internal/cache"
 	"github.com/Paintersrp/an/internal/config"
+	v "github.com/Paintersrp/an/internal/views"
 	"github.com/Paintersrp/an/pkg/fs/templater"
 	"github.com/Paintersrp/an/pkg/fs/zet"
 	"github.com/Paintersrp/an/utils"
@@ -18,43 +20,44 @@ import (
 	"golang.org/x/term"
 )
 
-// DONE: Would be nice to hold tab and see alt info like path and tertiary details
-// DONE: don't include files in the base vault dir in archive
-// TODO: cache view outputs
-// TODO: Replace panics
 // TODO: Replace Magic Number (Cache Size)
 // TODO: Orphan as 2 not archive, archive as 3
 
 type NoteListModel struct {
-	views             map[string]ViewConfig
-	config            *config.Config
-	cache             *cache.Cache
-	keys              *listKeyMap
-	delegateKeys      *delegateKeyMap
-	list              list.Model
-	preview           string
-	width             int
-	height            int
-	viewFlag          string
-	showAsFileDetails bool
-	renaming          bool
-	input             ListInputModel
-	form              FormModel
-	creating          bool
+	config       *config.Config
+	templater    *templater.Templater
+	views        map[string]v.View
+	cache        *cache.Cache
+	list         list.Model
+	keys         *listKeyMap
+	delegateKeys *delegateKeyMap
+	preview      string
+	width        int
+	height       int
+	viewName     string
+	showDetails  bool
+	renaming     bool
+	inputModel   InputModel
+	formModel    FormModel
+	creating     bool
 }
 
 func NewNoteListModel(
 	cfg *config.Config,
 	t *templater.Templater,
-	views map[string]ViewConfig,
-	viewFlag string,
-) (NoteListModel, *cache.Cache) {
-	files, _ := GetFilesByView(views, viewFlag, cfg.VaultDir)
+	views map[string]v.View,
+	viewName string,
+) (*NoteListModel, error) {
+	files, err := v.GetFilesByView(views, viewName, cfg.VaultDir)
+	if err != nil {
+		return nil, err
+	}
+
 	items := ParseNoteFiles(files, cfg.VaultDir, false)
 	dkeys := newDelegateKeyMap()
 	lkeys := newListKeyMap()
-	title := getTitleForView(viewFlag)
-	delegate := newItemDelegate(dkeys, cfg, viewFlag)
+	title := v.GetTitleForView(viewName)
+	delegate := newItemDelegate(dkeys, cfg, viewName)
 
 	l := list.New(items, delegate, 0, 0)
 	l.Title = title
@@ -74,22 +77,23 @@ func NewNoteListModel(
 		panic(err)
 	}
 
-	i := initialInputModel()
-	f := initialFormModel(cfg, t)
+	i := NewInputModel()
+	f := NewFormModel(cfg, t)
 
-	return NoteListModel{
+	return &NoteListModel{
+		config:       cfg,
+		templater:    t,
+		views:        views,
+		cache:        c,
 		list:         l,
+		viewName:     viewName,
 		keys:         lkeys,
 		delegateKeys: dkeys,
-		config:       cfg,
-		cache:        c,
-		views:        views,
-		viewFlag:     viewFlag,
-		input:        i,
-		form:         f,
+		inputModel:   i,
+		formModel:    f,
 		renaming:     false,
 		creating:     false,
-	}, c
+	}, nil
 }
 
 func (m NoteListModel) Init() tea.Cmd {
@@ -113,28 +117,23 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		if m.renaming {
-			// Handle exiting input mode
 			if key.Matches(msg, m.keys.exitAltView) {
-				m.input.Input.Blur()
-				m.renaming = false
+				m.toggleRename()
 				return m, nil
 			}
 
-			// Update the text input and handle its commands
 			var cmd tea.Cmd
-			m.input.Input, cmd = m.input.Input.Update(msg)
+			m.inputModel.Input, cmd = m.inputModel.Input.Update(msg)
 			cmds = append(cmds, cmd)
 
-			// Handle the case when Enter is pressed and the input is submitted
 			if key.Matches(msg, m.keys.submitAltView) {
-				// Retrieve the new name from the input model
 				err := renameFile(m)
 
 				if err != nil {
 					return m, nil
 				}
 
-				m.renaming = false
+				m.toggleRename()
 				m.refresh()
 				return m, cmd
 
@@ -144,15 +143,13 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		if m.creating {
-			// Handle exiting input mode
 			if key.Matches(msg, m.keys.exitAltView) {
-				m.form.inputs[m.form.focused].Blur()
-				m.creating = false
+				m.toggleCreation()
 				return m, nil
 			}
 
 			var cmd tea.Cmd
-			m.form, cmd = m.form.Update(msg)
+			m.formModel, cmd = m.formModel.Update(msg)
 			cmds = append(cmds, cmd)
 
 			return m, tea.Batch(cmds...)
@@ -167,10 +164,7 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case key.Matches(msg, m.keys.toggleTitleBar):
-			v := !m.list.ShowTitle()
-			m.list.SetShowTitle(v)
-			m.list.SetShowFilter(v)
-			m.list.SetFilteringEnabled(v)
+			m.toggleTitleBar()
 			return m, nil
 
 		case key.Matches(msg, m.keys.toggleStatusBar):
@@ -186,50 +180,31 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case key.Matches(msg, m.keys.toggleDisplayView):
-			m.showAsFileDetails = !m.showAsFileDetails
-			cmd := m.refreshItems()
-			return m, cmd
+			return m, m.toggleDetails()
 
 		case key.Matches(msg, m.keys.changeView):
-			m.cycleView()
-			cmd := m.refresh()
-			return m, cmd
+			return m, m.cycleView()
 
 		case key.Matches(msg, m.keys.switchToDefaultView):
-			m.viewFlag = "default"
-			cmd := m.refresh()
-			return m, cmd
+			return m, m.swapView("default")
 
 		case key.Matches(msg, m.keys.switchToArchiveView):
-			m.viewFlag = "archive"
-			cmd := m.refresh()
-			return m, cmd
+			return m, m.swapView("archive")
 
 		case key.Matches(msg, m.keys.switchToOrphanView):
-			m.viewFlag = "orphan"
-			cmd := m.refresh()
-			return m, cmd
+			return m, m.swapView("orphan")
 
 		case key.Matches(msg, m.keys.switchToTrashView):
-			m.viewFlag = "trash"
-			cmd := m.refresh()
-			return m, cmd
+			return m, m.swapView("trash")
 
 		case key.Matches(msg, m.keys.switchToUnfulfillView):
-			m.viewFlag = "unfulfilled"
-			cmd := m.refresh()
-			return m, cmd
-		}
+			return m, m.swapView("unfulfilled")
 
-		if key.Matches(msg, m.keys.rename) {
-			m.renaming = true
-			m.input.Input.Focus()
-			if s, ok := m.list.SelectedItem().(ListItem); ok {
-				m.input.Input.SetValue(s.title)
-			}
-		}
-		if key.Matches(msg, m.keys.create) {
-			m.creating = true
+		case key.Matches(msg, m.keys.rename):
+			m.toggleRename()
+
+		case key.Matches(msg, m.keys.create):
+			m.toggleCreation()
 		}
 
 	}
@@ -252,7 +227,7 @@ func (m NoteListModel) View() string {
 		modelStyle := lipgloss.NewStyle().
 			Width(m.width).
 			Height(m.height).Padding(0, 1)
-		return appStyle.Render(modelStyle.Render(m.form.View()))
+		return appStyle.Render(modelStyle.Render(m.formModel.View()))
 	}
 
 	if m.renaming {
@@ -261,7 +236,7 @@ func (m NoteListModel) View() string {
 				Height(m.list.Height()).
 				MaxHeight(m.list.Height()).
 				Padding(0, 2).
-				Render(fmt.Sprintf("%s\n\n%s", titleStyle.Render("Rename File"), m.input.View())),
+				Render(fmt.Sprintf("%s\n\n%s", titleStyle.Render("Rename File"), m.inputModel.View())),
 		)
 
 		layout := lipgloss.JoinHorizontal(lipgloss.Top, list, textPrompt)
@@ -282,7 +257,7 @@ func (m NoteListModel) View() string {
 func Run(
 	c *config.Config,
 	t *templater.Templater,
-	views map[string]ViewConfig,
+	views map[string]v.View,
 	viewFlag string,
 ) error {
 	// Save the current terminal state
@@ -299,7 +274,10 @@ func Run(
 		}
 	}()
 
-	m, mCache := NewNoteListModel(c, t, views, viewFlag)
+	m, err := NewNoteListModel(c, t, views, viewFlag)
+	if err != nil {
+		return err
+	}
 
 	if _, err := tea.NewProgram(m, tea.WithInput(os.Stdin), tea.WithAltScreen()).Run(); err != nil {
 		// handle error for instances where neovim/editor doesn't pass stdin back in time to close gracefully with bubbletea
@@ -309,9 +287,6 @@ func Run(
 			log.Fatalf("Error running program: %v", err)
 		}
 	}
-
-	fmt.Printf("Cache size: %s\n", cache.ReadableSize(int64(mCache.SizeOf())))
-	fmt.Printf("Cache size: %d\n", mCache.SizeOf())
 
 	// ran with no errors*, terminal gracefully
 	return nil
@@ -331,23 +306,18 @@ func (m *NoteListModel) handlePreview() {
 				m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Error accessing cache: %s", err)))
 			}
 
-			// calculate the width and height for the preview pane
 			w := m.width / 2
 			h := m.list.Height()
 
-			// render the preview
 			r := utils.RenderMarkdownPreview(
 				s.path,
 				w,
 				h,
 			)
 
-			// add item preview to cache
 			if err := m.cache.Put(s.path, r); err != nil {
-				// handle the error appropriately, e.g., log it or show an error message
 				m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Error updating cache: %s", err)))
 			} else {
-				// no errors, update preview with rendered content
 				m.preview = r
 			}
 		}
@@ -355,7 +325,7 @@ func (m *NoteListModel) handlePreview() {
 }
 
 func (m *NoteListModel) refresh() tea.Cmd {
-	m.list.Title = getTitleForView(m.viewFlag)
+	m.list.Title = v.GetTitleForView(m.viewName)
 	m.refreshDelegate()
 	cmd := m.refreshItems()
 	m.handlePreview()
@@ -364,35 +334,15 @@ func (m *NoteListModel) refresh() tea.Cmd {
 
 // refreshes the list items based on view conditions
 func (m *NoteListModel) refreshItems() tea.Cmd {
-	files, _ := GetFilesByView(m.views, m.viewFlag, m.config.VaultDir)
-	items := ParseNoteFiles(files, m.config.VaultDir, m.showAsFileDetails)
+	files, _ := v.GetFilesByView(m.views, m.viewName, m.config.VaultDir)
+	items := ParseNoteFiles(files, m.config.VaultDir, m.showDetails)
 	return m.list.SetItems(items)
 }
 
 func (m *NoteListModel) refreshDelegate() {
 	dkeys := newDelegateKeyMap()
-	delegate := newItemDelegate(dkeys, m.config, m.viewFlag)
+	delegate := newItemDelegate(dkeys, m.config, m.viewName)
 	m.list.SetDelegate(delegate)
-}
-
-// cycles through views
-// default -> archive
-// archive -> orphan
-// orphan -> trash
-// trash -> default -> repeat
-func (m *NoteListModel) cycleView() {
-	switch m.viewFlag {
-	case "default":
-		m.viewFlag = "archive"
-	case "archive":
-		m.viewFlag = "orphan"
-	case "orphan":
-		m.viewFlag = "trash"
-	case "trash":
-		m.viewFlag = "default"
-	default:
-		m.viewFlag = "default"
-	}
 }
 
 // should prob use an error over a bool but a "success" flag sort of feels more natural for the context.
@@ -415,4 +365,62 @@ func (m *NoteListModel) openNote() bool {
 	}
 
 	return true
+}
+
+func (m *NoteListModel) toggleTitleBar() {
+	v := !m.list.ShowTitle()
+	m.list.SetShowTitle(v)
+	m.list.SetShowFilter(v)
+	m.list.SetFilteringEnabled(v)
+}
+
+func (m *NoteListModel) toggleDetails() tea.Cmd {
+	m.showDetails = !m.showDetails
+	return m.refreshItems()
+}
+
+func (m *NoteListModel) cycleView() tea.Cmd {
+	switch m.viewName {
+	case "default":
+		m.viewName = "archive"
+	case "archive":
+		m.viewName = "orphan"
+	case "orphan":
+		m.viewName = "trash"
+	case "trash":
+		m.viewName = "default"
+	default:
+		m.viewName = "default"
+	}
+
+	return m.refresh()
+}
+
+func (m *NoteListModel) swapView(newView string) tea.Cmd {
+	m.viewName = newView
+	return m.refresh()
+}
+
+func (m *NoteListModel) toggleRename() {
+	if !m.renaming {
+		m.renaming = true
+		m.inputModel.Input.Focus()
+		if s, ok := m.list.SelectedItem().(ListItem); ok {
+			m.inputModel.Input.SetValue(s.title)
+		}
+	} else {
+		m.renaming = false
+		m.inputModel.Input.Blur()
+	}
+}
+
+// clear?
+func (m *NoteListModel) toggleCreation() {
+	if !m.creating {
+		m.formModel.inputs[m.formModel.focused].Focus()
+		m.creating = true
+	} else {
+		m.formModel.inputs[m.formModel.focused].Blur()
+		m.creating = false
+	}
 }

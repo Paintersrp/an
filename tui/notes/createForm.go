@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/internal/views"
 	"github.com/Paintersrp/an/pkg/fs/templater"
 	"github.com/Paintersrp/an/pkg/fs/zet"
 	"github.com/Paintersrp/an/utils"
@@ -52,7 +53,7 @@ type FormModel struct {
 	btn                  SubmitButton
 }
 
-func initialFormModel(cfg *config.Config, t *templater.Templater) FormModel {
+func NewFormModel(cfg *config.Config, t *templater.Templater) FormModel {
 	var inputs = make([]textinput.Model, 5)
 	inputs[title] = textinput.New()
 	inputs[title].Placeholder = "Title"
@@ -93,7 +94,7 @@ func initialFormModel(cfg *config.Config, t *templater.Templater) FormModel {
 	// Join the template names into a single string separated by commas.
 	availableTemplateNames := strings.Join(templateNames, ", ")
 
-	availableSubdirs := getSubdirectories(cfg.VaultDir, "")
+	availableSubdirs := views.GetSubdirectories(cfg.VaultDir, "")
 	var visibleSubdirs []string
 	for _, subdir := range availableSubdirs {
 		if !strings.HasPrefix(subdir, ".") {

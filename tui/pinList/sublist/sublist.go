@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/Paintersrp/an/internal/config"
+	v "github.com/Paintersrp/an/internal/views"
 	"github.com/Paintersrp/an/tui/notes"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
@@ -35,8 +36,8 @@ func NewSubListModel(cfg *config.Config) SubListModel {
 	// l.DisableQuitKeybindings()
 	l.AdditionalFullHelpKeys = func() []key.Binding { return fullHelp(listKeys) }
 
-	views := notes.GenerateViews(cfg.VaultDir)
-	files, _ := notes.GetFilesByView(views, "default", cfg.VaultDir)
+	views := v.GenerateViews(cfg.VaultDir)
+	files, _ := v.GetFilesByView(views, "default", cfg.VaultDir)
 	items := notes.ParseNoteFiles(files, cfg.VaultDir, false)
 	l.SetItems(items)
 

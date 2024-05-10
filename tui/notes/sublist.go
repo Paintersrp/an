@@ -6,13 +6,14 @@ package notes
 
 import (
 	"github.com/Paintersrp/an/internal/config"
+	v "github.com/Paintersrp/an/internal/views"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 type SubListModel struct {
-	views             map[string]ViewConfig
+	views             map[string]v.View
 	config            *config.Config
 	list              list.Model
 	width             int
@@ -22,9 +23,9 @@ type SubListModel struct {
 
 func NewSubListModel(
 	cfg *config.Config,
-	views map[string]ViewConfig,
+	views map[string]v.View,
 ) SubListModel {
-	files, _ := GetFilesByView(views, "default", cfg.VaultDir)
+	files, _ := v.GetFilesByView(views, "default", cfg.VaultDir)
 	items := ParseNoteFiles(files, cfg.VaultDir, false)
 
 	// Setup list

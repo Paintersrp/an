@@ -8,20 +8,20 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-type ListInputModel struct {
+type InputModel struct {
 	Title      string
 	Input      textinput.Model
 	cursorMode cursor.Mode
 }
 
-func initialInputModel() ListInputModel {
+func NewInputModel() InputModel {
 	t := textinput.New()
 	t.Cursor.Style = cursorStyle
 	t.PromptStyle = focusedStyle
 	t.TextStyle = focusedStyle
 	t.Focus()
 
-	m := ListInputModel{
+	m := InputModel{
 		Title: "",
 		Input: t,
 	}
@@ -29,11 +29,11 @@ func initialInputModel() ListInputModel {
 	return m
 }
 
-func (m ListInputModel) Init() tea.Cmd {
+func (m InputModel) Init() tea.Cmd {
 	return textinput.Blink
 }
 
-func (m ListInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m InputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -57,7 +57,7 @@ func (m ListInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m ListInputModel) View() string {
+func (m InputModel) View() string {
 	var b strings.Builder
 	b.WriteString(m.Input.View())
 	return b.String()
