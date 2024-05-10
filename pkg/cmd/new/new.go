@@ -89,7 +89,9 @@ func run(
 			content = msg
 		}
 	} else {
-		content = arg.HandleContent(args)
+		if len(args) < 1 {
+			content = arg.HandleContent(args)
+		}
 	}
 
 	note := zet.NewZettelkastenNote(

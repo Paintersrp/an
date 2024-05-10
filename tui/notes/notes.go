@@ -49,8 +49,8 @@ func NewNoteListModel(
 	views map[string]ViewConfig,
 	viewFlag string,
 ) (NoteListModel, *cache.Cache) {
-	files, _ := getFilesByView(views, viewFlag, cfg.VaultDir)
-	items := parseNoteFiles(files, cfg.VaultDir, false)
+	files, _ := GetFilesByView(views, viewFlag, cfg.VaultDir)
+	items := ParseNoteFiles(files, cfg.VaultDir, false)
 	dkeys := newDelegateKeyMap()
 	lkeys := newListKeyMap()
 	title := getTitleForView(viewFlag)
@@ -364,8 +364,8 @@ func (m *NoteListModel) refresh() tea.Cmd {
 
 // refreshes the list items based on view conditions
 func (m *NoteListModel) refreshItems() tea.Cmd {
-	files, _ := getFilesByView(m.views, m.viewFlag, m.config.VaultDir)
-	items := parseNoteFiles(files, m.config.VaultDir, m.showAsFileDetails)
+	files, _ := GetFilesByView(m.views, m.viewFlag, m.config.VaultDir)
+	items := ParseNoteFiles(files, m.config.VaultDir, m.showAsFileDetails)
 	return m.list.SetItems(items)
 }
 

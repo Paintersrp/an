@@ -62,3 +62,7 @@ func (i ListItem) FilterValue() string {
 		i.subdirectory,
 	)
 }
+
+func (i ListItem) Path() string {
+	return i.path
+}

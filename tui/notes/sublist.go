@@ -24,8 +24,8 @@ func NewSubListModel(
 	cfg *config.Config,
 	views map[string]ViewConfig,
 ) SubListModel {
-	files, _ := getFilesByView(views, "default", cfg.VaultDir)
-	items := parseNoteFiles(files, cfg.VaultDir, false)
+	files, _ := GetFilesByView(views, "default", cfg.VaultDir)
+	items := ParseNoteFiles(files, cfg.VaultDir, false)
 
 	// Setup list
 	d := list.NewDefaultDelegate()

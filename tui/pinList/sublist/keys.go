@@ -1,4 +1,4 @@
-package pinList
+package sublist
 
 import "github.com/charmbracelet/bubbles/key"
 
@@ -11,11 +11,6 @@ type listKeyMap struct {
 	swapToTextView   key.Binding
 	swapToTaskView   key.Binding
 	openNote         key.Binding
-	find             key.Binding
-	findSelect       key.Binding
-	rename           key.Binding
-	backToMain       key.Binding
-	create           key.Binding
 }
 
 func newListKeyMap() *listKeyMap {
@@ -52,26 +47,6 @@ func newListKeyMap() *listKeyMap {
 			key.WithKeys("enter"),
 			key.WithHelp("↵", "open"),
 		),
-		find: key.NewBinding(
-			key.WithKeys("F"),
-			key.WithHelp("F", "find"),
-		),
-		findSelect: key.NewBinding(
-			key.WithKeys("enter"),
-			key.WithHelp("enter", "select (find)"),
-		),
-		rename: key.NewBinding(
-			key.WithKeys("R"),
-			key.WithHelp("R", "rename"),
-		),
-		create: key.NewBinding(
-			key.WithKeys("C"),
-			key.WithHelp("C", "create"),
-		),
-		backToMain: key.NewBinding(
-			key.WithKeys("esc", "q"),
-			key.WithHelp("esc", "back to main list"),
-		),
 	}
 }
 
@@ -85,18 +60,5 @@ func fullHelp(keys *listKeyMap) []key.Binding {
 		keys.swapToTextView,
 		keys.swapToTaskView,
 		keys.openNote,
-		keys.find,
-		keys.findSelect,
-		keys.rename,
-		keys.backToMain,
-		keys.create,
-	}
-}
-
-func shortHelp(keys *listKeyMap) []key.Binding {
-	return []key.Binding{
-		keys.openNote,
-		keys.find,
-		keys.create,
 	}
 }

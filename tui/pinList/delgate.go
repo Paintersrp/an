@@ -14,6 +14,7 @@ func newItemDelegate(keys *delegateKeyMap, cfg *config.Config) list.DefaultDeleg
 	d.Styles.SelectedDesc = selectedItemStyle
 
 	d.UpdateFunc = func(msg tea.Msg, m *list.Model) tea.Cmd {
+		var cmds []tea.Cmd
 		var title string
 
 		if i, ok := m.SelectedItem().(PinListItem); ok {
@@ -24,21 +25,9 @@ func newItemDelegate(keys *delegateKeyMap, cfg *config.Config) list.DefaultDeleg
 
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
+
 			switch {
-			case key.Matches(msg, keys.rename):
-				if title == "default" {
-					return m.NewStatusMessage(statusMessageStyle("Cannot rename the default pin"))
-				}
-				pinType := ""
 
-				if m.Title == "Available Task Pins" {
-					pinType = "task"
-				} else {
-					pinType = "text"
-				}
-
-				cfg.RenamePin(title, "test", pinType, false)
-				refreshItems(cfg, pinType, m)
 			case key.Matches(msg, keys.makeDefault):
 				if i, ok := m.SelectedItem().(PinListItem); ok {
 					description := i.Description()
@@ -85,7 +74,7 @@ func newItemDelegate(keys *delegateKeyMap, cfg *config.Config) list.DefaultDeleg
 			}
 		}
 
-		return nil
+		return tea.Batch(cmds...)
 	}
 
 	help := []key.Binding{keys.makeDefault, keys.remove, keys.rename}
@@ -113,9 +102,10 @@ func newDelegateKeyMap() *delegateKeyMap {
 			key.WithKeys("M"),
 			key.WithHelp("M", "make default"),
 		),
+
 		remove: key.NewBinding(
 			key.WithKeys("D", "backspace", "delete"),
-			key.WithHelp("D", "delete"),
+			key.WithHelp("D", "del"),
 		),
 		rename: key.NewBinding(
 			key.WithKeys("R"),
