@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Paintersrp/an/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/Paintersrp/an/utils"
 )
 
 func AddLinks(cmd *cobra.Command) {

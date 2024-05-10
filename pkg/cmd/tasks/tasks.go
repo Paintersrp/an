@@ -1,14 +1,15 @@
 package tasks
 
 import (
+	"github.com/spf13/cobra"
+
+	"github.com/Paintersrp/an/fs/templater"
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/pkg/cmd/tasks/taskEcho"
 	"github.com/Paintersrp/an/pkg/cmd/tasks/taskList"
 	"github.com/Paintersrp/an/pkg/cmd/tasks/taskNewEchoFile"
 	"github.com/Paintersrp/an/pkg/cmd/tasks/taskOpenPin"
 	"github.com/Paintersrp/an/pkg/cmd/tasks/taskPin"
-	"github.com/Paintersrp/an/pkg/fs/templater"
-	"github.com/spf13/cobra"
 )
 
 func NewCmdTasks(c *config.Config, t *templater.Templater) *cobra.Command {

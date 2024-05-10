@@ -6,15 +6,16 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc/v2"
-	"github.com/Paintersrp/an/internal/config"
-	"github.com/Paintersrp/an/pkg/arg"
-	"github.com/Paintersrp/an/pkg/flags"
-	"github.com/Paintersrp/an/pkg/fs/templater"
-	"github.com/Paintersrp/an/pkg/fs/zet"
-	"github.com/Paintersrp/an/utils"
 	"github.com/atotto/clipboard"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/Paintersrp/an/fs/templater"
+	"github.com/Paintersrp/an/fs/zet"
+	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/pkg/arg"
+	"github.com/Paintersrp/an/pkg/flags"
+	"github.com/Paintersrp/an/utils"
 )
 
 // TODO: adding links/tags/content after note already exists?

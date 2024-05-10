@@ -4,14 +4,15 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Paintersrp/an/internal/config"
-	"github.com/Paintersrp/an/pkg/fs/zet"
-	"github.com/Paintersrp/an/tui/notes"
-	"github.com/Paintersrp/an/tui/pinList/nameInput"
-	"github.com/Paintersrp/an/tui/pinList/sublist"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/Paintersrp/an/fs/zet"
+	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/tui/notes"
+	"github.com/Paintersrp/an/tui/pinList/nameInput"
+	"github.com/Paintersrp/an/tui/pinList/sublist"
 )
 
 type PinListModel struct {
@@ -20,12 +21,12 @@ type PinListModel struct {
 	delegateKeys *delegateKeyMap
 	cfg          *config.Config
 	pinType      string
+	findingFor   string
+	renamingFor  string
 	sublist      sublist.SubListModel
 	input        nameInput.NameInputModel
 	finding      bool
-	findingFor   string
 	renaming     bool
-	renamingFor  string
 	adding       bool
 }
 

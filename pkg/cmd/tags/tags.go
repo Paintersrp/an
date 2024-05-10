@@ -3,9 +3,10 @@ package tags
 import (
 	"fmt"
 
-	"github.com/Paintersrp/an/internal/config"
-	"github.com/Paintersrp/an/pkg/fs/parser"
 	"github.com/spf13/cobra"
+
+	"github.com/Paintersrp/an/fs/parser"
+	"github.com/Paintersrp/an/internal/config"
 )
 
 func NewCmdTags(c *config.Config) *cobra.Command {

@@ -5,9 +5,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Paintersrp/an/pkg/fs/templater"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/Paintersrp/an/fs/templater"
 )
 
 func AddTemplate(cmd *cobra.Command, def string) {

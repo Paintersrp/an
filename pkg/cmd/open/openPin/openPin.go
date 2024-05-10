@@ -8,8 +8,8 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/spf13/cobra"
 
+	"github.com/Paintersrp/an/fs/zet"
 	"github.com/Paintersrp/an/internal/config"
-	"github.com/Paintersrp/an/pkg/fs/zet"
 )
 
 func NewCmdOpenPin(c *config.Config) *cobra.Command {

@@ -5,14 +5,15 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Paintersrp/an/internal/config"
-	"github.com/Paintersrp/an/internal/views"
-	"github.com/Paintersrp/an/pkg/fs/templater"
-	"github.com/Paintersrp/an/pkg/fs/zet"
-	"github.com/Paintersrp/an/utils"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/Paintersrp/an/fs/templater"
+	"github.com/Paintersrp/an/fs/zet"
+	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/internal/views"
+	"github.com/Paintersrp/an/utils"
 )
 
 type (
@@ -43,13 +44,13 @@ var (
 )
 
 type FormModel struct {
-	Inputs               []textinput.Model
-	Focused              int
 	cfg                  *config.Config
 	t                    *templater.Templater
 	availableTemplates   string
-	availableSubdirs     []string
 	availableSubdirNames string
+	Inputs               []textinput.Model
+	availableSubdirs     []string
+	Focused              int
 	btn                  SubmitButton
 }
 

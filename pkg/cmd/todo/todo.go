@@ -8,8 +8,9 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc/v2"
-	"github.com/Paintersrp/an/internal/config"
 	"github.com/spf13/cobra"
+
+	"github.com/Paintersrp/an/internal/config"
 )
 
 func NewCmdTodo(c *config.Config) *cobra.Command {

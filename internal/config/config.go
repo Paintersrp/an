@@ -6,20 +6,21 @@ import (
 	"os"
 	"path"
 
-	"github.com/Paintersrp/an/internal/constants"
 	"gopkg.in/yaml.v3"
+
+	"github.com/Paintersrp/an/internal/constants"
 )
 
 type Config struct {
+	NamedPins      map[string]string `json:"named_pins"       yaml:"named_pins"`
+	NamedTaskPins  map[string]string `json:"named_task_pins"  yaml:"named_task_pins"`
 	VaultDir       string            `json:"vault_dir"        yaml:"vaultdir"`
 	Editor         string            `json:"editor"           yaml:"editor"`
 	NvimArgs       string            `json:"nvim_args"        yaml:"nvimargs"`
-	SubDirs        []string          `json:"sub_dirs"         yaml:"subdirs"`
 	FileSystemMode string            `json:"fs_mode"          yaml:"fsmode"`
 	PinnedFile     string            `json:"pinned_file"      yaml:"pinned_file"`
-	NamedPins      map[string]string `json:"named_pins"       yaml:"named_pins"`
 	PinnedTaskFile string            `json:"pinned_task_file" yaml:"pinned_task_file"`
-	NamedTaskPins  map[string]string `json:"named_task_pins"  yaml:"named_task_pins"`
+	SubDirs        []string          `json:"sub_dirs"         yaml:"subdirs"`
 }
 
 var ValidModes = map[string]bool{
