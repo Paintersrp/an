@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/Paintersrp/an/fs/templater"
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/pkg/cmd/addSubdir"
 	"github.com/Paintersrp/an/pkg/cmd/archive"
@@ -27,7 +28,6 @@ import (
 	"github.com/Paintersrp/an/pkg/cmd/trash"
 	"github.com/Paintersrp/an/pkg/cmd/unarchive"
 	"github.com/Paintersrp/an/pkg/cmd/untrash"
-	"github.com/Paintersrp/an/pkg/fs/templater"
 )
 
 var (

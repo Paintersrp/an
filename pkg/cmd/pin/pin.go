@@ -4,12 +4,13 @@ import (
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/spf13/cobra"
+
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/pkg/cmd/pin/pinAdd"
 	"github.com/Paintersrp/an/pkg/cmd/pin/pinList"
 	"github.com/Paintersrp/an/pkg/cmd/pin/pinRemove"
 	"github.com/Paintersrp/an/pkg/cmd/pin/pinTable"
-	"github.com/spf13/cobra"
 )
 
 func NewCmdPin(c *config.Config, pinType string) *cobra.Command {

@@ -6,15 +6,16 @@ import (
 	"sort"
 	"strings"
 
-	tableTui "github.com/Paintersrp/an/tui/table"
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
+
+	tableTui "github.com/Paintersrp/an/tui/table"
 )
 
 type Task struct {
-	ID      int
-	Status  string // "checked" or "unchecked"
+	Status  string
 	Content string
+	ID      int
 }
 
 type TaskHandler struct {

@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Paintersrp/an/internal/config"
-	v "github.com/Paintersrp/an/internal/views"
-	"github.com/Paintersrp/an/tui/notes"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/Paintersrp/an/internal/config"
+	v "github.com/Paintersrp/an/internal/views"
+	"github.com/Paintersrp/an/tui/notes"
 )
 
 type SubListModel struct {

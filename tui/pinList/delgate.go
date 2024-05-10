@@ -1,10 +1,11 @@
 package pinList
 
 import (
-	"github.com/Paintersrp/an/internal/config"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/Paintersrp/an/internal/config"
 )
 
 func newItemDelegate(keys *delegateKeyMap, cfg *config.Config) list.DefaultDelegate {

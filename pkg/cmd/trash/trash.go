@@ -4,9 +4,10 @@ import (
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/spf13/cobra"
+
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/utils"
-	"github.com/spf13/cobra"
 )
 
 // Not very useful on it's own, but quite handy for scripting

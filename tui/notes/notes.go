@@ -7,39 +7,42 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Paintersrp/an/internal/cache"
-	"github.com/Paintersrp/an/internal/config"
-	v "github.com/Paintersrp/an/internal/views"
-	"github.com/Paintersrp/an/pkg/fs/templater"
-	"github.com/Paintersrp/an/pkg/fs/zet"
-	"github.com/Paintersrp/an/tui/notes/submodels"
-	"github.com/Paintersrp/an/utils"
-	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"golang.org/x/term"
+
+	"github.com/Paintersrp/an/fs/templater"
+	"github.com/Paintersrp/an/fs/zet"
+	"github.com/Paintersrp/an/internal/cache"
+	"github.com/Paintersrp/an/internal/config"
+	v "github.com/Paintersrp/an/internal/views"
+	"github.com/Paintersrp/an/tui/notes/submodels"
+	"github.com/Paintersrp/an/utils"
+	"github.com/charmbracelet/bubbles/key"
 )
 
 // TODO: Replace Magic Number (Cache Size)
 // TODO: Orphan as 2 not archive, archive as 3
 
+var maxCacheSizeMb int64 = 50
+
 type NoteListModel struct {
-	config       *config.Config
+	list         list.Model
 	templater    *templater.Templater
 	views        map[string]v.View
 	cache        *cache.Cache
-	list         list.Model
 	keys         *listKeyMap
 	delegateKeys *delegateKeyMap
+	config       *config.Config
 	preview      string
+	viewName     string
+	formModel    submodels.FormModel
+	inputModel   submodels.InputModel
 	width        int
 	height       int
-	viewName     string
-	showDetails  bool
 	renaming     bool
-	inputModel   submodels.InputModel
-	formModel    submodels.FormModel
+	showDetails  bool
 	creating     bool
 }
 
@@ -72,7 +75,7 @@ func NewNoteListModel(
 	}
 
 	l.AdditionalFullHelpKeys = lkeys.fullHelp
-	c, err := cache.New(50)
+	c, err := cache.New(maxCacheSizeMb)
 
 	if err != nil {
 		panic(err)
@@ -130,6 +133,7 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if key.Matches(msg, m.keys.submitAltView) {
 				err := renameFile(m)
 
+				// TODO: Error Handling
 				if err != nil {
 					return m, nil
 				}
@@ -215,8 +219,7 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds = append(cmds, cmd)
 
 	// we need to asyncronously generate the markdown preview, then
-	// once we have the preview we update it which should update the display
-	// while waiting, could just show preview as blank for now
+	// once we have the preview we update it which should update the display, or stream in as it comes
 	m.handlePreview()
 	return m, tea.Batch(cmds...)
 }
@@ -309,12 +312,7 @@ func (m *NoteListModel) handlePreview() {
 
 			w := m.width / 2
 			h := m.list.Height()
-
-			r := utils.RenderMarkdownPreview(
-				s.path,
-				w,
-				h,
-			)
+			r := utils.RenderMarkdownPreview(s.path, w, h)
 
 			if err := m.cache.Put(s.path, r); err != nil {
 				m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Error updating cache: %s", err)))
@@ -403,25 +401,27 @@ func (m *NoteListModel) swapView(newView string) tea.Cmd {
 }
 
 func (m *NoteListModel) toggleRename() {
-	if !m.renaming {
+	switch m.renaming {
+	case true:
+		m.renaming = false
+		m.inputModel.Input.Blur()
+	case false:
 		m.renaming = true
 		m.inputModel.Input.Focus()
 		if s, ok := m.list.SelectedItem().(ListItem); ok {
 			m.inputModel.Input.SetValue(s.title)
 		}
-	} else {
-		m.renaming = false
-		m.inputModel.Input.Blur()
 	}
 }
 
 // clear?
 func (m *NoteListModel) toggleCreation() {
-	if !m.creating {
-		m.formModel.Inputs[m.formModel.Focused].Focus()
-		m.creating = true
-	} else {
+	switch m.creating {
+	case true:
 		m.formModel.Inputs[m.formModel.Focused].Blur()
 		m.creating = false
+	case false:
+		m.formModel.Inputs[m.formModel.Focused].Focus()
+		m.creating = true
 	}
 }

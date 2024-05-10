@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"text/template"
 	"time"
@@ -32,32 +31,29 @@ var AvailableTemplates = map[string]bool{
 	"year":     true,
 }
 
-// SingleTemplate represents a single template file and its associated data.
 type SingleTemplate struct {
-	FilePath string       `json:"file_path" yaml:"file_path"` // Path to the template file.
-	Data     TemplateData `json:"data"      yaml:"data"`      // Data structure to be used with the template.
+	FilePath string
+	Data     TemplateData
 }
 
-// TemplateMap is a map of template names to SingleTemplate instances.
 type TemplateMap map[string]SingleTemplate
 
 // Templater manages a collection of templates.
 type Templater struct {
-	templates TemplateMap // Map of template names to their corresponding SingleTemplate.
+	templates TemplateMap
 }
 
 // TemplateData defines the structure for data that will be passed to templates during rendering.
 type TemplateData struct {
-	Title     string   `json:"title"     yaml:"title"`     // Title of the note.
-	Date      string   `json:"date"      yaml:"date"`      // Date associated with the note.
-	Tags      []string `json:"tags"      yaml:"tags"`      // Tags to be associated with the note.
-	Links     []string `json:"links"     yaml:"links"`     // Tags to be associated with the note.
-	Upstream  string   `json:"upstream"  yaml:"upstream"`  // Tags to be associated with the note.
-	Content   string   `json:"content"   yaml:"content"`   // Tags to be associated with the note.
-	Fulfilled bool     `json:"fulfilled" yaml:"fulfilled"` // Tags to be associated with the note.
+	Title     string
+	Date      string
+	Upstream  string
+	Content   string
+	Tags      []string
+	Links     []string
+	Fulfilled bool
 }
 
-// NewTemplater initializes a new Templater instance by loading template files from a specified directory.
 func NewTemplater() (*Templater, error) {
 	tmplMap := make(TemplateMap)
 
@@ -67,7 +63,7 @@ func NewTemplater() (*Templater, error) {
 		return nil, err
 	}
 	userTemplateDir := filepath.Join(userHomeDir, ".an", "templates")
-	err = loadTemplates(userTemplateDir, tmplMap)
+	err = tmplMap.loadTemplates(userTemplateDir)
 	if err != nil {
 		return nil, err
 	}
@@ -81,22 +77,21 @@ func NewTemplater() (*Templater, error) {
 	var templateDir string
 	if os.Getenv("DEV_MODE") == "true" {
 		// In development, use the relative path from the current working directory.
-		templateDir = "./pkg/fs/templater/views"
+		templateDir = "./fs/templater/views"
 	} else {
 		// In production, use the directory of the executable.
 		executableDir, err := os.Executable()
 		if err != nil {
 			return nil, err
 		}
-		templateDir = filepath.Join(filepath.Dir(executableDir), "pkg/fs/templater/views")
+		templateDir = filepath.Join(filepath.Dir(executableDir), "fs/templater/views")
 	}
 
-	err = loadTemplates(templateDir, tmplMap)
+	err = tmplMap.loadTemplates(templateDir)
 	if err != nil {
 		return nil, err
 	}
 
-	// Return templater loaded ready to execute the available templates
 	return &Templater{templates: tmplMap}, nil
 }
 
@@ -110,31 +105,17 @@ func (t *Templater) Execute(
 		return "", errors.New("template not found")
 	}
 
-	// Validate data against the struct type.
-	// Since we are auto generating the metadata, and most of the user input is already validated...
-	// Do we need this?
-	expectedType := reflect.TypeOf(tmplData.Data)
-	if expectedType != nil &&
-		!reflect.TypeOf(data).AssignableTo(expectedType) {
-		return "", errors.New(
-			"provided data type does not match expected template data type",
-		)
-	}
-
-	// Parse and execute the template.
 	tmpl, err := template.ParseFiles(tmplData.FilePath)
 	if err != nil {
 		return "", err
 	}
 
-	// Execute the template and write the output into the buffer.
 	var renderedTemplate bytes.Buffer
 	err = tmpl.Execute(&renderedTemplate, data)
 	if err != nil {
 		return "", err
 	}
 
-	// Return the captured template as a string.
 	return renderedTemplate.String(), nil
 }
 
@@ -142,32 +123,22 @@ func (t *Templater) Execute(
 func (t *Templater) GenerateTagsAndDate(
 	tmplName string,
 ) (string, []string) {
-	// Get the current time in UTC.
-	currentTime := time.Now().UTC()
+	cur := time.Now().UTC()
+	zetTime := cur.Format("20060102150405")
 
-	// Format the time as a Zettelkasten-style timestamp with 12-digit seconds resolution.
-	zettelkastenTime := currentTime.Format("20060102150405")
+	day := strings.ToLower(cur.Weekday().String())
+	hour := fmt.Sprintf("%02dh", cur.Hour())
 
-	// Generate tags for the day of the week and the hour of the day.
-	dayOfWeekTag := strings.ToLower(currentTime.Weekday().String())
-	hourOfDayTag := fmt.Sprintf("%02dh", currentTime.Hour())
-
-	// return values with template specific tags as well
-	// maybe better way to handle this somehow?
+	// Do we want more automated tags, or just what's in the template? If more.. expand here
 	switch tmplName {
 	case "daily":
-		return zettelkastenTime, []string{
-			"daily",
-			dayOfWeekTag,
-			hourOfDayTag,
-		}
+		return zetTime, []string{"daily", day, hour}
 	default:
-		return zettelkastenTime, []string{}
+		return zetTime, []string{}
 	}
 }
 
-// loadTemplates loads templates from the specified directory into the provided TemplateMap.
-func loadTemplates(dirPath string, tmplMap TemplateMap) error {
+func (m TemplateMap) loadTemplates(dirPath string) error {
 	return filepath.Walk(
 		dirPath,
 		func(path string, info os.FileInfo, err error) error {
@@ -177,14 +148,12 @@ func loadTemplates(dirPath string, tmplMap TemplateMap) error {
 
 			// if not a directory and extension is .tmpl, we add it to the template map
 			if !info.IsDir() && filepath.Ext(path) == ".tmpl" {
-				name := strings.TrimSuffix(
-					info.Name(),
-					filepath.Ext(info.Name()),
-				)
+				name := strings.TrimSuffix(info.Name(), filepath.Ext(info.Name()))
+
 				// Check if the template is already loaded (from the user's directory).
-				if _, exists := tmplMap[name]; !exists {
+				if _, exists := m[name]; !exists {
 					var data TemplateData
-					tmplMap[name] = SingleTemplate{
+					m[name] = SingleTemplate{
 						FilePath: path,
 						Data:     data,
 					}

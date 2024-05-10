@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Paintersrp/an/pkg/fs/fzf"
+	"github.com/Paintersrp/an/fs/handler"
 )
 
 type View struct {
@@ -135,7 +135,7 @@ func GetFilesByView(
 		excludeDirs = m.ExcludeFiles
 	}
 
-	return fzf.StaticListFiles(vaultDir, excludeDirs, excludeFiles, viewFlag)
+	return handler.WalkFiles(vaultDir, excludeDirs, excludeFiles, viewFlag)
 }
 
 func getAvailableViews(views map[string]View) string {

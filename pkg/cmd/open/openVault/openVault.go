@@ -5,10 +5,11 @@ import (
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc/v2"
-	"github.com/Paintersrp/an/internal/config"
-	"github.com/Paintersrp/an/pkg/fs/zet"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/Paintersrp/an/fs/zet"
+	"github.com/Paintersrp/an/internal/config"
 )
 
 func NewCmdOpenVault(c *config.Config) *cobra.Command {

@@ -10,20 +10,19 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/Paintersrp/an/pkg/fs/templater"
 	"github.com/spf13/viper"
-)
 
-// TODO:ensure "zet" / "atoms" directory in vault
+	"github.com/Paintersrp/an/fs/templater"
+)
 
 // ZettelkastenNote represents a zettelkasten note with its metadata.
 type ZettelkastenNote struct {
 	VaultDir      string   `json:"vault_dir"      yaml:"vault_dir"`
 	SubDir        string   `json:"sub_dir"        yaml:"sub_dir"`
 	Filename      string   `json:"filename"       yaml:"filename"`
+	Upstream      string   `json:"upstream"       yaml:"upstream"`
 	OriginalTags  []string `json:"original_tags"  yaml:"original_tags"`
 	OriginalLinks []string `json:"original_links" yaml:"original_links"`
-	Upstream      string   `json:"upstream"       yaml:"upstream"`
 }
 
 // errors?
@@ -60,14 +59,12 @@ func (note *ZettelkastenNote) EnsurePath() (string, error) {
 	dir := fmt.Sprintf("%s/%s", note.VaultDir, note.SubDir)
 	filePath := fmt.Sprintf("%s/%s.md", dir, note.Filename)
 
-	// Check if the directory already exists
 	_, err := os.Stat(dir)
 	if err == nil {
 		// Directory already exists, return file path
 		return filePath, nil
 	}
 
-	// If the directory does not exist, create it
 	if os.IsNotExist(err) {
 		err := os.MkdirAll(dir, os.ModePerm)
 		if err != nil {
@@ -107,13 +104,11 @@ func (note *ZettelkastenNote) Create(
 	t *templater.Templater,
 	content string,
 ) (bool, error) {
-	// Verify the directories up to the new note
 	path, err := note.EnsurePath()
 	if err != nil {
 		return false, err // exit
 	}
 
-	// Create the empty note file.
 	file, err := os.Create(path)
 	if err != nil {
 		return false, err // exit
@@ -131,7 +126,6 @@ func (note *ZettelkastenNote) Create(
 		Fulfilled: false,
 	}
 
-	// Execute the template and return the rendered output
 	output, err := t.Execute(tmplName, data)
 	if err != nil {
 		// TODO: delete file made on failure?
@@ -139,7 +133,6 @@ func (note *ZettelkastenNote) Create(
 		return false, err // exit
 	}
 
-	// Write to file
 	file.WriteString(output)
 
 	// Return created (true) and nil (error)
@@ -166,6 +159,7 @@ func (note *ZettelkastenNote) Open() error {
 	}
 
 	if err := OpenFromPath(filePath); err != nil {
+		// TODO: fix - print is too specific
 		fmt.Println(
 			"Error opening note in Neovim:",
 			err,
@@ -275,15 +269,12 @@ func OpenWithNvim(path string) error {
 func OpenWithObsidian(path string) error {
 	// Get the full vault directory path from the configuration
 	fullVaultDir := viper.GetString("vaultdir")
-	fmt.Printf("config vault dir: %s", fullVaultDir)
 
 	// Extract the vault name from the full vault directory path
 	vaultName := filepath.Base(fullVaultDir)
-	fmt.Printf("VAULTNAME BASE: %s", vaultName)
 
 	// Get the relative path by removing the full vault directory path from the file path
 	relativePath := strings.TrimPrefix(path, fmt.Sprintf("%s/", fullVaultDir))
-	fmt.Printf("relative file path: %s", relativePath)
 
 	// Construct the obsidian URI
 	obsidianURI := fmt.Sprintf(
@@ -303,7 +294,6 @@ func OpenWithObsidian(path string) error {
 	case "windows":
 		cmdArgs = []string{"cmd", "/c", "start", obsidianURI}
 	default:
-		fmt.Printf("Error: Unsupported operating system '%s'\n", runtime.GOOS)
 		return fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
 	}
 

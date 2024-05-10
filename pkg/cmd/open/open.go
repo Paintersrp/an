@@ -1,11 +1,12 @@
 package open
 
 import (
+	"github.com/spf13/cobra"
+
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/pkg/cmd/open/openFind"
 	"github.com/Paintersrp/an/pkg/cmd/open/openPin"
 	"github.com/Paintersrp/an/pkg/cmd/open/openVault"
-	"github.com/spf13/cobra"
 )
 
 func NewCmdOpen(c *config.Config) *cobra.Command {

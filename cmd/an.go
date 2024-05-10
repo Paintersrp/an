@@ -19,13 +19,13 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+
+	"github.com/Paintersrp/an/fs/templater"
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/internal/constants"
 	"github.com/Paintersrp/an/pkg/cmd/root"
-	"github.com/Paintersrp/an/pkg/fs/templater"
-
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 func Execute() {

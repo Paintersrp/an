@@ -5,10 +5,11 @@ import (
 	"os"
 	"sort"
 
-	tableTui "github.com/Paintersrp/an/tui/table"
-	"github.com/Paintersrp/an/utils"
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
+
+	tableTui "github.com/Paintersrp/an/tui/table"
+	"github.com/Paintersrp/an/utils"
 )
 
 // TagHandler handles the logic related to tags.

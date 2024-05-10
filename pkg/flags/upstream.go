@@ -6,8 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Paintersrp/an/pkg/fs/fzf"
 	"github.com/spf13/cobra"
+
+	"github.com/Paintersrp/an/fs/fzf"
 )
 
 func AddUpstream(cmd *cobra.Command) {

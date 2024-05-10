@@ -6,8 +6,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Paintersrp/an/internal/config"
 	"github.com/spf13/cobra"
+
+	"github.com/Paintersrp/an/internal/config"
 )
 
 // TODO: Clean

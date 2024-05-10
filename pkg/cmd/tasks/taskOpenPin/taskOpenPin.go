@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Paintersrp/an/internal/config"
-	"github.com/Paintersrp/an/pkg/fs/zet"
 	"github.com/spf13/cobra"
+
+	"github.com/Paintersrp/an/fs/zet"
+	"github.com/Paintersrp/an/internal/config"
 )
 
 func NewCmdTaskOpenPin(c *config.Config) *cobra.Command {

@@ -8,9 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Paintersrp/an/internal/config"
 	"github.com/charmbracelet/glamour"
 	"github.com/muesli/termenv"
+
+	"github.com/Paintersrp/an/internal/config"
 )
 
 func AppendIfNotExists(slice []string, value string) []string {

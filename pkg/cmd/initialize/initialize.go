@@ -2,9 +2,10 @@ package initialize
 
 import (
 	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/spf13/cobra"
+
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/tui/initialize"
-	"github.com/spf13/cobra"
 )
 
 func NewCmdInit(c *config.Config) *cobra.Command {

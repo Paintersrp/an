@@ -8,14 +8,14 @@ import (
 )
 
 type ListItem struct {
-	tags         []string
-	size         int64
 	fileName     string
 	path         string
 	lastModified string
 	title        string
-	showFullPath bool
 	subdirectory string
+	tags         []string
+	size         int64
+	showFullPath bool
 }
 
 func (i ListItem) Title() string {

@@ -6,10 +6,11 @@ import (
 	"path/filepath"
 
 	"github.com/MakeNowJust/heredoc/v2"
-	"github.com/Paintersrp/an/internal/config"
-	"github.com/Paintersrp/an/pkg/fs/fzf"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/Paintersrp/an/fs/fzf"
+	"github.com/Paintersrp/an/internal/config"
 )
 
 func NewCmdSymlink(c *config.Config) *cobra.Command {

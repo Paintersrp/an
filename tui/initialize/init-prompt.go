@@ -5,11 +5,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Paintersrp/an/internal/config"
 	"github.com/charmbracelet/bubbles/cursor"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/Paintersrp/an/internal/config"
 )
 
 var (
@@ -33,10 +34,10 @@ var (
 )
 
 type InitPromptModel struct {
-	focusIndex int
-	inputs     []textinput.Model
-	cursorMode cursor.Mode
 	configPath string
+	inputs     []textinput.Model
+	focusIndex int
+	cursorMode cursor.Mode
 }
 
 func InitialPrompt(cfgPath string) InitPromptModel {

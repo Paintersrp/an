@@ -2,9 +2,10 @@ package pinTable
 
 import (
 	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/spf13/cobra"
+
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/tui/pinList"
-	"github.com/spf13/cobra"
 )
 
 func Command(c *config.Config, pinType string) *cobra.Command {

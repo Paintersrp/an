@@ -2,11 +2,12 @@ package notes
 
 import (
 	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/spf13/cobra"
+
+	"github.com/Paintersrp/an/fs/templater"
 	"github.com/Paintersrp/an/internal/config"
 	v "github.com/Paintersrp/an/internal/views"
-	"github.com/Paintersrp/an/pkg/fs/templater"
 	"github.com/Paintersrp/an/tui/notes"
-	"github.com/spf13/cobra"
 )
 
 // TODO: Could also allow shorthands for view flag with parsing

@@ -12,9 +12,9 @@ import (
 )
 
 type Parser struct {
-	DirPath     string
 	TaskHandler *TaskHandler
 	TagHandler  *TagHandler
+	DirPath     string
 }
 
 func NewParser(dirPath string) *Parser {

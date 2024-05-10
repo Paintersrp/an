@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Paintersrp/an/internal/config"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/Paintersrp/an/internal/config"
 )
 
 // TODO: Clean and Organize
@@ -67,9 +68,9 @@ type ListModel struct {
 	list         list.Model
 	keys         *listKeyMap
 	delegateKeys *delegateKeyMap
+	config       *config.Config
 	configInput  ListInputModel
 	inputActive  bool
-	config       *config.Config
 }
 
 func NewListModel(cfg *config.Config) ListModel {
