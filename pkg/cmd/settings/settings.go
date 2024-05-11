@@ -5,7 +5,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/Paintersrp/an/internal/config"
-	"github.com/Paintersrp/an/tui/list"
+	"github.com/Paintersrp/an/internal/tui/list"
 )
 
 func NewCmdSettings(c *config.Config) *cobra.Command {

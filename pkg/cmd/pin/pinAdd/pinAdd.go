@@ -9,15 +9,14 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/Paintersrp/an/fs/fzf"
+	"github.com/Paintersrp/an/internal/fzf"
 	"github.com/Paintersrp/an/internal/state"
-	"github.com/Paintersrp/an/pkg/flags"
+	"github.com/Paintersrp/an/pkg/shared/flags"
 )
 
 // Pin Type is for using the same command with the task variant of pin
 func Command(s *state.State, pinType string) *cobra.Command {
 	var check bool
-	var name string
 
 	cmd := &cobra.Command{
 		Use:     "add [query] [--name pin_name] [--path file_path] [--check]",
@@ -38,12 +37,12 @@ func Command(s *state.State, pinType string) *cobra.Command {
 				fmt.Println("Current pinned file:", s.Config.PinnedFile)
 				return nil
 			}
-			return run(cmd, args, s, name, pinType)
+			return run(cmd, args, s, pinType)
 		},
 	}
 
 	cmd.Flags().BoolVarP(&check, "check", "c", false, "Check the current pinned file")
-	cmd.Flags().StringVarP(&name, "name", "n", "", "Save as a named pin")
+	flags.AddName(cmd, "Name for new pin.")
 	flags.AddPath(cmd)
 
 	return cmd
@@ -53,10 +52,13 @@ func run(
 	cmd *cobra.Command,
 	args []string,
 	s *state.State,
-	name string,
 	pinType string,
 ) error {
 	path := flags.HandlePath(cmd)
+	name, err := flags.HandleName(cmd)
+	if err != nil {
+		return err
+	}
 
 	if path == "" {
 		vaultDir := viper.GetString("vaultDir")

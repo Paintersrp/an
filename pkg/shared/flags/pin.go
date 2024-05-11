@@ -3,8 +3,8 @@ package flags
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/Paintersrp/an/fs/zet"
 	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/internal/zet"
 )
 
 func AddPin(cmd *cobra.Command) {

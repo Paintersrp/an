@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/Paintersrp/an/fs/parser"
+	"github.com/Paintersrp/an/internal/parser"
 	"github.com/Paintersrp/an/internal/state"
 )
 

@@ -8,12 +8,12 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/Paintersrp/an/fs/zet"
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/internal/state"
-	"github.com/Paintersrp/an/tui/notes"
-	"github.com/Paintersrp/an/tui/pinList/nameInput"
-	"github.com/Paintersrp/an/tui/pinList/sublist"
+	"github.com/Paintersrp/an/internal/tui/notes"
+	"github.com/Paintersrp/an/internal/tui/pinList/nameInput"
+	"github.com/Paintersrp/an/internal/tui/pinList/sublist"
+	"github.com/Paintersrp/an/internal/zet"
 )
 
 type PinListModel struct {

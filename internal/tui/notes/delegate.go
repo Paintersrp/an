@@ -7,7 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/Paintersrp/an/fs/handler"
+	"github.com/Paintersrp/an/internal/handler"
 )
 
 var currView string

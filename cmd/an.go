@@ -25,36 +25,12 @@ import (
 )
 
 func Execute() {
-	// // Get Home Directory for locating config files
-	// home, err := os.UserHomeDir()
-	// cobra.CheckErr(err)
-	//
-	// // Eventually will factor out Viper entirely
-	// viper.AddConfigPath(home + constants.ConfigDir)
-	// viper.SetConfigName(constants.ConfigFile)
-	// viper.SetConfigType(constants.ConfigFileType)
-	// viper.ReadInConfig()
-	//
-	// config.EnsureConfigExists(home)
-	// cfg, cfgErr := config.FromFile(config.StaticGetConfigPath(home))
-	// if cfgErr != nil {
-	// 	return // exit?
-	// }
-	//
-	// templater, templaterErr := templater.NewTemplater()
-	// if templaterErr != nil {
-	// 	fmt.Printf("failed to create templater: %v", templaterErr)
-	// 	cobra.CheckErr(templaterErr)
-	// }
-	//
-	// hndlr := handler.NewFileHandler(cfg.VaultDir)
-
 	s, err := state.NewState()
 	cobra.CheckErr(err)
 
 	rootCmd, rootErr := root.NewCmdRoot(s)
 	if rootErr != nil {
-		return // exit?
+		return
 	}
 
 	execErr := rootCmd.Execute()

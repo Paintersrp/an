@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/Paintersrp/an/fs/templater"
+	"github.com/Paintersrp/an/internal/templater"
 )
 
 func AddTemplate(cmd *cobra.Command, def string) {

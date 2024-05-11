@@ -4,15 +4,15 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Paintersrp/an/fs/handler"
+	"github.com/Paintersrp/an/internal/handler"
 )
 
 var titlePrefixMap = map[string]string{
-	"archive":     "📦 - Archive",
+	"default":     "✅ - Default (All)",
 	"orphan":      "❓ - Orphan",
-	"trash":       "🗑️  - Trash", // Note the extra space before the dash
 	"unfulfilled": "⬜ - Unfulfilled",
-	"default":     "✅ - Active",
+	"archive":     "📦 - Archive",
+	"trash":       "🗑️  - Trash", // Note the extra space before the dash
 }
 
 func GetTitleForView(viewFlag string) string {
@@ -50,26 +50,26 @@ func NewViewManager(h *handler.FileHandler, vaultDir string) *ViewManager {
 		OrphanOnly:   false,
 	}
 
-	vm.Views["archive"] = View{
-		ExcludeDirs:  h.GetSubdirectories(vaultDir, "archive"),
-		ExcludeFiles: []string{},
-		OrphanOnly:   false,
-	}
-
 	vm.Views["orphan"] = View{
 		ExcludeDirs:  []string{"archive", "trash"},
 		ExcludeFiles: []string{},
 		OrphanOnly:   true,
 	}
 
-	vm.Views["trash"] = View{
-		ExcludeDirs:  h.GetSubdirectories(vaultDir, "trash"),
+	vm.Views["unfulfilled"] = View{
+		ExcludeDirs:  []string{"archive", "trash"},
 		ExcludeFiles: []string{},
 		OrphanOnly:   false,
 	}
 
-	vm.Views["unfulfilled"] = View{
-		ExcludeDirs:  []string{"archive", "trash"},
+	vm.Views["archive"] = View{
+		ExcludeDirs:  h.GetSubdirectories(vaultDir, "archive"),
+		ExcludeFiles: []string{},
+		OrphanOnly:   false,
+	}
+
+	vm.Views["trash"] = View{
+		ExcludeDirs:  h.GetSubdirectories(vaultDir, "trash"),
 		ExcludeFiles: []string{},
 		OrphanOnly:   false,
 	}

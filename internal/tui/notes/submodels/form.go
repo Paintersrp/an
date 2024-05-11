@@ -9,9 +9,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/Paintersrp/an/fs/templater"
-	"github.com/Paintersrp/an/fs/zet"
 	"github.com/Paintersrp/an/internal/state"
+	"github.com/Paintersrp/an/internal/templater"
+	"github.com/Paintersrp/an/internal/zet"
 	"github.com/Paintersrp/an/utils"
 )
 

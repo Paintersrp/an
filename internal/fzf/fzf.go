@@ -6,13 +6,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Paintersrp/an/internal/handler"
+	"github.com/Paintersrp/an/internal/parser"
+	"github.com/Paintersrp/an/internal/zet"
 	"github.com/charmbracelet/glamour"
 	"github.com/ktr0731/go-fuzzyfinder"
 	"github.com/muesli/termenv"
-
-	"github.com/Paintersrp/an/fs/handler"
-	"github.com/Paintersrp/an/fs/parser"
-	"github.com/Paintersrp/an/fs/zet"
 )
 
 // FuzzyFinder encapsulates the fuzzy finder functionality

@@ -12,20 +12,20 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/Paintersrp/an/fs/templater"
+	"github.com/Paintersrp/an/internal/templater"
 )
 
 // ZettelkastenNote represents a zettelkasten note with its metadata.
 type ZettelkastenNote struct {
-	VaultDir      string   `json:"vault_dir"      yaml:"vault_dir"`
-	SubDir        string   `json:"sub_dir"        yaml:"sub_dir"`
-	Filename      string   `json:"filename"       yaml:"filename"`
-	Upstream      string   `json:"upstream"       yaml:"upstream"`
-	OriginalTags  []string `json:"original_tags"  yaml:"original_tags"`
-	OriginalLinks []string `json:"original_links" yaml:"original_links"`
+	VaultDir      string
+	SubDir        string
+	Filename      string
+	Upstream      string
+	OriginalTags  []string
+	OriginalLinks []string
 }
 
-// errors?
+// NewZettelkastenNote creates a new ZettelkastenNote instance.
 func NewZettelkastenNote(
 	vaultDir string,
 	subDir string,
@@ -46,44 +46,24 @@ func NewZettelkastenNote(
 
 // GetFilepath returns the file path of the zettelkasten note.
 func (note *ZettelkastenNote) GetFilepath() string {
-	return fmt.Sprintf(
-		"%s/%s/%s.md",
-		note.VaultDir,
-		note.SubDir,
-		note.Filename,
-	)
+	return filepath.Join(note.VaultDir, note.SubDir, note.Filename+".md")
 }
 
 // EnsurePath creates the necessary directory structure for the note file.
 func (note *ZettelkastenNote) EnsurePath() (string, error) {
-	dir := fmt.Sprintf("%s/%s", note.VaultDir, note.SubDir)
-	filePath := fmt.Sprintf("%s/%s.md", dir, note.Filename)
+	dir := filepath.Join(note.VaultDir, note.SubDir)
+	filePath := filepath.Join(dir, note.Filename+".md")
 
-	_, err := os.Stat(dir)
-	if err == nil {
-		// Directory already exists, return file path
-		return filePath, nil
-	}
-
-	if os.IsNotExist(err) {
-		err := os.MkdirAll(dir, os.ModePerm)
-		if err != nil {
-			// Failed to create directory
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		if err := os.MkdirAll(dir, os.ModePerm); err != nil {
 			return "", err
 		}
-		return filePath, nil
 	}
 
-	// Other error occurred
-	return "", err
+	return filePath, nil
 }
 
-// Because of the way the fuzzy finding works, we should never get a file exists error
-// as we are only selecting from the files processed directly from the vault
-// If you open into a file exists error, there's an issue with the options being
-// provided by the fuzzyfinder
-//
-// FileExists checks if the Zettelkasten note file already exists.
+// FileExists checks if the zettelkasten note file already exists.
 func (note *ZettelkastenNote) FileExists() (bool, string, error) {
 	noteFilePath := note.GetFilepath()
 	_, err := os.Stat(noteFilePath)
@@ -95,6 +75,7 @@ func (note *ZettelkastenNote) FileExists() (bool, string, error) {
 	if os.IsNotExist(err) {
 		return false, noteFilePath, nil
 	}
+
 	return false, noteFilePath, err
 }
 
@@ -106,13 +87,14 @@ func (note *ZettelkastenNote) Create(
 ) (bool, error) {
 	path, err := note.EnsurePath()
 	if err != nil {
-		return false, err // exit
+		return false, err
 	}
 
 	file, err := os.Create(path)
 	if err != nil {
-		return false, err // exit
+		return false, err
 	}
+	defer file.Close()
 
 	// Setup template metadata
 	zetTime, tags := t.GenerateTagsAndDate(tmplName)
@@ -128,14 +110,15 @@ func (note *ZettelkastenNote) Create(
 
 	output, err := t.Execute(tmplName, data)
 	if err != nil {
-		// TODO: delete file made on failure?
-		fmt.Printf("Failed to execute template: %v", err)
-		return false, err // exit
+		// TODO: Delete newly created note on failure
+		return false, fmt.Errorf("failed to execute template: %w", err)
 	}
 
-	file.WriteString(output)
+	_, err = file.WriteString(output)
+	if err != nil {
+		return false, fmt.Errorf("failed to write to file: %w", err)
+	}
 
-	// Return created (true) and nil (error)
 	return true, nil
 }
 
@@ -170,19 +153,15 @@ func (note *ZettelkastenNote) Open() error {
 	return nil
 }
 
+// HandleConflicts checks for file naming conflicts and provides suggestions.
 func (note *ZettelkastenNote) HandleConflicts() error {
 	exists, _, err := note.FileExists()
 	if err != nil {
-		fmt.Printf("error processing note file: %s", err)
-		return err
+		return fmt.Errorf("error processing note file: %w", err)
 	}
 
 	if exists {
-		fmt.Println("error: Note with given title already exists in the vault directory.")
-		fmt.Println(
-			"hint: Try again with a new title, or run again with either an overwrite (-o) flag or an increment (-i) flag",
-		)
-		return errors.New("file naming conflict")
+		return errors.New("note with given title already exists in the vault directory")
 	}
 
 	return nil
@@ -190,50 +169,39 @@ func (note *ZettelkastenNote) HandleConflicts() error {
 
 // GetNotesInDirectory retrieves all note filenames in the specified vault and subdirectory.
 func GetNotesInDirectory(vaultDir, subDir string) ([]string, error) {
-	var notes []string
-	// Construct the directory path
-	dirPath := fmt.Sprintf("%s/%s", vaultDir, subDir)
-	// Read the directory contents
+	dirPath := filepath.Join(vaultDir, subDir)
 	files, err := os.ReadDir(dirPath)
 	if err != nil {
 		return nil, err
 	}
-	// Filter and collect note filenames
+
+	var notes []string
 	for _, file := range files {
 		if !file.IsDir() {
-			notes = append(notes, file.Name())
+			notes = append(notes, strings.TrimSuffix(file.Name(), ".md"))
 		}
 	}
+
 	return notes, nil
 }
 
+// StaticHandleNoteLaunch handles the creation and opening of a note.
 func StaticHandleNoteLaunch(
 	note *ZettelkastenNote,
 	t *templater.Templater,
-	tmpl string,
-	content string,
+	tmpl, content string,
 ) {
-	var cnt string
-
-	if content == "" {
-		cnt = "Placeholder"
-	} else {
-		cnt = content
-	}
-
-	_, err := note.Create(tmpl, t, cnt)
+	created, err := note.Create(tmpl, t, content)
 	if err != nil {
-		fmt.Printf("error creating note file: %s", err)
+		fmt.Printf("error creating note file: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Open the note in Neovim.
-	if err := note.Open(); err != nil {
-		fmt.Println(
-			"Error opening note in Neovim:",
-			err,
-		)
-		os.Exit(1)
+	if created {
+		if err := note.Open(); err != nil {
+			fmt.Printf("error opening note in editor: %v\n", err)
+			os.Exit(1)
+		}
 	}
 }
 
@@ -243,48 +211,38 @@ func OpenFromPath(path string) error {
 
 	switch editor {
 	case "nvim":
-		return OpenWithNvim(path)
+		return openWithNvim(path)
 	case "obsidian":
-		return OpenWithObsidian(path)
+		return openWithObsidian(path)
 	default:
-		fmt.Printf("Error: Unsupported editor '%s'\n", editor)
 		return fmt.Errorf("unsupported editor: %s", editor)
 	}
 }
 
-// OpenWithNvim opens the note in Neovim.
-func OpenWithNvim(path string) error {
+// openWithNvim opens the note in Neovim.
+func openWithNvim(path string) error {
 	nvimArgs := viper.GetString("nvimargs")
 	cmdArgs := []string{"nvim", path}
 
 	if nvimArgs != "" {
-		// Append user-specified arguments for Neovim
 		cmdArgs = append(cmdArgs, strings.Fields(nvimArgs)...)
 	}
 
 	return runEditorCommand(cmdArgs)
 }
 
-// OpenWithObsidian opens the note in Obsidian.
-func OpenWithObsidian(path string) error {
-	// Get the full vault directory path from the configuration
+// openWithObsidian opens the note in Obsidian.
+func openWithObsidian(path string) error {
 	fullVaultDir := viper.GetString("vaultdir")
-
-	// Extract the vault name from the full vault directory path
 	vaultName := filepath.Base(fullVaultDir)
+	relativePath := strings.TrimPrefix(path, fullVaultDir+"/")
 
-	// Get the relative path by removing the full vault directory path from the file path
-	relativePath := strings.TrimPrefix(path, fmt.Sprintf("%s/", fullVaultDir))
-
-	// Construct the obsidian URI
 	obsidianURI := fmt.Sprintf(
 		"obsidian://open?vault=%s&file=%s",
 		vaultName,
 		relativePath,
 	)
 
-	// Obsidian is opened via a URL scheme, so we use 'open' command on macOS,
-	// 'xdg-open' on Linux, and 'start' on Windows.
 	var cmdArgs []string
 	switch runtime.GOOS {
 	case "darwin":

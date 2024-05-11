@@ -16,8 +16,8 @@ type Cache struct {
 	items        map[interface{}]*list.Element
 	evictionList *list.List
 	mutex        sync.Mutex
-	currentSize  int64 // Current size of the cache in bytes
-	maxSizeBytes int64 // Maximum size of the cache in bytes
+	currentSize  int64
+	maxSizeBytes int64
 }
 
 // Entry represents a key-value pair in the cache.

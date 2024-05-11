@@ -10,7 +10,6 @@ import (
 	"github.com/Paintersrp/an/pkg/cmd/pin/pinAdd"
 	"github.com/Paintersrp/an/pkg/cmd/pin/pinList"
 	"github.com/Paintersrp/an/pkg/cmd/pin/pinRemove"
-	"github.com/Paintersrp/an/pkg/cmd/pin/pinTable"
 )
 
 func NewCmdPin(s *state.State, pinType string) *cobra.Command {
@@ -40,7 +39,6 @@ func NewCmdPin(s *state.State, pinType string) *cobra.Command {
 	cmd.AddCommand(pinAdd.Command(s, pinType))
 	cmd.AddCommand(pinRemove.Command(s, pinType))
 	cmd.AddCommand(pinList.Command(s, pinType))
-	cmd.AddCommand(pinTable.Command(s, pinType))
 
 	return cmd
 }

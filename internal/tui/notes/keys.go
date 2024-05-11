@@ -74,21 +74,21 @@ func newListKeyMap() *listKeyMap {
 			key.WithKeys("1"),
 			key.WithHelp("1", "switch to default view"),
 		),
-		switchToArchiveView: key.NewBinding(
-			key.WithKeys("2"),
-			key.WithHelp("2", "switch to archive view"),
-		),
 		switchToOrphanView: key.NewBinding(
-			key.WithKeys("3"),
-			key.WithHelp("3", "switch to orphan view"),
-		),
-		switchToTrashView: key.NewBinding(
-			key.WithKeys("4"),
-			key.WithHelp("4", "switch to trash view"),
+			key.WithKeys("2"),
+			key.WithHelp("2", "switch to orphan view"),
 		),
 		switchToUnfulfillView: key.NewBinding(
+			key.WithKeys("3"),
+			key.WithHelp("3", "switch to unfulfilled view"),
+		),
+		switchToArchiveView: key.NewBinding(
+			key.WithKeys("4"),
+			key.WithHelp("4", "switch to archive view"),
+		),
+		switchToTrashView: key.NewBinding(
 			key.WithKeys("5"),
-			key.WithHelp("5", "switch to unfulfilled view"),
+			key.WithHelp("5", "switch to trash view"),
 		),
 	}
 }

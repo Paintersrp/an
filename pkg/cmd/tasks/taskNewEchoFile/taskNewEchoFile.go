@@ -8,10 +8,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/Paintersrp/an/fs/zet"
 	"github.com/Paintersrp/an/internal/state"
-	"github.com/Paintersrp/an/pkg/arg"
-	"github.com/Paintersrp/an/pkg/flags"
+	"github.com/Paintersrp/an/internal/zet"
+	"github.com/Paintersrp/an/pkg/shared/arg"
+	"github.com/Paintersrp/an/pkg/shared/flags"
 )
 
 func NewCmdNewEchoFile(s *state.State) *cobra.Command {

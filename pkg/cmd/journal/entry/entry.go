@@ -10,11 +10,11 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/Paintersrp/an/fs/templater"
-	"github.com/Paintersrp/an/fs/zet"
 	"github.com/Paintersrp/an/internal/state"
-	"github.com/Paintersrp/an/pkg/arg"
-	"github.com/Paintersrp/an/pkg/flags"
+	"github.com/Paintersrp/an/internal/templater"
+	"github.com/Paintersrp/an/internal/zet"
+	"github.com/Paintersrp/an/pkg/shared/arg"
+	"github.com/Paintersrp/an/pkg/shared/flags"
 	"github.com/Paintersrp/an/utils"
 )
 
@@ -64,10 +64,10 @@ func NewCmdEntry(
 	}
 
 	flags.AddLinks(cmd)
+	flags.AddPaste(cmd)
 	cmd.Flags().
 		IntVarP(&index, "index", "i", 0, fmt.Sprintf("Index for the %s relative to today. Can be negative for past %ss or positive for future %ss.", templateType, templateType, templateType))
-	cmd.Flags().
-		BoolP("paste", "p", false, "Automatically paste clipboard contents as note content in placeholder.")
+
 	return cmd
 }
 
@@ -87,7 +87,7 @@ func run(
 	}
 
 	content := ""
-	paste, err := cmd.Flags().GetBool("paste")
+	paste, err := flags.HandlePaste(cmd)
 	if err != nil {
 		return err
 	}

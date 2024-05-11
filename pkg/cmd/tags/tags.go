@@ -5,8 +5,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/Paintersrp/an/fs/parser"
 	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/internal/parser"
 )
 
 func NewCmdTags(c *config.Config) *cobra.Command {

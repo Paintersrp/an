@@ -6,8 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Paintersrp/an/fs/parser"
-	"github.com/Paintersrp/an/utils"
+	"github.com/Paintersrp/an/internal/parser"
 )
 
 type FileHandler struct {
@@ -18,20 +17,60 @@ func NewFileHandler(vaultDir string) *FileHandler {
 	return &FileHandler{vaultDir: vaultDir}
 }
 
+// Archive moves a note file to the archive subdirectory.
 func (h *FileHandler) Archive(path string) error {
-	return utils.Archive(path, h.vaultDir)
+	subDir, err := filepath.Rel(h.vaultDir, filepath.Dir(path))
+	if err != nil {
+		return err
+	}
+
+	archiveSubDir := filepath.Join(h.vaultDir, "archive", subDir)
+	if err := os.MkdirAll(archiveSubDir, os.ModePerm); err != nil {
+		return err
+	}
+
+	newPath := filepath.Join(archiveSubDir, filepath.Base(path))
+	return os.Rename(path, newPath)
 }
 
+// Unarchive moves a note file from the archive subdirectory to its original location.
 func (h *FileHandler) Unarchive(path string) error {
-	return utils.Unarchive(path, h.vaultDir)
+	subDir, err := filepath.Rel(filepath.Join(h.vaultDir, "archive"), filepath.Dir(path))
+	if err != nil {
+		return err
+	}
+
+	originalDir := filepath.Join(h.vaultDir, subDir)
+	newPath := filepath.Join(originalDir, filepath.Base(path))
+	return os.Rename(path, newPath)
 }
 
+// Trash moves a note file to the trash subdirectory.
 func (h *FileHandler) Trash(path string) error {
-	return utils.Trash(path, h.vaultDir)
+	subDir, err := filepath.Rel(h.vaultDir, filepath.Dir(path))
+	if err != nil {
+		return err
+	}
+
+	trashDir := filepath.Join(h.vaultDir, "trash", subDir)
+	if err := os.MkdirAll(trashDir, os.ModePerm); err != nil {
+		return err
+	}
+
+	newPath := filepath.Join(trashDir, filepath.Base(path))
+	return os.Rename(path, newPath)
 }
 
+// Untrash moves a note file from the trash subdirectory to its original location.
 func (h *FileHandler) Untrash(path string) error {
-	return utils.Untrash(path, h.vaultDir)
+	subDir, err := filepath.Rel(filepath.Join(h.vaultDir, "trash"), filepath.Dir(path))
+	if err != nil {
+		return err
+	}
+
+	originalDir := filepath.Join(h.vaultDir, subDir)
+	newPath := filepath.Join(originalDir, filepath.Base(path))
+	return os.Rename(path, newPath)
 }
 
 func (h *FileHandler) WalkFiles(
@@ -46,7 +85,7 @@ func (h *FileHandler) WalkFiles(
 		h.vaultDir,
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
-				return err // exit
+				return err
 			}
 
 			// Calculate the depth of the current path
@@ -57,14 +96,14 @@ func (h *FileHandler) WalkFiles(
 				return nil
 			}
 
-			// Check if the current directory is in the list of directories to exclude
+			// Check if the current directory is in the excluded list
 			dir := filepath.Dir(path)
 			for _, d := range excludeDirs {
 				if dir == filepath.Join(h.vaultDir, d) {
 					if info.IsDir() {
-						return filepath.SkipDir // skip the entire directory
+						return filepath.SkipDir
 					}
-					return nil // skip the single file
+					return nil
 				}
 			}
 
@@ -72,16 +111,16 @@ func (h *FileHandler) WalkFiles(
 			file := filepath.Base(path)
 			for _, f := range excludeFiles {
 				if file == f {
-					return nil // skip this file
+					return nil
 				}
 			}
 
 			// Skip hidden files or directories
 			if strings.HasPrefix(file, ".") {
 				if info.IsDir() {
-					return filepath.SkipDir // skip directory if hidden
+					return filepath.SkipDir
 				}
-				return nil // skip file if hidden
+				return nil
 			}
 
 			// Verify that the file has a .md extension (Markdown file)
@@ -89,12 +128,12 @@ func (h *FileHandler) WalkFiles(
 				content, err := os.ReadFile(path)
 				if err != nil {
 					log.Printf("Error reading file: %s, error: %v", path, err)
-					return nil // skip this file due to read error
+					return nil
 				}
 
 				switch modeFlag {
 				case "orphan":
-					// Only append the file if it does not contain note links
+					// Append the file if it does not contain note links
 					if !parser.HasNoteLinks(content) {
 						files = append(files, path)
 					}
@@ -107,17 +146,17 @@ func (h *FileHandler) WalkFiles(
 				}
 			}
 
-			return nil // walk on or finish
+			return nil
 		},
 	)
 
-	// Return files and any errors
 	return files, err
 }
 
 func (h *FileHandler) GetSubdirectories(directory, excludeDir string) []string {
 	files, err := os.ReadDir(directory)
 	if err != nil {
+		// Should probably properly propagate this error back up the application
 		log.Fatalf("Failed to read directory: %v", err)
 	}
 

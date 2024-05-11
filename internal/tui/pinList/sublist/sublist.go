@@ -10,7 +10,7 @@ import (
 
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/internal/state"
-	"github.com/Paintersrp/an/tui/notes"
+	"github.com/Paintersrp/an/internal/tui/notes"
 )
 
 type SubListModel struct {

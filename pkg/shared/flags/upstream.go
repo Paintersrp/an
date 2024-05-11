@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/Paintersrp/an/fs/fzf"
+	"github.com/Paintersrp/an/internal/fzf"
 )
 
 func AddUpstream(cmd *cobra.Command) {

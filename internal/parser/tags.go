@@ -8,7 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 
-	tableTui "github.com/Paintersrp/an/tui/table"
+	tableTui "github.com/Paintersrp/an/internal/tui/table"
 	"github.com/Paintersrp/an/utils"
 )
 

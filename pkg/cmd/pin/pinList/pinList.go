@@ -5,7 +5,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/Paintersrp/an/internal/state"
-	"github.com/Paintersrp/an/tui/pinList"
+	"github.com/Paintersrp/an/internal/tui/pinList"
 )
 
 func Command(s *state.State, pinType string) *cobra.Command {

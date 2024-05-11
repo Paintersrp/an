@@ -9,16 +9,16 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/Paintersrp/an/internal/state"
+	"github.com/Paintersrp/an/pkg/shared/flags"
 )
 
 // TODO: Clean
 
 func NewCmdTaskEcho(s *state.State) *cobra.Command {
 	var priority string
-	var target string
 
 	cmd := &cobra.Command{
-		Use:     "echo [task] -p {priority} -t {target}",
+		Use:     "echo [task] -p {priority} -n {name}",
 		Aliases: []string{"e"},
 		Short:   "Append a task to the pinned task file with optional priority.",
 		Long: `The task-echo command appends a task to the pinned task file under the "## Tasks" section.
@@ -29,31 +29,35 @@ It allows for tasks to be categorized under high, medium, or low priority sectio
     `,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(args, s, priority, target)
+			return run(cmd, args, s, priority)
 		},
 	}
 
 	cmd.Flags().
 		StringVarP(&priority, "priority", "p", "low", "Priority of the task (high, medium, low).")
-	cmd.Flags().
-		StringVarP(&target, "target", "t", "", "Named task pin to target.")
+	flags.AddName(cmd, "Named task pin to target.")
 
 	return cmd
 }
 
-func run(args []string, s *state.State, priority string, target string) error {
+func run(cmd *cobra.Command, args []string, s *state.State, priority string) error {
+	name, err := flags.HandleName(cmd)
+	if err != nil {
+		return err
+	}
+
 	task := strings.Join(args, " ")
 	taskEntry := fmt.Sprintf("- [ ] %s\n", task)
-	var targetPin string
 
-	if target != "" {
-		if s.Config.NamedTaskPins[target] == "" {
+	var targetPin string
+	if name != "" {
+		if s.Config.NamedTaskPins[name] == "" {
 			return fmt.Errorf(
 				"no task file pinned for named task pin '%s'. Use the task-pin command to pin a task-file first",
-				target,
+				name,
 			)
 		}
-		targetPin = s.Config.NamedTaskPins[target]
+		targetPin = s.Config.NamedTaskPins[name]
 	} else {
 		if s.Config.PinnedTaskFile == "" {
 			return errors.New(
@@ -126,10 +130,10 @@ func run(args []string, s *state.State, priority string, target string) error {
 		return err
 	}
 
-	if target != "" {
+	if name != "" {
 		fmt.Printf(
 			"Task appended to the pinned named task file '%s' under the \"%s\" section.\n",
-			target,
+			name,
 			priority,
 		)
 	} else {

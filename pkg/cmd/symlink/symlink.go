@@ -7,13 +7,12 @@ import (
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
-	"github.com/Paintersrp/an/fs/fzf"
-	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/internal/fzf"
+	"github.com/Paintersrp/an/internal/state"
 )
 
-func NewCmdSymlink(c *config.Config) *cobra.Command {
+func NewCmdSymlink(s *state.State) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "symlink [query]",
 		Aliases: []string{"sl", "sym"},
@@ -31,16 +30,15 @@ func NewCmdSymlink(c *config.Config) *cobra.Command {
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return symlink(args)
+			return symlink(args, s)
 		},
 	}
 
 	return cmd
 }
 
-func symlink(args []string) error {
-	vaultDir := viper.GetString("vaultDir")
-	finder := fzf.NewFuzzyFinder(vaultDir, "Select file to symlink.")
+func symlink(args []string, s *state.State) error {
+	finder := fzf.NewFuzzyFinder(s.Vault, "Select file to symlink.")
 
 	var (
 		selectedFile string

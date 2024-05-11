@@ -5,7 +5,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/Paintersrp/an/internal/state"
-	"github.com/Paintersrp/an/tui/initialize"
+	"github.com/Paintersrp/an/internal/tui/initialize"
 )
 
 func NewCmdInit(s *state.State) *cobra.Command {

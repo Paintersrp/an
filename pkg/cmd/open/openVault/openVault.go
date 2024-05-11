@@ -8,8 +8,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/Paintersrp/an/fs/zet"
 	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/internal/zet"
 )
 
 func NewCmdOpenVault(c *config.Config) *cobra.Command {
@@ -37,12 +37,10 @@ func NewCmdOpenVault(c *config.Config) *cobra.Command {
 
 func run() error {
 	vaultDir := viper.GetString("vaultDir")
-
 	if vaultDir == "" {
 		fmt.Println("No vault directory configured.\nExiting")
 		return errors.New("no vault directory")
 	}
 	zet.OpenFromPath(vaultDir)
-
 	return nil
 }

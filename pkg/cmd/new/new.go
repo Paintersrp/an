@@ -10,10 +10,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/Paintersrp/an/fs/zet"
 	"github.com/Paintersrp/an/internal/state"
-	"github.com/Paintersrp/an/pkg/arg"
-	"github.com/Paintersrp/an/pkg/flags"
+	"github.com/Paintersrp/an/internal/zet"
+	"github.com/Paintersrp/an/pkg/shared/arg"
+	"github.com/Paintersrp/an/pkg/shared/flags"
 )
 
 func NewCmdNew(s *state.State) *cobra.Command {
@@ -40,12 +40,10 @@ func NewCmdNew(s *state.State) *cobra.Command {
 	flags.AddLinks(cmd)
 	flags.AddUpstream(cmd)
 	flags.AddPin(cmd)
+	flags.AddPaste(cmd)
 
 	cmd.Flags().
 		Bool("symlink", false, "Automatically add a symlink to the new note in the current working directory.")
-
-	cmd.Flags().
-		Bool("paste", false, "Automatically paste clipboard contents as note content in placeholder.")
 
 	return cmd
 }
@@ -73,7 +71,7 @@ func run(
 		return err
 	}
 
-	paste, err := cmd.Flags().GetBool("paste")
+	paste, err := flags.HandlePaste(cmd)
 	if err != nil {
 		return err
 	}
@@ -120,5 +118,5 @@ func run(
 		}
 	}
 
-	return nil // no errors
+	return nil
 }

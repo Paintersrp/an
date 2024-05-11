@@ -56,31 +56,23 @@ func FromFile(path string) (*Config, error) {
 }
 
 func (cfg *Config) ToFile() error {
-	b, err := yaml.Marshal(cfg)
+	data, err := yaml.Marshal(cfg)
 	if err != nil {
 		return err
 	}
-	p := cfg.GetConfigPath()
 
-	d := path.Dir(p)
-	if _, err := os.Stat(d); errors.Is(
-		err,
-		os.ErrNotExist,
-	) {
-		if err := os.MkdirAll(d, 0755); err != nil {
+	configPath := cfg.GetConfigPath()
+	dir := path.Dir(configPath)
+	if _, err := os.Stat(dir); errors.Is(err, os.ErrNotExist) {
+		if err := os.MkdirAll(dir, 0755); err != nil {
 			return err
 		}
 	}
 
-	if err := os.WriteFile(p, b, 0644); err != nil {
-		return err
-	}
-
-	return nil
+	return os.WriteFile(configPath, data, 0644)
 }
 
 func (cfg *Config) AddSubdir(name string) {
-	// Check if the subdirectory already exists
 	for _, subDir := range cfg.SubDirs {
 		if subDir == name {
 			fmt.Println("Subdirectory", name, "already exists.")
@@ -88,30 +80,25 @@ func (cfg *Config) AddSubdir(name string) {
 		}
 	}
 
-	// Append the new sub directory
 	cfg.SubDirs = append(cfg.SubDirs, name)
-	cfg.ToFile()
+	if err := cfg.ToFile(); err != nil {
+		fmt.Println("Error saving the configuration:", err)
+		return
+	}
 
 	fmt.Println("Subdirectory", name, "added successfully.")
 }
 
 func (cfg *Config) GetConfigPath() string {
-	home, err := os.UserHomeDir()
+	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		fmt.Println("Home directory not found")
 		os.Exit(1)
 	}
-	return fmt.Sprintf(
-		"%s%s%s.%s",
-		home,
-		constants.ConfigDir,
-		constants.ConfigFile,
-		constants.ConfigFileType,
-	)
+	return StaticGetConfigPath(homeDir)
 }
 
 func (cfg *Config) ChangeMode(mode string) {
-	// Validate the input mode
 	if _, valid := ValidModes[mode]; !valid {
 		fmt.Printf(
 			"Invalid mode: %s. Please choose from 'strict', 'confirm', or 'free'.\n",
@@ -120,51 +107,31 @@ func (cfg *Config) ChangeMode(mode string) {
 		return
 	}
 
-	// Update the struct with the new mode
 	cfg.FileSystemMode = mode
-
-	// Save the updated configuration to file
-	err := cfg.ToFile()
-	if err != nil {
+	if err := cfg.ToFile(); err != nil {
 		fmt.Println("Error saving the configuration:", err)
 		return
 	}
 
-	fmt.Printf(
-		"Mode changed to '%s' and configuration saved successfully.\n",
-		mode,
-	)
+	fmt.Printf("Mode changed to '%s' and configuration saved successfully.\n", mode)
 }
 
 func (cfg *Config) ChangeEditor(editor string) {
-	// Validate the input editor
 	if _, valid := ValidEditors[editor]; !valid {
-		fmt.Printf(
-			"Invalid editor: %s. The only valid option is 'nvim'.\n",
-			editor,
-		)
+		fmt.Printf("Invalid editor: %s. The only valid option is 'nvim'.\n", editor)
 		return
 	}
 
-	// Update the struct with the new editor
 	cfg.Editor = editor
-
-	// Save the updated configuration to file
-	err := cfg.ToFile()
-	if err != nil {
+	if err := cfg.ToFile(); err != nil {
 		fmt.Println("Error saving the configuration:", err)
 		return
 	}
 
-	fmt.Printf(
-		"Editor changed to '%s' and configuration saved successfully.\n",
-		editor,
-	)
+	fmt.Printf("Editor changed to '%s' and configuration saved successfully.\n", editor)
 }
 
 func (cfg *Config) ChangePin(file, pinType, pinName string) {
-	// TODO: Validation
-
 	switch pinType {
 	case "task":
 		if pinName == "" {
@@ -183,9 +150,7 @@ func (cfg *Config) ChangePin(file, pinType, pinName string) {
 		return
 	}
 
-	// Save the updated configuration to file
-	err := cfg.ToFile()
-	if err != nil {
+	if err := cfg.ToFile(); err != nil {
 		fmt.Println("Error saving the configuration:", err)
 		return
 	}
@@ -197,33 +162,21 @@ func (cfg *Config) ChangePin(file, pinType, pinName string) {
 			file,
 		)
 	} else {
-		fmt.Printf(
-			"Pinned File changed to '%s' and configuration saved successfully.\n",
-			file,
-		)
+		fmt.Printf("Pinned File changed to '%s' and configuration saved successfully.\n", file)
 	}
 }
 
-func (cfg *Config) DeleteNamedPin(pinName string, pinType string, verbose bool) error {
+func (cfg *Config) DeleteNamedPin(pinName, pinType string, verbose bool) error {
+	var pinMap map[string]string
+	var message string
+
 	switch pinType {
 	case "task":
-		if _, exists := cfg.NamedTaskPins[pinName]; exists {
-			delete(cfg.NamedTaskPins, pinName)
-			if verbose {
-				fmt.Printf("Task pin '%s' deleted successfully.\n", pinName)
-			}
-		} else {
-			return fmt.Errorf("task pin '%s' does not exist", pinName)
-		}
+		pinMap = cfg.NamedTaskPins
+		message = "Task pin '%s' deleted successfully."
 	case "text":
-		if _, exists := cfg.NamedPins[pinName]; exists {
-			delete(cfg.NamedPins, pinName)
-			if verbose {
-				fmt.Printf("Text pin '%s' deleted successfully.\n", pinName)
-			}
-		} else {
-			return fmt.Errorf("text pin '%s' does not exist", pinName)
-		}
+		pinMap = cfg.NamedPins
+		message = "Text pin '%s' deleted successfully."
 	default:
 		return fmt.Errorf(
 			"invalid pin type: %s. Valid options are 'text' and 'task'",
@@ -231,9 +184,17 @@ func (cfg *Config) DeleteNamedPin(pinName string, pinType string, verbose bool) 
 		)
 	}
 
-	// Save the updated configuration to file
+	if _, exists := pinMap[pinName]; !exists {
+		return fmt.Errorf("%s pin '%s' does not exist", pinType, pinName)
+	}
+
+	delete(pinMap, pinName)
 	if err := cfg.ToFile(); err != nil {
 		return fmt.Errorf("error saving the configuration: %s", err)
+	}
+
+	if verbose {
+		fmt.Printf(message+"\n", pinName)
 	}
 
 	return nil
@@ -258,7 +219,6 @@ func (cfg *Config) ClearPinnedFile(pinType string, verbose bool) error {
 		)
 	}
 
-	// Save the updated configuration to file
 	if err := cfg.ToFile(); err != nil {
 		return fmt.Errorf("error saving the configuration: %s", err)
 	}
@@ -266,11 +226,7 @@ func (cfg *Config) ClearPinnedFile(pinType string, verbose bool) error {
 	return nil
 }
 
-func (cfg *Config) RenamePin(
-	oldName, newName, pinType string,
-	verbose bool,
-) error {
-	// Validate input
+func (cfg *Config) RenamePin(oldName, newName, pinType string, verbose bool) error {
 	if oldName == "" || newName == "" {
 		return fmt.Errorf("old name and new name must be provided")
 	}
@@ -280,7 +236,6 @@ func (cfg *Config) RenamePin(
 
 	var pinMap map[string]string
 
-	// Select the appropriate pin map based on pin type
 	switch pinType {
 	case "task":
 		pinMap = cfg.NamedTaskPins
@@ -293,25 +248,24 @@ func (cfg *Config) RenamePin(
 		)
 	}
 
-	// Check if the old pin name exists
 	if _, exists := pinMap[oldName]; !exists {
 		return fmt.Errorf("%s pin '%s' does not exist", pinType, oldName)
 	}
 
-	// Rename the pin
 	pinMap[newName] = pinMap[oldName]
-
-	// Delete the old pin
 	delete(pinMap, oldName)
 
-	// Save the updated configuration to file
 	if err := cfg.ToFile(); err != nil {
 		return fmt.Errorf("error saving the configuration: %s", err)
 	}
 
 	if verbose {
-		fmt.Printf("%s pin '%s' renamed to '%s'", pinType, oldName, newName)
-		fmt.Println(" and configuration saved successfully.")
+		fmt.Printf(
+			"%s pin '%s' renamed to '%s' and configuration saved successfully.\n",
+			pinType,
+			oldName,
+			newName,
+		)
 	}
 
 	return nil
@@ -362,7 +316,6 @@ func StaticGetConfigPath(homeDir string) string {
 }
 
 func EnsureConfigExists(home string) {
-	// Get the directory path of the file and absolute file path
 	dir := fmt.Sprintf("%s/%s", home, constants.ConfigDir)
 	filePath := fmt.Sprintf(
 		"%s/%s.%s",
@@ -371,10 +324,7 @@ func EnsureConfigExists(home string) {
 		constants.ConfigFileType,
 	)
 
-	// Check if the directory already exists
-	_, dirErr := os.Stat(dir)
-	if os.IsNotExist(dirErr) {
-		// If the directory does not exist, create it
+	if _, dirErr := os.Stat(dir); os.IsNotExist(dirErr) {
 		err := os.MkdirAll(dir, os.ModePerm)
 		if err != nil {
 			fmt.Printf("failed to create config directory.\nerror: %s", err)
@@ -382,10 +332,7 @@ func EnsureConfigExists(home string) {
 		}
 	}
 
-	// Check if the file already exists
-	_, fileErr := os.Stat(filePath)
-	if os.IsNotExist(fileErr) {
-		// If the file does not exist, create an empty file
+	if _, fileErr := os.Stat(filePath); os.IsNotExist(fileErr) {
 		file, err := os.Create(filePath)
 		if err != nil {
 			fmt.Printf("Error: failed to create config file. \nerror: %s", err)

@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Paintersrp/an/fs/handler"
-	"github.com/Paintersrp/an/fs/templater"
+	"github.com/spf13/viper"
+
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/internal/constants"
+	"github.com/Paintersrp/an/internal/handler"
+	"github.com/Paintersrp/an/internal/templater"
 	"github.com/Paintersrp/an/internal/views"
-	"github.com/spf13/viper"
 )
 
 type State struct {

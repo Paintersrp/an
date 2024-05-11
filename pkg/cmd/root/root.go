@@ -12,7 +12,6 @@ import (
 	"github.com/Paintersrp/an/internal/state"
 	"github.com/Paintersrp/an/pkg/cmd/addSubdir"
 	"github.com/Paintersrp/an/pkg/cmd/archive"
-	"github.com/Paintersrp/an/pkg/cmd/day"
 	"github.com/Paintersrp/an/pkg/cmd/echo"
 	"github.com/Paintersrp/an/pkg/cmd/initialize"
 	"github.com/Paintersrp/an/pkg/cmd/journal"
@@ -30,13 +29,9 @@ import (
 	"github.com/Paintersrp/an/pkg/cmd/untrash"
 )
 
-var (
-	subdirName string
-)
+var subdirName string
 
-func NewCmdRoot(
-	s *state.State,
-) (*cobra.Command, error) {
+func NewCmdRoot(s *state.State) (*cobra.Command, error) {
 	cmd := &cobra.Command{
 		Use:     "atomic",
 		Aliases: []string{"an", "a-n"},
@@ -51,7 +46,6 @@ func NewCmdRoot(
 		RunE: notes.NewCmdNotes(s).RunE,
 	}
 
-	// Validate the subdirectory flag
 	cmd.PersistentFlags().
 		StringVarP(
 			&subdirName,
@@ -60,31 +54,31 @@ func NewCmdRoot(
 			"atoms",
 			"Subdirectory to use for this command.",
 		)
-
 	viper.BindPFlag("subdir", cmd.PersistentFlags().Lookup("subdir"))
 
 	// TODO: Subdirectory creation is being asked even on the init command, should prob find a way to avoid that
 	handleSubdirs(s.Config)
 
 	// Add Child Commands to Root
-	cmd.AddCommand(initialize.NewCmdInit(s))
-	cmd.AddCommand(addSubdir.NewCmdAddSubdir(s))
-	cmd.AddCommand(new.NewCmdNew(s))
-	cmd.AddCommand(open.NewCmdOpen(s.Config))
-	cmd.AddCommand(tags.NewCmdTags(s.Config))
-	cmd.AddCommand(tasks.NewCmdTasks(s))
-	cmd.AddCommand(day.NewCmdDay(s))
-	cmd.AddCommand(pin.NewCmdPin(s, "text"))
-	cmd.AddCommand(echo.NewCmdEcho(s))
-	cmd.AddCommand(settings.NewCmdSettings(s.Config))
-	cmd.AddCommand(symlink.NewCmdSymlink(s.Config))
-	cmd.AddCommand(notes.NewCmdNotes(s))
-	cmd.AddCommand(todo.NewCmdTodo(s.Config))
-	cmd.AddCommand(archive.NewCmdArchive(s))
-	cmd.AddCommand(unarchive.NewCmdUnarchive(s))
-	cmd.AddCommand(trash.NewCmdTrash(s))
-	cmd.AddCommand(untrash.NewCmdUntrash(s))
-	cmd.AddCommand(journal.NewCmdJournal(s))
+	cmd.AddCommand(
+		initialize.NewCmdInit(s),
+		addSubdir.NewCmdAddSubdir(s),
+		new.NewCmdNew(s),
+		open.NewCmdOpen(s.Config),
+		tags.NewCmdTags(s.Config),
+		tasks.NewCmdTasks(s),
+		pin.NewCmdPin(s, "text"),
+		echo.NewCmdEcho(s),
+		settings.NewCmdSettings(s.Config),
+		symlink.NewCmdSymlink(s),
+		notes.NewCmdNotes(s),
+		todo.NewCmdTodo(s.Config),
+		archive.NewCmdArchive(s),
+		unarchive.NewCmdUnarchive(s),
+		trash.NewCmdTrash(s),
+		untrash.NewCmdUntrash(s),
+		journal.NewCmdJournal(s),
+	)
 
 	return cmd, nil
 }
@@ -120,24 +114,16 @@ func handleSubdirs(c *config.Config) {
 func verifySubdirExists() (bool, error) {
 	var subdirs []string
 	if err := viper.UnmarshalKey("subdirs", &subdirs); err != nil {
-		fmt.Println("Error unmarshalling subdirs:", err)
 		return false, err
 	}
 
-	// Check if the specified subdirectory exists
-	subdirExists := false
 	for _, subdir := range subdirs {
 		if subdir == subdirName {
-			subdirExists = true
-			break
+			return true, nil
 		}
 	}
 
-	if !subdirExists {
-		return subdirExists, nil
-	}
-
-	return subdirExists, nil
+	return false, nil
 }
 
 func getConfirmation(c *config.Config) {

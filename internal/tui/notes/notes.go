@@ -7,18 +7,18 @@ import (
 	"os"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"golang.org/x/term"
 
-	"github.com/Paintersrp/an/fs/zet"
 	"github.com/Paintersrp/an/internal/cache"
 	"github.com/Paintersrp/an/internal/state"
+	"github.com/Paintersrp/an/internal/tui/notes/submodels"
 	v "github.com/Paintersrp/an/internal/views"
-	"github.com/Paintersrp/an/tui/notes/submodels"
+	"github.com/Paintersrp/an/internal/zet"
 	"github.com/Paintersrp/an/utils"
-	"github.com/charmbracelet/bubbles/key"
 )
 
 // TODO: Replace Magic Number (Cache Size)
@@ -186,17 +186,17 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, m.keys.switchToDefaultView):
 			return m, m.swapView("default")
 
-		case key.Matches(msg, m.keys.switchToArchiveView):
-			return m, m.swapView("archive")
+		case key.Matches(msg, m.keys.switchToUnfulfillView):
+			return m, m.swapView("unfulfilled")
 
 		case key.Matches(msg, m.keys.switchToOrphanView):
 			return m, m.swapView("orphan")
 
+		case key.Matches(msg, m.keys.switchToArchiveView):
+			return m, m.swapView("archive")
+
 		case key.Matches(msg, m.keys.switchToTrashView):
 			return m, m.swapView("trash")
-
-		case key.Matches(msg, m.keys.switchToUnfulfillView):
-			return m, m.swapView("unfulfilled")
 
 		case key.Matches(msg, m.keys.rename):
 			m.toggleRename()
