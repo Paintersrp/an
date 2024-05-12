@@ -170,7 +170,7 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 				// Save the updated config
-				err := m.config.ToFile()
+				err := m.config.Save()
 				if err != nil {
 					fmt.Println("Failed to save config file, exiting...")
 					os.Exit(1)

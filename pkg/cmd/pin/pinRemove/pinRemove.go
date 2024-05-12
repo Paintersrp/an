@@ -32,7 +32,7 @@ func Command(s *state.State, pinType string) *cobra.Command {
 				return errors.New("you must specify a name for the pin to unpin")
 			}
 
-			return s.Config.DeleteNamedPin(name, pinType, true)
+			return s.Config.DeleteNamedPin(name, pinType)
 		},
 	}
 

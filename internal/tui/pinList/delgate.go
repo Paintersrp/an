@@ -47,7 +47,7 @@ func newItemDelegate(keys *delegateKeyMap, cfg *config.Config) list.DefaultDeleg
 					} else {
 						cfg.PinnedFile = description
 					}
-					if err := cfg.ToFile(); err != nil {
+					if err := cfg.Save(); err != nil {
 						return m.NewStatusMessage(statusMessageStyle("Error saving the configuration: " + err.Error()))
 					}
 
@@ -61,13 +61,13 @@ func newItemDelegate(keys *delegateKeyMap, cfg *config.Config) list.DefaultDeleg
 
 			case key.Matches(msg, keys.remove):
 				if title == "default" {
-					cfg.ClearPinnedFile("text", false)
+					cfg.ClearPinnedFile("text")
 					m.SelectedItem()
 					m.SetItem(m.Index(), PinListItem{title: title, description: "No Default Pinned File"})
 					return m.NewStatusMessage(statusMessageStyle("Cannot delete default pin. Cleared instead."))
 				}
 
-				cfg.DeleteNamedPin(title, "text", false)
+				cfg.DeleteNamedPin(title, "text")
 				index := m.Index()
 				m.RemoveItem(index)
 

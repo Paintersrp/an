@@ -72,5 +72,5 @@ func LoadConfig(home string) (*config.Config, error) {
 	viper.ReadInConfig()
 
 	config.EnsureConfigExists(home)
-	return config.FromFile(config.StaticGetConfigPath(home))
+	return config.Load(home)
 }

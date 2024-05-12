@@ -141,7 +141,7 @@ func (m InitPromptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					PinnedTaskFile: defaults[6],
 				}
 
-				cfgErr := cfg.ToFile()
+				cfgErr := cfg.Save()
 				if cfgErr != nil {
 					panic(cfgErr)
 				}

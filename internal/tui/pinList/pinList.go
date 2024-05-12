@@ -170,7 +170,7 @@ func (m PinListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, m.list.NewStatusMessage("new name and old name matched.")
 				}
 
-				m.state.Config.RenamePin(m.renamingFor, nv, m.pinType, false)
+				m.state.Config.RenamePin(m.renamingFor, nv, m.pinType)
 				m.input.Input.Blur()
 				m.renaming = false
 
@@ -256,9 +256,11 @@ func (m PinListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case key.Matches(msg, m.keys.swapToTextView):
+			m.pinType = "text"
 			return m, m.refreshItems("text")
 
 		case key.Matches(msg, m.keys.swapToTaskView):
+			m.pinType = "task"
 			return m, m.refreshItems("task")
 
 		case key.Matches(msg, m.keys.swapView):

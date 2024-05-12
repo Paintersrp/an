@@ -10,7 +10,7 @@ import (
 
 func Command(s *state.State, pinType string) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "list",
+		Use:     "list --print",
 		Aliases: []string{"l"},
 		Short:   "List all named pins of a specified type.",
 		Long: heredoc.Doc(`

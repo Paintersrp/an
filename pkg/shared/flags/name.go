@@ -9,5 +9,5 @@ func AddName(cmd *cobra.Command, usage string) {
 }
 
 func HandleName(cmd *cobra.Command) (string, error) {
-	return cmd.Flags().GetString("template")
+	return cmd.Flags().GetString("name")
 }

@@ -77,14 +77,14 @@ func NewTemplater() (*Templater, error) {
 	var templateDir string
 	if os.Getenv("DEV_MODE") == "true" {
 		// In development, use the relative path from the current working directory.
-		templateDir = "./internal/templater/views"
+		templateDir = "./internal/templater/templates"
 	} else {
 		// In production, use the directory of the executable.
 		executableDir, err := os.Executable()
 		if err != nil {
 			return nil, err
 		}
-		templateDir = filepath.Join(filepath.Dir(executableDir), "internal/templater/views")
+		templateDir = filepath.Join(filepath.Dir(executableDir), "internal/templater/templates")
 	}
 
 	err = tmplMap.loadTemplates(templateDir)
