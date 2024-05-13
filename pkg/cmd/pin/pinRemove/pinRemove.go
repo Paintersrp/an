@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func Command(s *state.State, pinType string) *cobra.Command {
+func NewCmdPinRemove(s *state.State, pinType string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "remove [--name pin_name]",
 		Aliases: []string{"r"},

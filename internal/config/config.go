@@ -106,6 +106,15 @@ func (cfg *Config) ChangeEditor(editor string) error {
 	return cfg.Save()
 }
 
+func (cfg *Config) AddPin(pinName, file, pinType string) error {
+	err := cfg.PinManager.AddPin(pinName, file, pinType)
+	if err != nil {
+		return err
+	}
+
+	return cfg.syncPinsAndSave()
+}
+
 func (cfg *Config) ChangePin(file, pinType, pinName string) error {
 	err := cfg.PinManager.ChangePin(file, pinType, pinName)
 	if err != nil {
@@ -113,7 +122,6 @@ func (cfg *Config) ChangePin(file, pinType, pinName string) error {
 	}
 
 	return cfg.syncPinsAndSave()
-
 }
 
 func (cfg *Config) DeleteNamedPin(pinName, pinType string) error {
@@ -123,7 +131,6 @@ func (cfg *Config) DeleteNamedPin(pinName, pinType string) error {
 	}
 
 	return cfg.syncPinsAndSave()
-
 }
 
 func (cfg *Config) ClearPinnedFile(pinType string) error {

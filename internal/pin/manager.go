@@ -29,13 +29,13 @@ func NewPinManager(
 func (m *PinManager) ChangePin(file, pinType, pinName string) error {
 	switch pinType {
 	case "task":
-		if pinName == "" {
+		if pinName == "default" || pinName == "" {
 			m.PinnedTaskFile = file
 		} else {
 			m.NamedTaskPins[pinName] = file
 		}
 	case "text":
-		if pinName == "" {
+		if pinName == "default" || pinName == "" {
 			m.PinnedFile = file
 		} else {
 			m.NamedPins[pinName] = file
@@ -49,7 +49,6 @@ func (m *PinManager) ChangePin(file, pinType, pinName string) error {
 
 func (m *PinManager) DeleteNamedPin(pinName, pinType string) error {
 	pinMap, err := m.getPinMap(pinType)
-	fmt.Println(pinMap)
 	if err != nil {
 		return err
 	}
@@ -97,6 +96,27 @@ func (m *PinManager) RenamePin(oldName, newName, pinType string) error {
 	pinMap[newName] = pinMap[oldName]
 	delete(pinMap, oldName)
 
+	return nil
+}
+
+func (m *PinManager) AddPin(pinName, file, pinType string) error {
+	if pinName == "" {
+		return errors.New("pin name must be provided")
+	}
+	if file == "" {
+		return errors.New("file must be provided")
+	}
+
+	pinMap, err := m.getPinMap(pinType)
+	if err != nil {
+		return err
+	}
+
+	if _, exists := pinMap[pinName]; exists {
+		return fmt.Errorf("%s pin %q already exists", pinType, pinName)
+	}
+
+	pinMap[pinName] = file
 	return nil
 }
 

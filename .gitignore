@@ -4,6 +4,8 @@ an
 .an-cli
 .an
 
+Planning v3.md
+Planning-v3.md
 .README.md
 .README
 
@@ -13,6 +15,3 @@ make-feature-notes
 .test-main.go
 test-main.go
 
-Planning-v3.md
-Planning v3.md
-.roadmap-bkup.md

@@ -8,7 +8,7 @@ import (
 	"github.com/Paintersrp/an/internal/tui/pinList"
 )
 
-func Command(s *state.State, pinType string) *cobra.Command {
+func NewCmdPinList(s *state.State, pinType string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list --print",
 		Aliases: []string{"l"},

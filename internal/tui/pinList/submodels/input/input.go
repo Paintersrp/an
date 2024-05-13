@@ -1,4 +1,4 @@
-package nameInput
+package input
 
 import (
 	"strings"

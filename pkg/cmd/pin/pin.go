@@ -9,6 +9,7 @@ import (
 	"github.com/Paintersrp/an/internal/state"
 	"github.com/Paintersrp/an/pkg/cmd/pin/pinAdd"
 	"github.com/Paintersrp/an/pkg/cmd/pin/pinList"
+	"github.com/Paintersrp/an/pkg/cmd/pin/pinOpen"
 	"github.com/Paintersrp/an/pkg/cmd/pin/pinRemove"
 )
 
@@ -36,9 +37,10 @@ func NewCmdPin(s *state.State, pinType string) *cobra.Command {
 		`, pinCommand, pinCommand, pinCommand)),
 	}
 
-	cmd.AddCommand(pinAdd.Command(s, pinType))
-	cmd.AddCommand(pinRemove.Command(s, pinType))
-	cmd.AddCommand(pinList.Command(s, pinType))
+	cmd.AddCommand(pinAdd.NewCmdPinAdd(s, pinType))
+	cmd.AddCommand(pinOpen.NewCmdPinOpen(s, pinType))
+	cmd.AddCommand(pinRemove.NewCmdPinRemove(s, pinType))
+	cmd.AddCommand(pinList.NewCmdPinList(s, pinType))
 
 	return cmd
 }

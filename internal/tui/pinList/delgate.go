@@ -8,7 +8,11 @@ import (
 	"github.com/Paintersrp/an/internal/config"
 )
 
-func newItemDelegate(keys *delegateKeyMap, cfg *config.Config) list.DefaultDelegate {
+func newItemDelegate(
+	keys *delegateKeyMap,
+	cfg *config.Config,
+	pinType string,
+) list.DefaultDelegate {
 	d := list.NewDefaultDelegate()
 
 	d.Styles.SelectedTitle = selectedItemStyle
@@ -61,13 +65,13 @@ func newItemDelegate(keys *delegateKeyMap, cfg *config.Config) list.DefaultDeleg
 
 			case key.Matches(msg, keys.remove):
 				if title == "default" {
-					cfg.ClearPinnedFile("text")
+					cfg.ClearPinnedFile(pinType)
 					m.SelectedItem()
 					m.SetItem(m.Index(), PinListItem{title: title, description: "No Default Pinned File"})
 					return m.NewStatusMessage(statusMessageStyle("Cannot delete default pin. Cleared instead."))
 				}
 
-				cfg.DeleteNamedPin(title, "text")
+				cfg.DeleteNamedPin(title, pinType)
 				index := m.Index()
 				m.RemoveItem(index)
 

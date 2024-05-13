@@ -11,8 +11,8 @@ import (
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/internal/state"
 	"github.com/Paintersrp/an/internal/tui/notes"
-	"github.com/Paintersrp/an/internal/tui/pinList/nameInput"
-	"github.com/Paintersrp/an/internal/tui/pinList/sublist"
+	"github.com/Paintersrp/an/internal/tui/pinList/submodels/input"
+	"github.com/Paintersrp/an/internal/tui/pinList/submodels/sublist"
 	"github.com/Paintersrp/an/internal/zet"
 )
 
@@ -25,7 +25,7 @@ type PinListModel struct {
 	findingFor   string
 	renamingFor  string
 	sublist      sublist.SubListModel
-	input        nameInput.NameInputModel
+	input        input.NameInputModel
 	finding      bool
 	renaming     bool
 	adding       bool
@@ -37,7 +37,7 @@ func NewPinListModel(s *state.State, pinType string) PinListModel {
 		listKeys     = newListKeyMap()
 	)
 
-	delegate := newItemDelegate(delegateKeys, s.Config)
+	delegate := newItemDelegate(delegateKeys, s.Config, pinType)
 	l := list.New(nil, delegate, 0, 0)
 	l.Title = getTitleByType(pinType)
 	l.Styles.Title = titleStyle
@@ -49,7 +49,7 @@ func NewPinListModel(s *state.State, pinType string) PinListModel {
 	l.SetHeight(20)
 
 	sl := sublist.NewSubListModel(s)
-	i := nameInput.NewNameInput()
+	i := input.NewNameInput()
 
 	return PinListModel{
 		list:         l,
@@ -79,14 +79,12 @@ func (m PinListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		h, v := appStyle.GetFrameSize()
 		m.list.SetSize(msg.Width-h, msg.Height-v)
 	case tea.KeyMsg:
-		// Don't match any of the keys below if we're actively filtering.
 		if m.list.FilterState() == list.Filtering {
 			break
 		}
 
 		if m.adding {
 			if m.renaming {
-				// Handle exiting input mode
 				if key.Matches(msg, m.keys.backToMain) {
 					m.input.Input.Blur()
 					m.renaming = false
@@ -98,15 +96,14 @@ func (m PinListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.input.Input, cmd = m.input.Input.Update(msg)
 				cmds = append(cmds, cmd)
 
-				// Handle the case when Enter is pressed and the input is submitted
 				if key.Matches(msg, m.keys.findSelect) {
 					nv := m.input.Input.Value()
+
 					if nv == "" {
 						m.renaming = false
 						return m, m.list.NewStatusMessage("given name was empty, please try again.")
 					}
 
-					// m.cfg.RenamePin(m.renamingFor, nv, m.pinType, false)
 					m.input.Input.Blur()
 					m.renaming = false
 					m.finding = true
@@ -120,14 +117,17 @@ func (m PinListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			if m.finding {
-				// TODO: Handle Exiting
-				// Handle exiting input mode
+				if key.Matches(msg, m.keys.backToMain) {
+					m.finding = false
+					return m, nil
+				}
+
 				if key.Matches(msg, m.keys.findSelect) {
 					if i, ok := m.sublist.List.SelectedItem().(notes.ListItem); ok {
 
-						// TODO: Add New Pin with Chosen Name and Selected Path
-						fmt.Println(i.Path())
-
+						path := i.Path()
+						name := m.input.Input.Value()
+						m.state.Config.AddPin(name, path, m.pinType)
 						m.finding = false
 						m.adding = false
 						return m, m.refreshItems(m.pinType)
@@ -136,18 +136,15 @@ func (m PinListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 
-				// Update the text input and handle its commands
 				var cmd tea.Cmd
 				m.sublist.List, cmd = m.sublist.List.Update(msg)
 				cmds = append(cmds, cmd)
 
 				return m, tea.Batch(cmds...)
 			}
-
 		}
 
 		if m.renaming {
-			// Handle exiting input mode
 			if key.Matches(msg, m.keys.backToMain) {
 				m.input.Input.Blur()
 				m.renaming = false
@@ -158,7 +155,6 @@ func (m PinListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.input.Input, cmd = m.input.Input.Update(msg)
 			cmds = append(cmds, cmd)
 
-			// Handle the case when Enter is pressed and the input is submitted
 			if key.Matches(msg, m.keys.findSelect) {
 				nv := m.input.Input.Value()
 				if nv == "" {
@@ -181,8 +177,11 @@ func (m PinListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		if m.finding {
-			// TODO: Handle Exiting
-			// Handle exiting input mode
+			if key.Matches(msg, m.keys.backToMain) {
+				m.finding = false
+				return m, nil
+			}
+
 			if key.Matches(msg, m.keys.findSelect) {
 				if i, ok := m.sublist.List.SelectedItem().(notes.ListItem); ok {
 					m.state.Config.ChangePin(i.Path(), m.pinType, m.findingFor)
@@ -193,7 +192,6 @@ func (m PinListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
-			// Update the text input and handle its commands
 			var cmd tea.Cmd
 			m.sublist.List, cmd = m.sublist.List.Update(msg)
 			cmds = append(cmds, cmd)
@@ -319,6 +317,11 @@ func (m *PinListModel) openNote() bool {
 
 	if i, ok := m.list.SelectedItem().(PinListItem); ok {
 		p = i.description
+
+		if p == "No Default Pinned File" {
+			m.list.NewStatusMessage(statusMessageStyle("Item has no path"))
+			return false
+		}
 	} else {
 		return false
 	}
@@ -337,7 +340,14 @@ func (m *PinListModel) refreshItems(pinType string) tea.Cmd {
 	items := getItemsByType(m.state.Config, pinType)
 	title := getTitleByType(pinType)
 	m.list.Title = title
+	m.refreshDelegate(pinType)
 	return m.list.SetItems(items)
+}
+
+func (m *PinListModel) refreshDelegate(pinType string) {
+	dkeys := newDelegateKeyMap()
+	delegate := newItemDelegate(dkeys, m.state.Config, pinType)
+	m.list.SetDelegate(delegate)
 }
 
 func getItemsByType(cfg *config.Config, pinType string) []list.Item {
@@ -361,12 +371,10 @@ func getItemsByType(cfg *config.Config, pinType string) []list.Item {
 			)
 		}
 	case "task":
-		// Iterate over NamedPins and create a PinListItem for each entry
 		for name, path := range cfg.NamedTaskPins {
 			items = append(items, PinListItem{title: name, description: path})
 		}
 
-		// Add the default PinnedFile if it's set
 		if cfg.PinnedTaskFile != "" {
 			items = append(
 				items,
@@ -377,7 +385,6 @@ func getItemsByType(cfg *config.Config, pinType string) []list.Item {
 				items,
 				PinListItem{title: "default", description: "No Default Pinned File"},
 			)
-
 		}
 	}
 

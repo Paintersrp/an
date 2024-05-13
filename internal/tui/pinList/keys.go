@@ -11,11 +11,11 @@ type listKeyMap struct {
 	swapToTextView   key.Binding
 	swapToTaskView   key.Binding
 	openNote         key.Binding
-	find             key.Binding
 	findSelect       key.Binding
 	rename           key.Binding
 	backToMain       key.Binding
 	create           key.Binding
+	find             key.Binding
 }
 
 func newListKeyMap() *listKeyMap {
@@ -90,6 +90,7 @@ func fullHelp(keys *listKeyMap) []key.Binding {
 		keys.rename,
 		keys.backToMain,
 		keys.create,
+		keys.find,
 	}
 }
 

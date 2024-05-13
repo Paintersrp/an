@@ -15,7 +15,7 @@ import (
 )
 
 // Pin Type is for using the same command with the task variant of pin
-func Command(s *state.State, pinType string) *cobra.Command {
+func NewCmdPinAdd(s *state.State, pinType string) *cobra.Command {
 	var check bool
 
 	cmd := &cobra.Command{
