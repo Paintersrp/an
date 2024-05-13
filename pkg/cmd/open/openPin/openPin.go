@@ -8,12 +8,12 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/spf13/cobra"
 
-	"github.com/Paintersrp/an/fs/zet"
 	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/internal/zet"
+	"github.com/Paintersrp/an/pkg/shared/flags"
 )
 
 func NewCmdOpenPin(c *config.Config) *cobra.Command {
-	var name string
 	cmd := &cobra.Command{
 		Use:     "pin -n {pin-name}",
 		Aliases: []string{"p"},
@@ -29,15 +29,19 @@ func NewCmdOpenPin(c *config.Config) *cobra.Command {
       an o p
     `),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(c, name)
+			return run(cmd, c)
 		},
 	}
-
-	cmd.Flags().StringVarP(&name, "name", "n", "", "Save as a named pin")
+	flags.AddName(cmd, "Named pin to target")
 	return cmd
 }
 
-func run(c *config.Config, name string) error {
+func run(cmd *cobra.Command, c *config.Config) error {
+	name, err := flags.HandleName(cmd)
+	if err != nil {
+		return err
+	}
+
 	var targetPin string
 	if name != "" {
 		if c.NamedPins[name] == "" {

@@ -4,12 +4,11 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/spf13/cobra"
 
-	"github.com/Paintersrp/an/fs/templater"
-	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/internal/state"
 	"github.com/Paintersrp/an/pkg/cmd/journal/entry"
 )
 
-func NewCmdJournal(c *config.Config, t *templater.Templater) *cobra.Command {
+func NewCmdJournal(s *state.State) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "journal",
 		Aliases: []string{"j"},
@@ -25,10 +24,10 @@ Examples:
       `),
 	}
 
-	dayCmd := entry.NewCmdEntry(c, t, "day")
-	weekCmd := entry.NewCmdEntry(c, t, "week")
-	monthCmd := entry.NewCmdEntry(c, t, "month")
-	yearCmd := entry.NewCmdEntry(c, t, "year")
+	dayCmd := entry.NewCmdEntry(s, "day")
+	weekCmd := entry.NewCmdEntry(s, "week")
+	monthCmd := entry.NewCmdEntry(s, "month")
+	yearCmd := entry.NewCmdEntry(s, "year")
 
 	cmd.AddCommand(dayCmd)
 	cmd.AddCommand(weekCmd)

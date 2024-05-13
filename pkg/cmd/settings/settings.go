@@ -5,7 +5,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/Paintersrp/an/internal/config"
-	"github.com/Paintersrp/an/tui/list"
+	"github.com/Paintersrp/an/internal/tui/settings"
 )
 
 func NewCmdSettings(c *config.Config) *cobra.Command {
@@ -19,7 +19,7 @@ func NewCmdSettings(c *config.Config) *cobra.Command {
 			CLI adapts to your workflow and preferences.
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := list.Run(c); err != nil {
+			if err := settings.Run(c); err != nil {
 				return err
 			}
 			return nil

@@ -8,17 +8,13 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/Paintersrp/an/fs/templater"
-	"github.com/Paintersrp/an/fs/zet"
-	"github.com/Paintersrp/an/internal/config"
-	"github.com/Paintersrp/an/pkg/arg"
-	"github.com/Paintersrp/an/pkg/flags"
+	"github.com/Paintersrp/an/internal/state"
+	"github.com/Paintersrp/an/internal/zet"
+	"github.com/Paintersrp/an/pkg/shared/arg"
+	"github.com/Paintersrp/an/pkg/shared/flags"
 )
 
-func NewCmdNewEchoFile(
-	c *config.Config,
-	t *templater.Templater,
-) *cobra.Command {
+func NewCmdNewEchoFile(s *state.State) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "task create-echo [tags] --pin",
 		Aliases: []string{"ce"},
@@ -26,7 +22,7 @@ func NewCmdNewEchoFile(
 		Long:    `Create a new task echo file with a unique incrementing title and optionally pin it using the --pin flag.`,
 		Example: "task create-echo 'tag1 tag2' --pin",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd, args, t, c)
+			return run(cmd, args, s)
 		},
 	}
 
@@ -39,11 +35,11 @@ func NewCmdNewEchoFile(
 func run(
 	cmd *cobra.Command,
 	args []string,
-	t *templater.Templater,
-	c *config.Config,
+	s *state.State,
 ) error {
 	tags := arg.HandleTags(args)
 	rootSubdirFlag := viper.GetString("subdir")
+	s.Config.HandleSubdir(rootSubdirFlag)
 	rootVaultDirFlag := viper.GetString("vaultdir")
 
 	// Get the highest existing increment
@@ -61,9 +57,9 @@ func run(
 		"",
 	)
 
-	flags.HandlePin(cmd, c, note, "task", nextTitle)
+	flags.HandlePin(cmd, s.Config, note, "task", nextTitle)
 
-	zet.StaticHandleNoteLaunch(note, t, "task-echo", "")
+	zet.StaticHandleNoteLaunch(note, s.Templater, "task-echo", "")
 
 	return nil // no errors
 }

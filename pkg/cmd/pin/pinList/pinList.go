@@ -4,13 +4,13 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/spf13/cobra"
 
-	"github.com/Paintersrp/an/internal/config"
-	"github.com/Paintersrp/an/tui/pinList"
+	"github.com/Paintersrp/an/internal/state"
+	"github.com/Paintersrp/an/internal/tui/pinList"
 )
 
-func Command(c *config.Config, pinType string) *cobra.Command {
+func Command(s *state.State, pinType string) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "list",
+		Use:     "list --print",
 		Aliases: []string{"l"},
 		Short:   "List all named pins of a specified type.",
 		Long: heredoc.Doc(`
@@ -27,10 +27,10 @@ an pin list
 			}
 
 			if print {
-				return c.ListPins(pinType)
+				return s.Config.ListPins(pinType)
 			}
 
-			pinList.Run(c, pinType)
+			pinList.Run(s, pinType)
 			return nil
 		},
 	}

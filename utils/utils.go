@@ -3,15 +3,12 @@ package utils
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/charmbracelet/glamour"
 	"github.com/muesli/termenv"
-
-	"github.com/Paintersrp/an/internal/config"
 )
 
 func AppendIfNotExists(slice []string, value string) []string {
@@ -25,7 +22,7 @@ func AppendIfNotExists(slice []string, value string) []string {
 
 func ValidateInput(input string) ([]string, error) {
 	if input == "" {
-		return []string{}, nil // No input provided, return an empty slice
+		return []string{}, nil
 	}
 
 	items := strings.Split(input, " ")
@@ -41,12 +38,9 @@ func ValidateInput(input string) ([]string, error) {
 }
 
 func isValidInput(input string) bool {
-	// Define the criteria for a valid input, for example:
-	// A valid input contains only letters, numbers, hyphens, and underscores.
 	return regexp.MustCompile(`^[a-zA-Z0-9-_]+$`).MatchString(input)
 }
 
-// GenerateDate generates a date string based on the given type (day, week, month, year).
 func GenerateDate(numUnits int, unitType string) string {
 	var date time.Time
 	var dateFormat string
@@ -57,29 +51,22 @@ func GenerateDate(numUnits int, unitType string) string {
 		date = now.AddDate(0, 0, numUnits)
 		dateFormat = "20060102"
 	case "week":
-		// Find Sunday of the current week
 		offset := int(time.Sunday - now.Weekday())
 		if offset > 0 {
 			offset = -6
 		}
 		startOfWeek := now.AddDate(0, 0, offset)
-		// Add the number of weeks
 		date = startOfWeek.AddDate(0, 0, numUnits*7)
 		dateFormat = "20060102"
 	case "month":
-		// Find the first day of the current month
 		startOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-		// Add the number of months
 		date = startOfMonth.AddDate(0, numUnits, 0)
 		dateFormat = "200601"
 	case "year":
-		// Find the first day of the current year
 		startOfYear := time.Date(now.Year(), 1, 1, 0, 0, 0, 0, now.Location())
-		// Add the number of years
 		date = startOfYear.AddDate(numUnits, 0, 0)
 		dateFormat = "2006"
 	default:
-		// Default to today's date
 		date = now
 		dateFormat = "20060102"
 	}
@@ -87,135 +74,91 @@ func GenerateDate(numUnits int, unitType string) string {
 	return date.Format(dateFormat)
 }
 
-func RenderMarkdownPreview(
-	path string,
-	w, h int,
-) string {
-	const cutoff = 1000
-
-	// Read file from system
+func ReadFileAndTrimContent(path string, cutoff int) (string, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
-		return "Error reading file"
+		return "", err
 	}
 
-	// Check if the content exceeds the cutoff and trim if necessary
 	if len(content) > cutoff {
 		content = content[:cutoff]
 	}
 
-	// Initiate glamour renderer to add colors to our markdown preview
+	return string(content), nil
+}
+
+func ParseFrontmatter(content string) (string, string) {
+	frontmatterRegex := regexp.MustCompile(`(?s)\A---\r?\n(.*?)\r?\n---\r?\n?`)
+	matches := frontmatterRegex.FindStringSubmatch(content)
+
+	var frontmatter, markdown string
+	if len(matches) > 1 {
+		frontmatter = matches[1]
+		markdown = strings.TrimPrefix(content, matches[0])
+	} else {
+		markdown = content
+	}
+
+	return frontmatter, markdown
+}
+
+func FormatFrontmatterAsMarkdown(frontmatter string) string {
+	lines := strings.Split(frontmatter, "\n")
+	formattedLines := make([]string, 0, len(lines))
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.Contains(line, ":") {
+			parts := strings.SplitN(line, ":", 2)
+			key := strings.TrimSpace(parts[0])
+			value := strings.TrimSpace(parts[1])
+
+			if value != "" {
+				formattedLines = append(
+					formattedLines,
+					fmt.Sprintf("**%s:** %s", key, value),
+				)
+			}
+		} else if line != "" {
+			formattedLines = append(formattedLines, line)
+		}
+	}
+
+	return strings.Join(formattedLines, "\n\n")
+}
+
+func RenderMarkdownPreview(path string, w, h int) string {
+	const cutoff = 1000
+
+	content, err := ReadFileAndTrimContent(path, cutoff)
+	if err != nil {
+		return "Error reading file"
+	}
+
+	frontmatter, markdown := ParseFrontmatter(content)
+	formattedFrontmatter := FormatFrontmatterAsMarkdown(frontmatter)
+
+	var renderedContent string
+	if formattedFrontmatter != "" {
+		renderedContent = formattedFrontmatter + "\n\n---\n\n\n" + markdown
+	} else {
+		renderedContent = "No frontmatter found.\n\n---\n\n\n" + markdown
+	}
+
 	r, _ := glamour.NewTermRenderer(
 		glamour.WithStandardStyle("dracula"),
 		glamour.WithWordWrap(100),
 		glamour.WithColorProfile(termenv.ANSI256),
 	)
 
-	// Render formatted and styled markdown content
-	markdown, err := r.Render(string(content))
+	renderedMarkdown, err := r.Render(renderedContent)
 	if err != nil {
-		return "Error rendering markdown" // Displayed in Preview Pane
+		return "Error rendering markdown"
 	}
 
-	// Return markdown output
-	return markdown
+	return renderedMarkdown
 }
 
-func Archive(path string, cfg *config.Config) error {
-	// Get the subdirectory path relative to the vault directory
-	subDir, err := filepath.Rel(cfg.VaultDir, filepath.Dir(path))
-	if err != nil {
-		return err
-	}
-
-	// Create the archive subdirectory path, if needed
-	archiveSubDir := filepath.Join(cfg.VaultDir, "archive", subDir)
-	if _, err := os.Stat(archiveSubDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(archiveSubDir, os.ModePerm); err != nil {
-			return err
-		}
-	}
-
-	// Move the note to the archive subdirectory
-	newPath := filepath.Join(archiveSubDir, filepath.Base(path))
-	if err := os.Rename(path, newPath); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func Unarchive(path string, cfg *config.Config) error {
-	// Infer the original subdirectory from the archive path
-	subDir, err := filepath.Rel(
-		filepath.Join(cfg.VaultDir, "archive"),
-		filepath.Dir(path),
-	)
-	if err != nil {
-		return err
-	}
-
-	// Define the original directory where the notes should be restored
-	originalDir := filepath.Join(cfg.VaultDir, subDir)
-
-	// Move the note from the archive directory back to the original directory
-	newPath := filepath.Join(originalDir, filepath.Base(path))
-	if err := os.Rename(path, newPath); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Function to move a note to the trash directory
-func Trash(path string, cfg *config.Config) error {
-	// Get the subdirectory path relative to the vault directory
-	subDir, err := filepath.Rel(cfg.VaultDir, filepath.Dir(path))
-	if err != nil {
-		return err
-	}
-
-	// Define the trash directory path
-	trashDir := filepath.Join(cfg.VaultDir, "trash", subDir)
-	if _, err := os.Stat(trashDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(trashDir, os.ModePerm); err != nil {
-			return err
-		}
-	}
-
-	// Move the note to the trash directory
-	newPath := filepath.Join(trashDir, filepath.Base(path))
-	if err := os.Rename(path, newPath); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Function to restore a note from the trash directory
-func Untrash(path string, cfg *config.Config) error {
-	// Infer the original subdirectory from the archive path
-	subDir, err := filepath.Rel(
-		filepath.Join(cfg.VaultDir, "trash"),
-		filepath.Dir(path),
-	)
-	if err != nil {
-		return err
-	}
-
-	// Define the original directory where the notes should be restored
-	originalDir := filepath.Join(cfg.VaultDir, subDir)
-
-	// Move the note from the trash directory back to the original directory
-	newPath := filepath.Join(originalDir, filepath.Base(path))
-	if err := os.Rename(path, newPath); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// converts bytes to a human-readable format.
 func FormatBytes(size int64) string {
 	var units = []string{"B", "KB", "MB", "GB", "TB", "PB", "EB"}
 	var mod int64 = 1024

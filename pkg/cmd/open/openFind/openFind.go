@@ -5,8 +5,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/Paintersrp/an/fs/fzf"
 	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/internal/fzf"
 )
 
 func NewCmdOpenFind(c *config.Config) *cobra.Command {

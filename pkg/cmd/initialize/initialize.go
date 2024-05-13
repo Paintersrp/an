@@ -4,11 +4,11 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/spf13/cobra"
 
-	"github.com/Paintersrp/an/internal/config"
-	"github.com/Paintersrp/an/tui/initialize"
+	"github.com/Paintersrp/an/internal/state"
+	"github.com/Paintersrp/an/internal/tui/initialize"
 )
 
-func NewCmdInit(c *config.Config) *cobra.Command {
+func NewCmdInit(s *state.State) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "initialize",
 		Aliases: []string{"i", "init"},
@@ -25,7 +25,7 @@ func NewCmdInit(c *config.Config) *cobra.Command {
 			an i
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := initialize.Run(c); err != nil {
+			if err := initialize.Run(); err != nil {
 				return err
 			}
 			return nil

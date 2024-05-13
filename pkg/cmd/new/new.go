@@ -10,17 +10,13 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/Paintersrp/an/fs/templater"
-	"github.com/Paintersrp/an/fs/zet"
-	"github.com/Paintersrp/an/internal/config"
-	"github.com/Paintersrp/an/pkg/arg"
-	"github.com/Paintersrp/an/pkg/flags"
+	"github.com/Paintersrp/an/internal/state"
+	"github.com/Paintersrp/an/internal/zet"
+	"github.com/Paintersrp/an/pkg/shared/arg"
+	"github.com/Paintersrp/an/pkg/shared/flags"
 )
 
-func NewCmdNew(
-	c *config.Config,
-	t *templater.Templater,
-) *cobra.Command {
+func NewCmdNew(s *state.State) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "new [title] [tags] [content] [--template template_name] [--links link1 link2 ...] [--pin] [--upstream] [--symlink] [--paste]",
 		Aliases: []string{"n"},
@@ -36,7 +32,7 @@ func NewCmdNew(
 		`),
 		Args: cobra.MaximumNArgs(3),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd, args, c, t)
+			return run(cmd, args, s)
 		},
 	}
 
@@ -44,12 +40,10 @@ func NewCmdNew(
 	flags.AddLinks(cmd)
 	flags.AddUpstream(cmd)
 	flags.AddPin(cmd)
+	flags.AddPaste(cmd)
 
 	cmd.Flags().
 		Bool("symlink", false, "Automatically add a symlink to the new note in the current working directory.")
-
-	cmd.Flags().
-		Bool("paste", false, "Automatically paste clipboard contents as note content in placeholder.")
 
 	return cmd
 }
@@ -57,12 +51,12 @@ func NewCmdNew(
 func run(
 	cmd *cobra.Command,
 	args []string,
-	c *config.Config,
-	t *templater.Templater,
+	s *state.State,
 ) error {
-	var content string
-	rootSubdir := viper.GetString("subdir")
-	rootVaultDir := viper.GetString("vaultdir")
+	subdirFlag := viper.GetString("subdir")
+	s.Config.HandleSubdir(subdirFlag)
+
+	vaultFlag := viper.GetString("vaultdir")
 
 	title, err := arg.HandleTitle(args)
 	if err != nil {
@@ -72,17 +66,18 @@ func run(
 	tags := arg.HandleTags(args)
 	links := flags.HandleLinks(cmd)
 	tmpl := flags.HandleTemplate(cmd)
-	upstream := flags.HandleUpstream(cmd, rootVaultDir)
+	upstream := flags.HandleUpstream(cmd, vaultFlag)
 	createSymlink, err := cmd.Flags().GetBool("symlink")
 	if err != nil {
 		return err
 	}
 
-	paste, err := cmd.Flags().GetBool("paste")
+	paste, err := flags.HandlePaste(cmd)
 	if err != nil {
 		return err
 	}
 
+	var content string
 	if paste {
 		msg, err := clipboard.ReadAll()
 		if err == nil && msg != "" {
@@ -95,8 +90,8 @@ func run(
 	}
 
 	note := zet.NewZettelkastenNote(
-		rootVaultDir,
-		rootSubdir,
+		vaultFlag,
+		subdirFlag,
 		title,
 		tags,
 		links,
@@ -109,8 +104,8 @@ func run(
 		return fmt.Errorf("%s", conflict)
 	}
 
-	flags.HandlePin(cmd, c, note, "text", title)
-	zet.StaticHandleNoteLaunch(note, t, tmpl, content)
+	flags.HandlePin(cmd, s.Config, note, "text", title)
+	zet.StaticHandleNoteLaunch(note, s.Templater, tmpl, content)
 
 	if createSymlink {
 		cwd, err := os.Getwd()
@@ -125,5 +120,5 @@ func run(
 		}
 	}
 
-	return nil // no errors
+	return nil
 }

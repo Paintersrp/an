@@ -4,16 +4,12 @@ import (
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/Paintersrp/an/internal/state"
 	"github.com/spf13/cobra"
-
-	"github.com/Paintersrp/an/internal/config"
-	"github.com/Paintersrp/an/utils"
 )
 
 // Not very useful on it's own, but quite handy for scripting
-func NewCmdTrash(
-	c *config.Config,
-) *cobra.Command {
+func NewCmdTrash(s *state.State) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "trash [path]",
 		Short: "Move a note to the trash.",
@@ -32,7 +28,7 @@ func NewCmdTrash(
 				return nil
 			}
 			path := args[0]
-			return utils.Trash(path, c)
+			return s.Handler.Trash(path)
 		},
 	}
 

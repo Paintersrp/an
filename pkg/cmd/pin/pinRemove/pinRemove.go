@@ -4,14 +4,12 @@ import (
 	"errors"
 
 	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/Paintersrp/an/internal/state"
+	"github.com/Paintersrp/an/pkg/shared/flags"
 	"github.com/spf13/cobra"
-
-	"github.com/Paintersrp/an/internal/config"
 )
 
-func Command(c *config.Config, pinType string) *cobra.Command {
-	var name string
-
+func Command(s *state.State, pinType string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "remove [--name pin_name]",
 		Aliases: []string{"r"},
@@ -25,16 +23,20 @@ func Command(c *config.Config, pinType string) *cobra.Command {
 			  an pin remove --name my-task
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			name, err := flags.HandleName(cmd)
+			if err != nil {
+				return err
+			}
+
 			if name == "" {
 				return errors.New("you must specify a name for the pin to unpin")
 			}
 
-			return c.DeleteNamedPin(name, pinType, true)
+			return s.Config.DeleteNamedPin(name, pinType)
 		},
 	}
 
-	cmd.Flags().
-		StringVarP(&name, "name", "n", "", "The name of the pin to unpin (required)")
+	flags.AddName(cmd, "The name of the pin to unpin (required)")
 	cmd.MarkFlagRequired("name")
 
 	return cmd

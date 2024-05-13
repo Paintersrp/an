@@ -2,106 +2,99 @@ package views
 
 import (
 	"fmt"
-	"log"
-	"os"
-	"path/filepath"
 	"strings"
 
-	"github.com/Paintersrp/an/fs/handler"
+	"github.com/Paintersrp/an/internal/handler"
 )
 
+var titlePrefixMap = map[string]string{
+	"default":     "✅ - Default (All)",
+	"orphan":      "❓ - Orphan",
+	"unfulfilled": "⬜ - Unfulfilled",
+	"archive":     "📦 - Archive",
+	"trash":       "🗑️  - Trash", // Note the extra space before the dash
+}
+
+func GetTitleForView(viewFlag string) string {
+	prefix, ok := titlePrefixMap[viewFlag]
+	if !ok {
+		prefix = titlePrefixMap["default"]
+	}
+
+	return prefix + " View"
+}
+
+// View represents a configuration for a specific view.
 type View struct {
 	ExcludeDirs  []string
 	ExcludeFiles []string
 	OrphanOnly   bool
 }
 
-func GenerateViews(vaultDir string) map[string]View {
-	views := make(map[string]View)
+// ViewManager manages available views and their configurations.
+type ViewManager struct {
+	Views   map[string]View
+	Handler *handler.FileHandler
+}
 
-	views["default"] = View{
+// NewViewManager creates a new ViewManager instance with default views.
+func NewViewManager(h *handler.FileHandler, vaultDir string) *ViewManager {
+	vm := &ViewManager{
+		Views:   make(map[string]View),
+		Handler: h,
+	}
+
+	vm.Views["default"] = View{
 		ExcludeDirs:  []string{"archive", "trash"},
 		ExcludeFiles: []string{},
 		OrphanOnly:   false,
 	}
 
-	views["archive"] = View{
-		ExcludeDirs:  GetSubdirectories(vaultDir, "archive"),
-		ExcludeFiles: []string{},
-		OrphanOnly:   false,
-	}
-
-	views["orphan"] = View{
+	vm.Views["orphan"] = View{
 		ExcludeDirs:  []string{"archive", "trash"},
 		ExcludeFiles: []string{},
 		OrphanOnly:   true,
 	}
 
-	views["trash"] = View{
-		ExcludeDirs:  GetSubdirectories(vaultDir, "trash"),
-		ExcludeFiles: []string{},
-		OrphanOnly:   false,
-	}
-
-	views["unfulfilled"] = View{
+	vm.Views["unfulfilled"] = View{
 		ExcludeDirs:  []string{"archive", "trash"},
 		ExcludeFiles: []string{},
 		OrphanOnly:   false,
 	}
 
-	return views
-}
-
-func GetTitleForView(viewFlag string) string {
-	var titlePrefix string
-	switch viewFlag {
-	case "archive":
-		titlePrefix = "📦 - Archive"
-	case "orphan":
-		titlePrefix = "❓ - Orphan"
-	case "trash":
-		// second space is intentional
-		titlePrefix = "🗑️  - Trash"
-	case "unfulfilled":
-		titlePrefix = "⬜ - Unfulfilled"
-	default:
-		titlePrefix = "✅ - Active"
+	vm.Views["archive"] = View{
+		ExcludeDirs:  h.GetSubdirectories(vaultDir, "archive"),
+		ExcludeFiles: []string{},
+		OrphanOnly:   false,
 	}
 
-	return titlePrefix + " View"
-}
-
-func GetSubdirectories(directory, excludeDir string) []string {
-	files, err := os.ReadDir(directory)
-	if err != nil {
-		log.Fatalf("Failed to read directory: %v", err)
+	vm.Views["trash"] = View{
+		ExcludeDirs:  h.GetSubdirectories(vaultDir, "trash"),
+		ExcludeFiles: []string{},
+		OrphanOnly:   false,
 	}
 
-	var subDirs []string
-	for _, f := range files {
-		if f.IsDir() && f.Name() != excludeDir {
-
-			subDir := strings.TrimPrefix(filepath.Join(directory, f.Name()), directory)
-			subDir = strings.TrimPrefix(
-				subDir,
-				string(os.PathSeparator),
-			)
-			subDirs = append(subDirs, subDir)
-		}
-	}
-	return subDirs
+	return vm
 }
 
-func GetAvailableViews(views map[string]View) string {
-	var l []string
-	for v := range views {
-		l = append(l, v)
+func (vm *ViewManager) GetView(viewName string) (View, error) {
+	view, ok := vm.Views[viewName]
+	if !ok {
+		return View{}, fmt.Errorf("invalid view: %s", viewName)
 	}
-	return strings.Join(l, ", ")
+	return view, nil
 }
 
-func GetFilesByView(
-	views map[string]View,
+// GetAvailableViews returns a comma-separated list of available view names.
+func (vm *ViewManager) GetAvailableViews() string {
+	var viewNames []string
+	for name := range vm.Views {
+		viewNames = append(viewNames, name)
+	}
+	return strings.Join(viewNames, ", ")
+}
+
+func (vm *ViewManager) GetFilesByView(
 	viewFlag string,
 	vaultDir string,
 ) ([]string, error) {
@@ -113,9 +106,9 @@ func GetFilesByView(
 		excludeFiles []string
 	)
 
-	m, ok := views[viewFlag]
+	m, ok := vm.Views[viewFlag]
 	if !ok {
-		availableViews := getAvailableViews(views)
+		availableViews := vm.GetAvailableViews()
 		panic(fmt.Errorf(
 			"invalid view: %s. Available views are: %s",
 			viewFlag,
@@ -135,13 +128,5 @@ func GetFilesByView(
 		excludeDirs = m.ExcludeFiles
 	}
 
-	return handler.WalkFiles(vaultDir, excludeDirs, excludeFiles, viewFlag)
-}
-
-func getAvailableViews(views map[string]View) string {
-	var l []string
-	for v := range views {
-		l = append(l, v)
-	}
-	return strings.Join(l, ", ")
+	return vm.Handler.WalkFiles(excludeDirs, excludeFiles, viewFlag)
 }

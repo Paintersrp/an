@@ -6,14 +6,13 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/spf13/cobra"
 
-	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/internal/state"
 	"github.com/Paintersrp/an/pkg/cmd/pin/pinAdd"
 	"github.com/Paintersrp/an/pkg/cmd/pin/pinList"
 	"github.com/Paintersrp/an/pkg/cmd/pin/pinRemove"
-	"github.com/Paintersrp/an/pkg/cmd/pin/pinTable"
 )
 
-func NewCmdPin(c *config.Config, pinType string) *cobra.Command {
+func NewCmdPin(s *state.State, pinType string) *cobra.Command {
 	pinCommand := ""
 
 	switch pinType {
@@ -37,10 +36,9 @@ func NewCmdPin(c *config.Config, pinType string) *cobra.Command {
 		`, pinCommand, pinCommand, pinCommand)),
 	}
 
-	cmd.AddCommand(pinAdd.Command(c, pinType))
-	cmd.AddCommand(pinRemove.Command(c, pinType))
-	cmd.AddCommand(pinList.Command(c, pinType))
-	cmd.AddCommand(pinTable.Command(c, pinType))
+	cmd.AddCommand(pinAdd.Command(s, pinType))
+	cmd.AddCommand(pinRemove.Command(s, pinType))
+	cmd.AddCommand(pinList.Command(s, pinType))
 
 	return cmd
 }

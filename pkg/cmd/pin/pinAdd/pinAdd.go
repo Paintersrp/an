@@ -9,15 +9,14 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/Paintersrp/an/fs/fzf"
-	"github.com/Paintersrp/an/internal/config"
-	"github.com/Paintersrp/an/pkg/flags"
+	"github.com/Paintersrp/an/internal/fzf"
+	"github.com/Paintersrp/an/internal/state"
+	"github.com/Paintersrp/an/pkg/shared/flags"
 )
 
 // Pin Type is for using the same command with the task variant of pin
-func Command(c *config.Config, pinType string) *cobra.Command {
+func Command(s *state.State, pinType string) *cobra.Command {
 	var check bool
-	var name string
 
 	cmd := &cobra.Command{
 		Use:     "add [query] [--name pin_name] [--path file_path] [--check]",
@@ -35,15 +34,15 @@ func Command(c *config.Config, pinType string) *cobra.Command {
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if check {
-				fmt.Println("Current pinned file:", c.PinnedFile)
+				fmt.Println("Current pinned file:", s.Config.PinnedFile)
 				return nil
 			}
-			return run(cmd, args, c, name, pinType)
+			return run(cmd, args, s, pinType)
 		},
 	}
 
 	cmd.Flags().BoolVarP(&check, "check", "c", false, "Check the current pinned file")
-	cmd.Flags().StringVarP(&name, "name", "n", "", "Save as a named pin")
+	flags.AddName(cmd, "Name for new pin.")
 	flags.AddPath(cmd)
 
 	return cmd
@@ -52,11 +51,14 @@ func Command(c *config.Config, pinType string) *cobra.Command {
 func run(
 	cmd *cobra.Command,
 	args []string,
-	c *config.Config,
-	name string,
+	s *state.State,
 	pinType string,
 ) error {
 	path := flags.HandlePath(cmd)
+	name, err := flags.HandleName(cmd)
+	if err != nil {
+		return err
+	}
 
 	if path == "" {
 		vaultDir := viper.GetString("vaultDir")
@@ -68,20 +70,20 @@ func run(
 				fmt.Printf("error fuzzyfinding note: %s", err)
 			}
 
-			c.ChangePin(choice, pinType, name)
+			s.Config.ChangePin(choice, pinType, name)
 		} else {
 			choice, err := finder.RunWithQuery(args[0], false)
 			if err != nil {
 				fmt.Printf("error fuzzyfinding note: %s", err)
 			}
 
-			c.ChangePin(choice, pinType, name)
+			s.Config.ChangePin(choice, pinType, name)
 		}
 	} else {
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			return errors.New("the specified file does not exist")
 		}
-		c.ChangePin(path, pinType, name)
+		s.Config.ChangePin(path, pinType, name)
 	}
 
 	return nil
