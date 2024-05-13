@@ -71,6 +71,10 @@ func LoadConfig(home string) (*config.Config, error) {
 	viper.SetConfigType(constants.ConfigFileType)
 	viper.ReadInConfig()
 
-	config.EnsureConfigExists(home)
+	err := config.EnsureConfigExists(home)
+	if err != nil {
+		return nil, err
+	}
+
 	return config.Load(home)
 }

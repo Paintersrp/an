@@ -22,6 +22,7 @@ type listKeyMap struct {
 	switchToOrphanView    key.Binding
 	switchToTrashView     key.Binding
 	switchToUnfulfillView key.Binding
+	updatePreview         key.Binding
 }
 
 func newListKeyMap() *listKeyMap {
@@ -89,6 +90,10 @@ func newListKeyMap() *listKeyMap {
 		switchToTrashView: key.NewBinding(
 			key.WithKeys("5"),
 			key.WithHelp("5", "switch to trash view"),
+		),
+		updatePreview: key.NewBinding(
+			key.WithKeys("f9"),
+			key.WithHelp("f9", "update preview"),
 		),
 	}
 }

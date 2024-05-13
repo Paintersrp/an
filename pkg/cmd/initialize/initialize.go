@@ -25,7 +25,7 @@ func NewCmdInit(s *state.State) *cobra.Command {
 			an i
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := initialize.Run(s); err != nil {
+			if err := initialize.Run(); err != nil {
 				return err
 			}
 			return nil

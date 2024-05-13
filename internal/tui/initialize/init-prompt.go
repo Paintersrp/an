@@ -11,7 +11,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/Paintersrp/an/internal/config"
-	"github.com/Paintersrp/an/internal/state"
 )
 
 var (
@@ -238,8 +237,14 @@ func SetupDefaults(path string) []string {
 	}
 }
 
-func Run(s *state.State) error {
-	if _, err := tea.NewProgram(InitialPrompt(s.Config.GetConfigPath())).Run(); err != nil {
+func Run() error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	path := config.GetConfigPath(homeDir)
+
+	if _, err := tea.NewProgram(InitialPrompt(path)).Run(); err != nil {
 		return err
 	}
 

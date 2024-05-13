@@ -74,20 +74,75 @@ func GenerateDate(numUnits int, unitType string) string {
 	return date.Format(dateFormat)
 }
 
-func RenderMarkdownPreview(
-	path string,
-	w, h int,
-) string {
+func ReadFileAndTrimContent(path string, cutoff int) (string, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+
+	if len(content) > cutoff {
+		content = content[:cutoff]
+	}
+
+	return string(content), nil
+}
+
+func ParseFrontmatter(content string) (string, string) {
+	frontmatterRegex := regexp.MustCompile(`(?s)\A---\r?\n(.*?)\r?\n---\r?\n?`)
+	matches := frontmatterRegex.FindStringSubmatch(content)
+
+	var frontmatter, markdown string
+	if len(matches) > 1 {
+		frontmatter = matches[1]
+		markdown = strings.TrimPrefix(content, matches[0])
+	} else {
+		markdown = content
+	}
+
+	return frontmatter, markdown
+}
+
+func FormatFrontmatterAsMarkdown(frontmatter string) string {
+	lines := strings.Split(frontmatter, "\n")
+	formattedLines := make([]string, 0, len(lines))
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.Contains(line, ":") {
+			parts := strings.SplitN(line, ":", 2)
+			key := strings.TrimSpace(parts[0])
+			value := strings.TrimSpace(parts[1])
+
+			if value != "" {
+				formattedLines = append(
+					formattedLines,
+					fmt.Sprintf("**%s:** %s", key, value),
+				)
+			}
+		} else if line != "" {
+			formattedLines = append(formattedLines, line)
+		}
+	}
+
+	return strings.Join(formattedLines, "\n\n")
+}
+
+func RenderMarkdownPreview(path string, w, h int) string {
 	const cutoff = 1000
 
-	content, err := os.ReadFile(path)
+	content, err := ReadFileAndTrimContent(path, cutoff)
 	if err != nil {
 		return "Error reading file"
 	}
 
-	// Check if the content exceeds the cutoff and trim if necessary
-	if len(content) > cutoff {
-		content = content[:cutoff]
+	frontmatter, markdown := ParseFrontmatter(content)
+	formattedFrontmatter := FormatFrontmatterAsMarkdown(frontmatter)
+
+	var renderedContent string
+	if formattedFrontmatter != "" {
+		renderedContent = formattedFrontmatter + "\n\n---\n\n\n" + markdown
+	} else {
+		renderedContent = "No frontmatter found.\n\n---\n\n\n" + markdown
 	}
 
 	r, _ := glamour.NewTermRenderer(
@@ -96,12 +151,12 @@ func RenderMarkdownPreview(
 		glamour.WithColorProfile(termenv.ANSI256),
 	)
 
-	markdown, err := r.Render(string(content))
+	renderedMarkdown, err := r.Render(renderedContent)
 	if err != nil {
 		return "Error rendering markdown"
 	}
 
-	return markdown
+	return renderedMarkdown
 }
 
 func FormatBytes(size int64) string {

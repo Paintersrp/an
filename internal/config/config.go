@@ -1,30 +1,30 @@
 package config
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/Paintersrp/an/internal/constants"
-	"github.com/Paintersrp/an/internal/pins"
+	"github.com/Paintersrp/an/internal/pin"
+	"github.com/spf13/cobra"
 )
 
 type PinMap map[string]string
 
 type Config struct {
-	PinManager     *pins.PinManager `yaml:"-"`
-	NamedPins      PinMap           `yaml:"named_pins"       json:"named_pins"`
-	NamedTaskPins  PinMap           `yaml:"named_task_pins"  json:"named_task_pins"`
-	VaultDir       string           `yaml:"vaultdir"         json:"vault_dir"`
-	Editor         string           `yaml:"editor"           json:"editor"`
-	NvimArgs       string           `yaml:"nvimargs"         json:"nvim_args"`
-	FileSystemMode string           `yaml:"fsmode"           json:"fs_mode"`
-	PinnedFile     string           `yaml:"pinned_file"      json:"pinned_file"`
-	PinnedTaskFile string           `yaml:"pinned_task_file" json:"pinned_task_file"`
-	SubDirs        []string         `yaml:"subdirs"          json:"sub_dirs"`
+	PinManager     *pin.PinManager `yaml:"-"`
+	NamedPins      PinMap          `yaml:"named_pins"       json:"named_pins"`
+	NamedTaskPins  PinMap          `yaml:"named_task_pins"  json:"named_task_pins"`
+	VaultDir       string          `yaml:"vaultdir"         json:"vault_dir"`
+	Editor         string          `yaml:"editor"           json:"editor"`
+	NvimArgs       string          `yaml:"nvimargs"         json:"nvim_args"`
+	FileSystemMode string          `yaml:"fsmode"           json:"fs_mode"`
+	PinnedFile     string          `yaml:"pinned_file"      json:"pinned_file"`
+	PinnedTaskFile string          `yaml:"pinned_task_file" json:"pinned_task_file"`
+	SubDirs        []string        `yaml:"subdirs"          json:"sub_dirs"`
 }
 
 var ValidModes = map[string]bool{
@@ -56,9 +56,9 @@ func Load(home string) (*Config, error) {
 		cfg.NamedTaskPins = make(PinMap)
 	}
 
-	cfg.PinManager = pins.NewPinManager(
-		pins.PinMap(cfg.NamedPins),
-		pins.PinMap(cfg.NamedTaskPins),
+	cfg.PinManager = pin.NewPinManager(
+		pin.PinMap(cfg.NamedPins),
+		pin.PinMap(cfg.NamedTaskPins),
 		cfg.PinnedFile,
 		cfg.PinnedTaskFile,
 	)
@@ -107,11 +107,7 @@ func (cfg *Config) ChangeEditor(editor string) error {
 }
 
 func (cfg *Config) ChangePin(file, pinType, pinName string) error {
-	err := cfg.PinManager.ChangePin(
-		file,
-		pinType,
-		pinName,
-	)
+	err := cfg.PinManager.ChangePin(file, pinType, pinName)
 	if err != nil {
 		return err
 	}
@@ -183,33 +179,53 @@ func (cfg *Config) syncPinsAndSave() error {
 	return cfg.Save()
 }
 
-func GetConfigPath(homeDir string) string {
-	return filepath.Join(
-		homeDir,
-		constants.ConfigDir,
-		constants.ConfigFile+"."+constants.ConfigFileType,
-	)
+func (cfg *Config) HandleSubdir(subdirName string) {
+	exists, err := verifySubdirExists(subdirName)
+	cobra.CheckErr(err)
+
+	switch cfg.FileSystemMode {
+	case "strict":
+		if !exists {
+			fmt.Println("Error: Subdirectory", subdirName, "does not exist.")
+			fmt.Println(
+				"In strict mode, new subdirectories are included with the add-subdir command.",
+			)
+			os.Exit(1)
+		}
+	case "free":
+		if !exists {
+			cfg.AddSubdir(subdirName)
+		}
+	case "confirm":
+		if !exists {
+			cfg.getConfirmation(subdirName)
+		}
+	default:
+		if !exists {
+			cfg.getConfirmation(subdirName)
+		}
+	}
 }
 
-func EnsureConfigExists(homeDir string) error {
-	configPath := GetConfigPath(homeDir)
-	configDir := filepath.Dir(configPath)
+func (cfg *Config) getConfirmation(subdirName string) {
+	var response string
+	for {
+		fmt.Printf(
+			"Subdirectory %s does not exist.\nDo you want to create it?\n(y/n): ",
+			subdirName,
+		)
+		fmt.Scanln(&response)
+		response = strings.ToLower(strings.TrimSpace(response))
 
-	if err := os.MkdirAll(configDir, 0755); err != nil {
-		return fmt.Errorf("failed to create config directory: %w", err)
+		switch response {
+		case "yes", "y":
+			cfg.AddSubdir(subdirName)
+			return
+		case "no", "n":
+			fmt.Println("Exiting due to non-existing subdirectory")
+			os.Exit(0)
+		default:
+			fmt.Println("Invalid response. Please enter 'y'/'yes' or 'n'/'no'.")
+		}
 	}
-
-	if _, err := os.Stat(configPath); err == nil {
-		return nil
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("failed to check config file existence: %w", err)
-	}
-
-	file, err := os.Create(configPath)
-	if err != nil {
-		return fmt.Errorf("failed to create config file: %w", err)
-	}
-	file.Close()
-
-	return nil
 }

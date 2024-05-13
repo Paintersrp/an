@@ -39,6 +39,7 @@ func run(
 ) error {
 	tags := arg.HandleTags(args)
 	rootSubdirFlag := viper.GetString("subdir")
+	s.Config.HandleSubdir(rootSubdirFlag)
 	rootVaultDirFlag := viper.GetString("vaultdir")
 
 	// Get the highest existing increment

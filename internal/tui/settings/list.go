@@ -1,4 +1,4 @@
-package list
+package settings
 
 import (
 	"fmt"
@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/erikgeiser/promptkit/selection"
 
 	"github.com/Paintersrp/an/internal/config"
 )
@@ -65,12 +66,16 @@ func newListKeyMap() *listKeyMap {
 }
 
 type ListModel struct {
-	list         list.Model
-	keys         *listKeyMap
-	delegateKeys *delegateKeyMap
-	config       *config.Config
-	configInput  ListInputModel
-	inputActive  bool
+	list               list.Model
+	keys               *listKeyMap
+	delegateKeys       *delegateKeyMap
+	config             *config.Config
+	configInput        ListInputModel
+	inputActive        bool
+	editorSelect       *selection.Model[string]
+	editorSelectActive bool
+	modeSelect         *selection.Model[string]
+	modeSelectActive   bool
 }
 
 func NewListModel(cfg *config.Config) ListModel {
@@ -102,17 +107,37 @@ func NewListModel(cfg *config.Config) ListModel {
 		}
 	}
 
+	editorSel := selection.New(
+		"Please select an editor option.",
+		[]string{"nvim", "obsidian", "vscode"},
+	)
+	editorSel.Filter = nil
+	editorSelect := selection.NewModel(editorSel)
+
+	modeSel := selection.New(
+		"Please a file system mode for your vault.",
+		[]string{"strict", "confirm", "free"},
+	)
+
+	modeSel.Filter = nil
+	modeSelect := selection.NewModel(modeSel)
+
 	return ListModel{
-		list:         configList,
-		keys:         listKeys,
-		delegateKeys: delegateKeys,
-		configInput:  configInput,
-		config:       cfg,
+		list:               configList,
+		keys:               listKeys,
+		delegateKeys:       delegateKeys,
+		configInput:        configInput,
+		inputActive:        false,
+		config:             cfg,
+		editorSelect:       editorSelect,
+		editorSelectActive: false,
+		modeSelect:         modeSelect,
+		modeSelectActive:   false,
 	}
 }
 
 func (m ListModel) Init() tea.Cmd {
-	return nil
+	return tea.Batch(m.editorSelect.Init(), m.modeSelect.Init())
 }
 
 func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -128,6 +153,103 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.list.FilterState() == list.Filtering {
 			break
 		}
+
+		if m.editorSelectActive {
+			// Handle exiting input mode
+			if key.Matches(msg, m.keys.exitInputMode) {
+				m.editorSelectActive = false
+				return m, nil
+			}
+
+			// Update the text input and handle its commands
+			var cmd tea.Cmd
+			_, cmd = m.editorSelect.Update(msg)
+			cmds = append(cmds, cmd)
+
+			// Handle the case when Enter is pressed and the input is submitted
+			if key.Matches(msg, m.keys.toggleEditItem) {
+				c, err := m.editorSelect.Value()
+				if err != nil {
+					return m, nil
+				}
+
+				m.config.Editor = c
+				m.editorSelectActive = false
+
+				// Save the updated config
+				saveErr := m.config.Save()
+				if saveErr != nil {
+					fmt.Println("Failed to save config file, exiting...")
+					os.Exit(1)
+				}
+
+				// Update the description of the selected item
+				index := m.list.Index()
+				items := m.list.Items()
+				items[index] = ListItem{title: "Editor", description: c}
+				m.list.SetItems(items)
+				m.list.NewStatusMessage(statusMessageStyle("Updated and Saved: Editor"))
+
+				editorSel := selection.New(
+					"Please select an editor option.",
+					[]string{"nvim", "obsidian", "vscode"},
+				)
+				editorSel.Filter = nil
+				m.editorSelect = selection.NewModel(editorSel)
+				return m, m.editorSelect.Init()
+			}
+
+			return m, tea.Batch(cmds...)
+		}
+
+		if m.modeSelectActive {
+			// Handle exiting input mode
+			if key.Matches(msg, m.keys.exitInputMode) {
+				m.modeSelectActive = false
+				return m, nil
+			}
+
+			// Update the text input and handle its commands
+			var cmd tea.Cmd
+			_, cmd = m.modeSelect.Update(msg)
+			cmds = append(cmds, cmd)
+
+			// Handle the case when Enter is pressed and the input is submitted
+			if key.Matches(msg, m.keys.toggleEditItem) {
+				c, err := m.modeSelect.Value()
+				if err != nil {
+					return m, nil
+				}
+
+				m.config.FileSystemMode = c
+				m.modeSelectActive = false
+
+				// Save the updated config
+				saveErr := m.config.Save()
+				if saveErr != nil {
+					fmt.Println("Failed to save config file, exiting...")
+					os.Exit(1)
+				}
+
+				// Update the description of the selected item
+				index := m.list.Index()
+				items := m.list.Items()
+				items[index] = ListItem{title: "FileSystemMode", description: c}
+				m.list.SetItems(items)
+				m.list.NewStatusMessage(statusMessageStyle("Updated and Saved: FileSystemMode"))
+
+				modeSel := selection.New(
+					"Please a file system mode for your vault.",
+					[]string{"strict", "confirm", "free"},
+				)
+				modeSel.Filter = nil
+				m.modeSelect = selection.NewModel(modeSel)
+				return m, m.modeSelect.Init()
+			}
+
+			return m, tea.Batch(cmds...)
+		}
+
 		if m.inputActive {
 			// Handle exiting input mode
 			if key.Matches(msg, m.keys.exitInputMode) {
@@ -203,7 +325,15 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
-			m.inputActive = true
+			switch title {
+			case "Editor":
+				m.editorSelectActive = true
+			case "FileSystemMode":
+				m.modeSelectActive = true
+			default:
+				m.inputActive = true
+			}
+
 			m.configInput.Title = title
 			m.configInput.Input.Focus()
 			m.configInput.Input.SetValue(value)
@@ -242,7 +372,12 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m ListModel) View() string {
 	if m.inputActive {
 		return appStyle.Render(inputStyle.Render(m.configInput.View()))
-
+	}
+	if m.editorSelectActive {
+		return appStyle.Render(m.editorSelect.View())
+	}
+	if m.modeSelectActive {
+		return appStyle.Render(m.modeSelect.View())
 	}
 	return appStyle.Render(m.list.View())
 }

@@ -16,25 +16,42 @@ limitations under the License.
 package cmd
 
 import (
-	"os"
+	"errors"
 
 	"github.com/spf13/cobra"
 
+	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/internal/state"
+	"github.com/Paintersrp/an/internal/tui/initialize"
 	"github.com/Paintersrp/an/pkg/cmd/root"
 )
 
 func Execute() {
 	s, err := state.NewState()
+
+	if err != nil {
+		var initErr *config.ConfigInitError
+		if errors.As(err, &initErr) {
+			err := initialize.Run()
+			cobra.CheckErr(err)
+
+			s, err := state.NewState()
+			cobra.CheckErr(err) // or loop again if failed?
+
+			executeRoot(s)
+		} else {
+			cobra.CheckErr(err)
+		}
+	} else {
+		executeRoot(s)
+	}
+}
+
+func executeRoot(s *state.State) {
+	cmd, err := root.NewCmdRoot(s)
 	cobra.CheckErr(err)
 
-	rootCmd, rootErr := root.NewCmdRoot(s)
-	if rootErr != nil {
-		return
-	}
+	execErr := cmd.Execute()
+	cobra.CheckErr(execErr)
 
-	execErr := rootCmd.Execute()
-	if execErr != nil {
-		os.Exit(1)
-	}
 }

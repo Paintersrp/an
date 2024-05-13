@@ -1,4 +1,4 @@
-package list
+package settings
 
 import (
 	"github.com/charmbracelet/bubbles/key"
@@ -10,6 +10,8 @@ func newItemDelegate(
 	keys *delegateKeyMap,
 ) list.DefaultDelegate {
 	d := list.NewDefaultDelegate()
+	d.Styles.SelectedTitle = selectedItemStyle
+	d.Styles.SelectedDesc = selectedItemStyle
 
 	d.UpdateFunc = func(msg tea.Msg, m *list.Model) tea.Cmd {
 		var title string

@@ -53,9 +53,10 @@ func run(
 	args []string,
 	s *state.State,
 ) error {
-	var content string
-	rootSubdir := viper.GetString("subdir")
-	rootVaultDir := viper.GetString("vaultdir")
+	subdirFlag := viper.GetString("subdir")
+	s.Config.HandleSubdir(subdirFlag)
+
+	vaultFlag := viper.GetString("vaultdir")
 
 	title, err := arg.HandleTitle(args)
 	if err != nil {
@@ -65,7 +66,7 @@ func run(
 	tags := arg.HandleTags(args)
 	links := flags.HandleLinks(cmd)
 	tmpl := flags.HandleTemplate(cmd)
-	upstream := flags.HandleUpstream(cmd, rootVaultDir)
+	upstream := flags.HandleUpstream(cmd, vaultFlag)
 	createSymlink, err := cmd.Flags().GetBool("symlink")
 	if err != nil {
 		return err
@@ -76,6 +77,7 @@ func run(
 		return err
 	}
 
+	var content string
 	if paste {
 		msg, err := clipboard.ReadAll()
 		if err == nil && msg != "" {
@@ -88,8 +90,8 @@ func run(
 	}
 
 	note := zet.NewZettelkastenNote(
-		rootVaultDir,
-		rootSubdir,
+		vaultFlag,
+		subdirFlag,
 		title,
 		tags,
 		links,

@@ -1,4 +1,4 @@
-package pins
+package pin
 
 import (
 	"errors"
