@@ -30,20 +30,26 @@ func NewCmdSymlink(s *state.State) *cobra.Command {
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return symlink(args, s)
+			return symlink(cmd, args, s)
 		},
 	}
+
+	cmd.Flags().StringP("output", "o", "", "Optional output path for the symlinked file.")
 
 	return cmd
 }
 
-func symlink(args []string, s *state.State) error {
+func symlink(cmd *cobra.Command, args []string, s *state.State) error {
+	outputPath, err := cmd.Flags().GetString("output")
+
+	if err != nil {
+		return err
+	}
+
 	finder := fzf.NewFuzzyFinder(s.Vault, "Select file to symlink.")
 
-	var (
-		selectedFile string
-		selectError  error
-	)
+	var selectedFile string
+	var selectError error
 	if len(args) == 0 {
 		selectedFile, selectError = finder.Run(false)
 	} else {
@@ -54,13 +60,18 @@ func symlink(args []string, s *state.State) error {
 		return fmt.Errorf("file selection error: %s", selectError)
 	}
 
-	// Get the current working directory
-	cwd, err := os.Getwd()
-	if err != nil {
-		return err
+	var symlinkPath string
+	if outputPath != "" {
+		symlinkPath = filepath.Join(outputPath, filepath.Base(selectedFile))
+	} else {
+		// Use the current working directory
+		cwd, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+
+		symlinkPath = filepath.Join(cwd, filepath.Base(selectedFile))
 	}
 
-	// Create the symlink in the current working directory
-	symlinkPath := filepath.Join(cwd, filepath.Base(selectedFile))
 	return os.Symlink(selectedFile, symlinkPath)
 }

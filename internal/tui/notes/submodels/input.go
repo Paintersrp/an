@@ -12,7 +12,6 @@ import (
 var (
 	focusedStyle = lipgloss.NewStyle().
 			Bold(true).
-			Background(lipgloss.Color("#0AF")).
 			Foreground(lipgloss.Color("#FFF"))
 
 	cursorStyle = focusedStyle.Copy()

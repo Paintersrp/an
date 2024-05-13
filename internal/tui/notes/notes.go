@@ -41,6 +41,7 @@ type NoteListModel struct {
 	renaming     bool
 	showDetails  bool
 	creating     bool
+	copying      bool
 }
 
 func NewNoteListModel(
@@ -90,6 +91,7 @@ func NewNoteListModel(
 		formModel:    f,
 		renaming:     false,
 		creating:     false,
+		copying:      false,
 	}, nil
 }
 
@@ -111,6 +113,33 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Don't match any of the keys below if we're actively filtering.
 		if m.list.FilterState() == list.Filtering {
 			break
+		}
+
+		if m.copying {
+			if key.Matches(msg, m.keys.exitAltView) {
+				m.toggleCopy()
+				return m, nil
+			}
+
+			var cmd tea.Cmd
+			m.inputModel.Input, cmd = m.inputModel.Input.Update(msg)
+			cmds = append(cmds, cmd)
+
+			if key.Matches(msg, m.keys.submitAltView) {
+				err := copyFile(m)
+
+				// TODO: Error Handling
+				if err != nil {
+					return m, nil
+				}
+
+				m.toggleCopy()
+				m.refresh()
+				return m, cmd
+
+			}
+
+			return m, tea.Batch(cmds...)
 		}
 
 		if m.renaming {
@@ -155,7 +184,14 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		switch {
 		case key.Matches(msg, m.keys.openNote):
-			if ok := m.openNote(); ok {
+			if ok := m.openNote(false); ok {
+				return m, tea.Quit
+			} else {
+				return m, nil
+			}
+
+		case key.Matches(msg, m.keys.openNoteInObsidian):
+			if ok := m.openNote(true); ok {
 				return m, tea.Quit
 			} else {
 				return m, nil
@@ -203,6 +239,9 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case key.Matches(msg, m.keys.create):
 			m.toggleCreation()
+
+		case key.Matches(msg, m.keys.copy):
+			m.toggleCopy()
 		}
 
 	}
@@ -219,6 +258,19 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m NoteListModel) View() string {
 	list := listStyle.MaxWidth(m.width / 2).Render(m.list.View())
+
+	if m.copying {
+		textPrompt := textPromptStyle.Render(
+			lipgloss.NewStyle().
+				Height(m.list.Height()).
+				MaxHeight(m.list.Height()).
+				Padding(0, 2).
+				Render(fmt.Sprintf("%s\n\n%s\n\n%s", titleStyle.Render("Choose new name for the copy"), m.inputModel.View(), helpStyle.Render("do not include file extension"))),
+		)
+
+		layout := lipgloss.JoinHorizontal(lipgloss.Top, list, textPrompt)
+		return appStyle.Render(layout)
+	}
 
 	if m.creating {
 		modelStyle := lipgloss.NewStyle().
@@ -251,11 +303,7 @@ func (m NoteListModel) View() string {
 	return appStyle.Render(layout)
 }
 
-func Run(
-	s *state.State,
-	views map[string]v.View,
-	viewFlag string,
-) error {
+func Run(s *state.State, views map[string]v.View, viewFlag string) error {
 	// Save the current terminal state
 	originalState, err := term.GetState(int(os.Stdin.Fd()))
 	if err != nil {
@@ -339,7 +387,7 @@ func (m *NoteListModel) refreshDelegate() {
 // should prob use an error over a bool but a "success" flag sort of feels more natural for the context.
 // unsuccessful opens provide a status message and the program stays live
 // successful opens return true which trigger graceful stdin passing and closing of the program
-func (m *NoteListModel) openNote() bool {
+func (m *NoteListModel) openNote(obsidian bool) bool {
 	var p string
 
 	if i, ok := m.list.SelectedItem().(ListItem); ok {
@@ -348,7 +396,7 @@ func (m *NoteListModel) openNote() bool {
 		return false
 	}
 
-	err := zet.OpenFromPath(p)
+	err := zet.OpenFromPath(p, obsidian)
 
 	if err != nil {
 		m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Open Error: %s", err)))
@@ -392,6 +440,19 @@ func (m *NoteListModel) swapView(newView string) tea.Cmd {
 	return m.refresh()
 }
 
+func (m *NoteListModel) toggleCopy() {
+	switch m.copying {
+	case true:
+		m.copying = false
+		m.inputModel.Input.Blur()
+	case false:
+		m.copying = true
+		m.inputModel.Input.Focus()
+		if s, ok := m.list.SelectedItem().(ListItem); ok {
+			m.inputModel.Input.SetValue(s.title + "-copy")
+		}
+	}
+}
 func (m *NoteListModel) toggleRename() {
 	switch m.renaming {
 	case true:

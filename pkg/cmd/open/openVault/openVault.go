@@ -41,6 +41,6 @@ func run() error {
 		fmt.Println("No vault directory configured.\nExiting")
 		return errors.New("no vault directory")
 	}
-	zet.OpenFromPath(vaultDir)
+	zet.OpenFromPath(vaultDir, false)
 	return nil
 }

@@ -141,7 +141,7 @@ func (note *ZettelkastenNote) Open() error {
 		os.Exit(1)
 	}
 
-	if err := OpenFromPath(filePath); err != nil {
+	if err := OpenFromPath(filePath, false); err != nil {
 		// TODO: fix - print is too specific
 		fmt.Println(
 			"Error opening note in Neovim:",
@@ -206,8 +206,13 @@ func StaticHandleNoteLaunch(
 }
 
 // OpenFromPath opens the note in the configured editor.
-func OpenFromPath(path string) error {
-	editor := viper.GetString("editor")
+func OpenFromPath(path string, obsidian bool) error {
+	var editor string
+	if obsidian {
+		editor = "obsidian"
+	} else {
+		editor = viper.GetString("editor")
+	}
 
 	switch editor {
 	case "nvim":

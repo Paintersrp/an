@@ -16,16 +16,9 @@ import (
 func ParseNoteFiles(noteFiles []string, vaultDir string, asFileDetails bool) []list.Item {
 	var items []list.Item
 	for _, p := range noteFiles {
-		fileWithoutVault := strings.TrimPrefix(
-			p,
-			vaultDir+"/",
-		)
+		fileWithoutVault := strings.TrimPrefix(p, vaultDir+"/")
 
-		// Split the file path by the path separator
-		parts := strings.Split(
-			fileWithoutVault,
-			string(filepath.Separator),
-		)
+		parts := strings.Split(fileWithoutVault, string(filepath.Separator))
 
 		var (
 			n  string
@@ -36,11 +29,7 @@ func ParseNoteFiles(noteFiles []string, vaultDir string, asFileDetails bool) []l
 			n = parts[0]
 		} else {
 			sd = parts[0]
-			// The remaining parts joined together form the filename
-			n = strings.Join(
-				parts[1:],
-				string(filepath.Separator),
-			)
+			n = strings.Join(parts[1:], string(filepath.Separator))
 		}
 
 		info, err := os.Stat(p)
@@ -50,13 +39,11 @@ func ParseNoteFiles(noteFiles []string, vaultDir string, asFileDetails bool) []l
 		size := info.Size()
 		last := info.ModTime().Format(time.RFC1123)
 
-		// Read the content of the note file
 		c, err := os.ReadFile(p)
 		if err != nil {
 			continue
 		}
 
-		// Extract title and tags from front matter
 		title, tags := parseFrontMatter(c, n)
 
 		items = append(items, ListItem{
@@ -73,44 +60,37 @@ func ParseNoteFiles(noteFiles []string, vaultDir string, asFileDetails bool) []l
 	return items
 }
 
-// parseFrontMatter extracts title and tags from YAML front matter
 func parseFrontMatter(
 	content []byte,
 	fileName string,
 ) (title string, tags []string) {
-	// Get everything between the ---s
+	// Get everything between the --- block in the markdown
 	re := regexp.MustCompile(`(?ms)^---\n(.+?)\n---`)
 	m := re.FindSubmatch(content)
 	if len(m) < 2 {
-		return "", nil // no yaml content found
+		return "", nil
 	}
 
 	yamlContent := m[1]
 
-	// Setup struct for binding the unmarshaled yamlContent
 	var data struct {
 		Title string   `yaml:"title"`
 		Tags  []string `yaml:"tags"`
 	}
 
-	// Bind yamlContent to data struct, or give err
 	if err := yaml.Unmarshal(yamlContent, &data); err != nil {
-		return fileName, nil // no data
+		return fileName, nil
 	}
 
-	// Return file name and tags
 	return strings.TrimSpace(data.Title), data.Tags
 }
 
 func renameFile(m NoteListModel) error {
 	newName := m.inputModel.Input.Value()
 
-	// Get the path of the currently selected item
 	if s, ok := m.list.SelectedItem().(ListItem); ok {
-		// Construct the new path with the updated name
 		newPath := filepath.Join(filepath.Dir(s.path), newName+".md")
 
-		// Read the content of the current file
 		content, err := os.ReadFile(s.path)
 		if err != nil {
 			m.list.NewStatusMessage(
@@ -119,14 +99,9 @@ func renameFile(m NoteListModel) error {
 			return err
 		}
 
-		m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Error renaming: %s", err)))
-		// Extract the current front matter
 		title, _ := parseFrontMatter(content, s.path)
-
-		// Update the title in the front matter
 		updatedContent := bytes.Replace(content, []byte(title), []byte(newName), 1)
 
-		// Write the updated content back to the file
 		if err := os.WriteFile(s.path, updatedContent, 0644); err != nil {
 			m.list.NewStatusMessage(
 				statusStyle(fmt.Sprintf("Error writing file: %s", err)),
@@ -134,12 +109,49 @@ func renameFile(m NoteListModel) error {
 			return err
 		}
 
-		// Rename the file
 		if err := os.Rename(s.path, newPath); err != nil {
 			m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Error renaming: %s", err)))
 			return err
 		}
+	}
+	return nil
+}
 
+func copyFile(m NoteListModel) error {
+	newName := m.inputModel.Input.Value()
+
+	// Get the path of the currently selected item
+	if s, ok := m.list.SelectedItem().(ListItem); ok {
+		newPath := filepath.Join(filepath.Dir(s.path), newName+".md")
+
+		content, err := os.ReadFile(s.path)
+		if err != nil {
+			m.list.NewStatusMessage(
+				statusStyle(fmt.Sprintf("Error reading file: %s", err)),
+			)
+			return err
+		}
+
+		title, _ := parseFrontMatter(content, s.path)
+		updatedContent := bytes.Replace(content, []byte(title), []byte(newName), 1)
+
+		destFile, err := os.Create(newPath)
+		if err != nil {
+			m.list.NewStatusMessage(
+				statusStyle(fmt.Sprintf("Error creating destination file: %s", err)),
+			)
+			return err
+		}
+		defer destFile.Close()
+
+		if _, err := destFile.Write(updatedContent); err != nil {
+			m.list.NewStatusMessage(
+				statusStyle(fmt.Sprintf("Error writing to destination file: %s", err)),
+			)
+			return err
+		}
+
+		m.list.NewStatusMessage(statusStyle("File copied and title updated successfully"))
 	}
 	return nil
 }

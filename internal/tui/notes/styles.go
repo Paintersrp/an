@@ -50,4 +50,6 @@ var (
 	cursorStyle = focusedStyle.Copy()
 	textStyle   = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#CCC"))
+	helpStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#cba6f7"))
 )

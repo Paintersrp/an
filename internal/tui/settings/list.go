@@ -13,8 +13,6 @@ import (
 )
 
 // TODO: Clean and Organize
-// TODO: Input Validation
-// TODO: Molecule Adding
 // TODO: Skip saving file and making changes if no changes to input occured
 
 type ListItem struct {
@@ -89,8 +87,6 @@ func NewListModel(cfg *config.Config) ListModel {
 		ListItem{title: "Editor", description: cfg.Editor},
 		ListItem{title: "NvimArgs", description: cfg.NvimArgs},
 		ListItem{title: "FileSystemMode", description: cfg.FileSystemMode},
-		ListItem{title: "PinnedFile", description: cfg.PinnedFile},
-		ListItem{title: "PinnedTaskFile", description: cfg.PinnedTaskFile},
 	}
 
 	// Setup list
@@ -283,12 +279,6 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.config.NvimArgs = inputValue
 				case "MoleculeMode":
 					m.config.FileSystemMode = inputValue
-				case "PinnedFile":
-					m.config.PinnedFile = inputValue
-				case "PinnedTaskFile":
-					m.config.PinnedTaskFile = inputValue
-				default:
-					// Handle unknown title
 				}
 
 				// Save the updated config

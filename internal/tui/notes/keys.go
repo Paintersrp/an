@@ -13,6 +13,7 @@ type listKeyMap struct {
 	changeView            key.Binding
 	rename                key.Binding
 	create                key.Binding
+	copy                  key.Binding
 	link                  key.Binding
 	submitAltView         key.Binding
 	exitAltView           key.Binding
@@ -23,6 +24,7 @@ type listKeyMap struct {
 	switchToTrashView     key.Binding
 	switchToUnfulfillView key.Binding
 	updatePreview         key.Binding
+	openNoteInObsidian    key.Binding
 }
 
 func newListKeyMap() *listKeyMap {
@@ -51,6 +53,10 @@ func newListKeyMap() *listKeyMap {
 			key.WithKeys("enter"),
 			key.WithHelp("↵", "open"),
 		),
+		openNoteInObsidian: key.NewBinding(
+			key.WithKeys("G"),
+			key.WithHelp("G", "open in obsidian"),
+		),
 		changeView: key.NewBinding(
 			key.WithKeys("V"),
 			key.WithHelp("V", "view"),
@@ -62,6 +68,10 @@ func newListKeyMap() *listKeyMap {
 		create: key.NewBinding(
 			key.WithKeys("C"),
 			key.WithHelp("C", "create"),
+		),
+		copy: key.NewBinding(
+			key.WithKeys("Y"),
+			key.WithHelp("Y", "copy"),
 		),
 		submitAltView: key.NewBinding(
 			key.WithKeys("enter"),
@@ -107,6 +117,7 @@ func (m listKeyMap) fullHelp() []key.Binding {
 		m.toggleDisplayView,
 		m.openNote,
 		m.rename,
+		m.copy,
 		m.changeView,
 		m.switchToDefaultView,
 		m.switchToArchiveView,
@@ -115,5 +126,6 @@ func (m listKeyMap) fullHelp() []key.Binding {
 		m.switchToUnfulfillView,
 		m.exitAltView,
 		m.submitAltView,
+		m.openNoteInObsidian,
 	}
 }

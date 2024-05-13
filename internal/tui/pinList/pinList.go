@@ -323,7 +323,7 @@ func (m *PinListModel) openNote() bool {
 		return false
 	}
 
-	err := zet.OpenFromPath(p)
+	err := zet.OpenFromPath(p, false)
 
 	if err != nil {
 		m.list.NewStatusMessage(statusMessageStyle(fmt.Sprintf("Open Error: %s", err)))

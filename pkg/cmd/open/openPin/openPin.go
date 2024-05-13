@@ -58,6 +58,6 @@ func run(cmd *cobra.Command, c *config.Config) error {
 	if _, err := os.Stat(targetPin); os.IsNotExist(err) {
 		return fmt.Errorf("the pinned file '%s' does not exist", targetPin)
 	}
-	return zet.OpenFromPath(targetPin)
+	return zet.OpenFromPath(targetPin, false)
 
 }
