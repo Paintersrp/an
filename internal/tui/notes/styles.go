@@ -9,9 +9,9 @@ var (
 
 	titleStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#0AF")).
-			Background(lipgloss.Color("#224")).
-			Bold(true).
-			Padding(0, 1)
+		// Background(lipgloss.Color("#224")).
+		Bold(true).
+		Padding(0, 1)
 
 	inputStyle = lipgloss.NewStyle().
 			BorderStyle(lipgloss.NormalBorder()).

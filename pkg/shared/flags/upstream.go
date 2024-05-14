@@ -21,7 +21,6 @@ func HandleUpstream(cmd *cobra.Command, vaultDir string) string {
 	if upstreamFlag {
 		finder := fzf.NewFuzzyFinder(vaultDir, "Select upstream file.")
 		upstreamFile, err := finder.Run(false)
-
 		if err != nil {
 			fmt.Printf("error selecting upstream file: %s", err)
 			os.Exit(1)

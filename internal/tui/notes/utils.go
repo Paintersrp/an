@@ -85,6 +85,7 @@ func parseFrontMatter(
 	return strings.TrimSpace(data.Title), data.Tags
 }
 
+// TODO: Handle rename conflicts / file name already exists
 func renameFile(m NoteListModel) error {
 	newName := m.inputModel.Input.Value()
 
@@ -102,7 +103,7 @@ func renameFile(m NoteListModel) error {
 		title, _ := parseFrontMatter(content, s.path)
 		updatedContent := bytes.Replace(content, []byte(title), []byte(newName), 1)
 
-		if err := os.WriteFile(s.path, updatedContent, 0644); err != nil {
+		if err := os.WriteFile(s.path, updatedContent, 0o644); err != nil {
 			m.list.NewStatusMessage(
 				statusStyle(fmt.Sprintf("Error writing file: %s", err)),
 			)
@@ -154,4 +155,14 @@ func copyFile(m NoteListModel) error {
 		m.list.NewStatusMessage(statusStyle("File copied and title updated successfully"))
 	}
 	return nil
+}
+
+func castToListItems(items []list.Item) []ListItem {
+	var listItems []ListItem
+	for _, item := range items {
+		if listItem, ok := item.(ListItem); ok {
+			listItems = append(listItems, listItem)
+		}
+	}
+	return listItems
 }

@@ -25,6 +25,11 @@ type listKeyMap struct {
 	switchToUnfulfillView key.Binding
 	updatePreview         key.Binding
 	openNoteInObsidian    key.Binding
+	sortByTitle           key.Binding
+	sortBySubdir          key.Binding
+	sortByModifiedAt      key.Binding
+	sortAscending         key.Binding
+	sortDescending        key.Binding
 }
 
 func newListKeyMap() *listKeyMap {
@@ -105,6 +110,26 @@ func newListKeyMap() *listKeyMap {
 			key.WithKeys("f9"),
 			key.WithHelp("f9", "update preview"),
 		),
+		sortByTitle: key.NewBinding(
+			key.WithKeys("f1"),
+			key.WithHelp("f1", "sort by title"),
+		),
+		sortBySubdir: key.NewBinding(
+			key.WithKeys("f2"),
+			key.WithHelp("f2", "sort by subdirectory"),
+		),
+		sortByModifiedAt: key.NewBinding(
+			key.WithKeys("f3"),
+			key.WithHelp("f3", "sort by modified"),
+		),
+		sortAscending: key.NewBinding(
+			key.WithKeys("f5"),
+			key.WithHelp("f5", "ascending sort"),
+		),
+		sortDescending: key.NewBinding(
+			key.WithKeys("f6"),
+			key.WithHelp("f6", "descending sort"),
+		),
 	}
 }
 
@@ -127,5 +152,7 @@ func (m listKeyMap) fullHelp() []key.Binding {
 		m.exitAltView,
 		m.submitAltView,
 		m.openNoteInObsidian,
+		m.sortByTitle,
+		m.sortBySubdir,
 	}
 }

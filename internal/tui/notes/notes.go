@@ -21,10 +21,7 @@ import (
 	"github.com/Paintersrp/an/utils"
 )
 
-// TODO: Replace Magic Number (Cache Size)
-// TODO: Orphan as 2 not archive, archive as 3
-
-var maxCacheSizeMb int64 = 50
+var maxCacheSizeMB int64 = 50
 
 type NoteListModel struct {
 	list         list.Model
@@ -42,6 +39,8 @@ type NoteListModel struct {
 	showDetails  bool
 	creating     bool
 	copying      bool
+	sortField    sortField
+	sortOrder    sortOrder
 }
 
 func NewNoteListModel(
@@ -54,12 +53,14 @@ func NewNoteListModel(
 	}
 
 	items := ParseNoteFiles(files, s.Vault, false)
+	sortedItems := sortItems(castToListItems(items), sortByModifiedAt, descending)
+
 	dkeys := newDelegateKeyMap()
 	lkeys := newListKeyMap()
-	title := v.GetTitleForView(viewName)
+	title := v.GetTitleForView(viewName, int(sortByModifiedAt), int(descending))
 	delegate := newItemDelegate(dkeys, s.Handler, viewName)
 
-	l := list.New(items, delegate, 0, 0)
+	l := list.New(sortedItems, delegate, 0, 0)
 	l.Title = title
 	l.Styles.Title = titleStyle
 
@@ -71,10 +72,9 @@ func NewNoteListModel(
 	}
 
 	l.AdditionalFullHelpKeys = lkeys.fullHelp
-	c, err := cache.New(maxCacheSizeMb)
-
+	c, err := cache.New(maxCacheSizeMB)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("failed to create cache: %w", err)
 	}
 
 	i := submodels.NewInputModel()
@@ -92,6 +92,8 @@ func NewNoteListModel(
 		renaming:     false,
 		creating:     false,
 		copying:      false,
+		sortField:    sortByModifiedAt,
+		sortOrder:    descending,
 	}, nil
 }
 
@@ -110,150 +112,187 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.list.SetSize(msg.Width-h, msg.Height-v)
 
 	case tea.KeyMsg:
-		// Don't match any of the keys below if we're actively filtering.
 		if m.list.FilterState() == list.Filtering {
 			break
 		}
 
-		if m.copying {
-			if key.Matches(msg, m.keys.exitAltView) {
-				m.toggleCopy()
-				return m, nil
-			}
-
-			var cmd tea.Cmd
-			m.inputModel.Input, cmd = m.inputModel.Input.Update(msg)
-			cmds = append(cmds, cmd)
-
-			if key.Matches(msg, m.keys.submitAltView) {
-				err := copyFile(m)
-
-				// TODO: Error Handling
-				if err != nil {
-					return m, nil
-				}
-
-				m.toggleCopy()
-				m.refresh()
-				return m, cmd
-
-			}
-
-			return m, tea.Batch(cmds...)
-		}
-
-		if m.renaming {
-			if key.Matches(msg, m.keys.exitAltView) {
-				m.toggleRename()
-				return m, nil
-			}
-
-			var cmd tea.Cmd
-			m.inputModel.Input, cmd = m.inputModel.Input.Update(msg)
-			cmds = append(cmds, cmd)
-
-			if key.Matches(msg, m.keys.submitAltView) {
-				err := renameFile(m)
-
-				// TODO: Error Handling
-				if err != nil {
-					return m, nil
-				}
-
-				m.toggleRename()
-				m.refresh()
-				return m, cmd
-
-			}
-
-			return m, tea.Batch(cmds...)
-		}
-
-		if m.creating {
-			if key.Matches(msg, m.keys.exitAltView) {
-				m.toggleCreation()
-				return m, nil
-			}
-
-			var cmd tea.Cmd
-			m.formModel, cmd = m.formModel.Update(msg)
-			cmds = append(cmds, cmd)
-
-			return m, tea.Batch(cmds...)
-		}
-
 		switch {
-		case key.Matches(msg, m.keys.openNote):
-			if ok := m.openNote(false); ok {
-				return m, tea.Quit
-			} else {
-				return m, nil
-			}
-
-		case key.Matches(msg, m.keys.openNoteInObsidian):
-			if ok := m.openNote(true); ok {
-				return m, tea.Quit
-			} else {
-				return m, nil
-			}
-
-		case key.Matches(msg, m.keys.toggleTitleBar):
-			m.toggleTitleBar()
-			return m, nil
-
-		case key.Matches(msg, m.keys.toggleStatusBar):
-			m.list.SetShowStatusBar(!m.list.ShowStatusBar())
-			return m, nil
-
-		case key.Matches(msg, m.keys.togglePagination):
-			m.list.SetShowPagination(!m.list.ShowPagination())
-			return m, nil
-
-		case key.Matches(msg, m.keys.toggleHelpMenu):
-			m.list.SetShowHelp(!m.list.ShowHelp())
-			return m, nil
-
-		case key.Matches(msg, m.keys.toggleDisplayView):
-			return m, m.toggleDetails()
-
-		case key.Matches(msg, m.keys.changeView):
-			return m, m.cycleView()
-
-		case key.Matches(msg, m.keys.switchToDefaultView):
-			return m, m.swapView("default")
-
-		case key.Matches(msg, m.keys.switchToUnfulfillView):
-			return m, m.swapView("unfulfilled")
-
-		case key.Matches(msg, m.keys.switchToOrphanView):
-			return m, m.swapView("orphan")
-
-		case key.Matches(msg, m.keys.switchToArchiveView):
-			return m, m.swapView("archive")
-
-		case key.Matches(msg, m.keys.switchToTrashView):
-			return m, m.swapView("trash")
-
-		case key.Matches(msg, m.keys.rename):
-			m.toggleRename()
-
-		case key.Matches(msg, m.keys.create):
-			m.toggleCreation()
-
-		case key.Matches(msg, m.keys.copy):
-			m.toggleCopy()
+		case m.copying:
+			return m.handleCopyUpdate(msg)
+		case m.renaming:
+			return m.handleRenameUpdate(msg)
+		case m.creating:
+			return m.handleCreationUpdate(msg)
+		default:
+			m.handleDefaultUpdate(msg)
 		}
-
 	}
 
 	nl, cmd := m.list.Update(msg)
 	m.list = nl
 	cmds = append(cmds, cmd)
 
-	// we need to asyncronously generate the markdown preview, then
-	// once we have the preview we update it which should update the display, or stream in as it comes
+	// TODO: need to asyncronously stream in the markdown preview
 	m.handlePreview()
 	return m, tea.Batch(cmds...)
+}
+
+func (m NoteListModel) handleCopyUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	var cmds []tea.Cmd
+	var cmd tea.Cmd
+
+	if key.Matches(msg, m.keys.exitAltView) {
+		m.toggleCopy()
+		return m, nil
+	}
+
+	m.inputModel.Input, cmd = m.inputModel.Input.Update(msg)
+	cmds = append(cmds, cmd)
+
+	if key.Matches(msg, m.keys.submitAltView) {
+		if err := copyFile(m); err != nil {
+			m.list.NewStatusMessage(
+				statusStyle(fmt.Sprintf("Error copying file: %v", err)),
+			)
+		} else {
+			m.toggleCopy()
+			m.refresh()
+			return m, cmd
+		}
+	}
+
+	return m, tea.Batch(cmds...)
+}
+
+func (m NoteListModel) handleRenameUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	var cmds []tea.Cmd
+	var cmd tea.Cmd
+
+	if key.Matches(msg, m.keys.exitAltView) {
+		m.toggleRename()
+		return m, nil
+	}
+
+	m.inputModel.Input, cmd = m.inputModel.Input.Update(msg)
+	cmds = append(cmds, cmd)
+
+	if key.Matches(msg, m.keys.submitAltView) {
+		if err := renameFile(m); err != nil {
+			m.list.NewStatusMessage(
+				statusStyle(fmt.Sprintf("Error renaming file: %v", err)),
+			)
+		} else {
+			m.toggleRename()
+			m.refresh()
+			return m, cmd
+		}
+	}
+
+	return m, tea.Batch(cmds...)
+}
+
+func (m *NoteListModel) handleCreationUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	var cmds []tea.Cmd
+	var cmd tea.Cmd
+
+	if key.Matches(msg, m.keys.exitAltView) {
+		m.toggleCreation()
+		return m, nil
+	}
+
+	m.formModel, cmd = m.formModel.Update(msg)
+	cmds = append(cmds, cmd)
+
+	return m, tea.Batch(cmds...)
+}
+
+func (m *NoteListModel) handleDefaultUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, m.keys.openNote):
+		if ok := m.openNote(false); ok {
+			return m, tea.Quit
+		} else {
+			return m, nil
+		}
+
+	case key.Matches(msg, m.keys.openNoteInObsidian):
+		if ok := m.openNote(true); ok {
+			return m, tea.Quit
+		} else {
+			return m, nil
+		}
+
+	case key.Matches(msg, m.keys.toggleTitleBar):
+		m.toggleTitleBar()
+		return m, nil
+
+	case key.Matches(msg, m.keys.toggleStatusBar):
+		m.list.SetShowStatusBar(!m.list.ShowStatusBar())
+		return m, nil
+
+	case key.Matches(msg, m.keys.togglePagination):
+		m.list.SetShowPagination(!m.list.ShowPagination())
+		return m, nil
+
+	case key.Matches(msg, m.keys.toggleHelpMenu):
+		m.list.SetShowHelp(!m.list.ShowHelp())
+		return m, nil
+
+	case key.Matches(msg, m.keys.toggleDisplayView):
+		return m, m.toggleDetails()
+
+	case key.Matches(msg, m.keys.changeView):
+		return m, m.cycleView()
+
+	case key.Matches(msg, m.keys.switchToDefaultView):
+		return m, m.swapView("default")
+
+	case key.Matches(msg, m.keys.switchToUnfulfillView):
+		return m, m.swapView("unfulfilled")
+
+	case key.Matches(msg, m.keys.switchToOrphanView):
+		return m, m.swapView("orphan")
+
+	case key.Matches(msg, m.keys.switchToArchiveView):
+		return m, m.swapView("archive")
+
+	case key.Matches(msg, m.keys.switchToTrashView):
+		return m, m.swapView("trash")
+
+	case key.Matches(msg, m.keys.rename):
+		m.toggleRename()
+
+	case key.Matches(msg, m.keys.create):
+		m.toggleCreation()
+
+	case key.Matches(msg, m.keys.copy):
+		m.toggleCopy()
+
+	case key.Matches(msg, m.keys.sortByTitle):
+		m.sortField = sortByTitle
+		return m, m.refreshSort()
+
+	case key.Matches(msg, m.keys.sortBySubdir):
+		m.sortField = sortBySubdir
+		return m, m.refreshSort()
+
+	case key.Matches(msg, m.keys.sortByModifiedAt):
+		m.sortField = sortByModifiedAt
+		return m, m.refreshSort()
+
+	case key.Matches(msg, m.keys.sortAscending):
+		m.sortOrder = ascending
+		return m, m.refreshSort()
+
+	case key.Matches(msg, m.keys.sortAscending):
+		m.sortOrder = descending
+		return m, m.refreshSort()
+
+	case key.Matches(msg, m.keys.sortDescending):
+		m.sortOrder = descending
+		return m, m.refreshSort()
+	}
+	return nil, nil
 }
 
 func (m NoteListModel) View() string {
@@ -304,15 +343,13 @@ func (m NoteListModel) View() string {
 }
 
 func Run(s *state.State, views map[string]v.View, viewFlag string) error {
-	// Save the current terminal state
 	originalState, err := term.GetState(int(os.Stdin.Fd()))
 	if err != nil {
 		log.Fatalf("Failed to get original terminal state: %v", err)
 	}
 
 	defer func() {
-		// in the event that the editor we open into does not terminate gracefully,
-		// we attempt to recover original state so that we can terminate gracefully (aka reach the return nil)
+		// we attempt to recover original state so that we can terminate gracefully
 		if err := term.Restore(int(os.Stdin.Fd()), originalState); err != nil {
 			log.Fatalf("Failed to restore original terminal state: %v", err)
 		}
@@ -326,26 +363,20 @@ func Run(s *state.State, views map[string]v.View, viewFlag string) error {
 	if _, err := tea.NewProgram(m, tea.WithInput(os.Stdin), tea.WithAltScreen()).Run(); err != nil {
 		// handle error for instances where neovim/editor doesn't pass stdin back in time to close gracefully with bubbletea
 		if strings.Contains(err.Error(), "resource temporarily unavailable") {
-			os.Exit(0) // exit gracefully
+			os.Exit(0)
 		} else {
 			log.Fatalf("Error running program: %v", err)
 		}
 	}
 
-	// ran with no errors*, terminal gracefully
 	return nil
 }
 
-// handles markdown preview generation for selected (highlighted) items
-// caches up to 50mb of previews to avoid reprocessing when navigating the list
 func (m *NoteListModel) handlePreview() {
 	if s, ok := m.list.SelectedItem().(ListItem); ok {
-		// check if the preview is already in the cache
 		if p, exists, err := m.cache.Get(s.path); err == nil && exists {
 			m.preview = p.(string)
 		} else {
-			// cache tries to recover from errors internally, so we *should* only see errors from
-			// nil values and improper size on New (negative values)
 			if err != nil {
 				m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Error accessing cache: %s", err)))
 			}
@@ -364,18 +395,19 @@ func (m *NoteListModel) handlePreview() {
 }
 
 func (m *NoteListModel) refresh() tea.Cmd {
-	m.list.Title = v.GetTitleForView(m.viewName)
+	m.list.Title = v.GetTitleForView(m.viewName, int(m.sortField), int(m.sortOrder))
 	m.refreshDelegate()
 	cmd := m.refreshItems()
+	m.list.ResetSelected()
 	m.handlePreview()
 	return cmd
 }
 
-// refreshes the list items based on view conditions
 func (m *NoteListModel) refreshItems() tea.Cmd {
 	files, _ := m.state.ViewManager.GetFilesByView(m.viewName, m.state.Vault)
 	items := ParseNoteFiles(files, m.state.Vault, m.showDetails)
-	return m.list.SetItems(items)
+	sortedItems := sortItems(castToListItems(items), m.sortField, m.sortOrder)
+	return m.list.SetItems(sortedItems)
 }
 
 func (m *NoteListModel) refreshDelegate() {
@@ -384,9 +416,19 @@ func (m *NoteListModel) refreshDelegate() {
 	m.list.SetDelegate(delegate)
 }
 
-// should prob use an error over a bool but a "success" flag sort of feels more natural for the context.
-// unsuccessful opens provide a status message and the program stays live
-// successful opens return true which trigger graceful stdin passing and closing of the program
+func (m *NoteListModel) refreshSort() tea.Cmd {
+	m.list.Title = v.GetTitleForView(m.viewName, int(m.sortField), int(m.sortOrder))
+	items := castToListItems(m.list.Items())
+	sortedItems := sortItems(items, m.sortField, m.sortOrder)
+	m.list.ResetSelected()
+	cmd := m.list.SetItems(sortedItems)
+	m.handlePreview()
+	return cmd
+}
+
+// TODO: should prob use an error over a bool but a "success" flag sort of feels more natural for the context.
+// TODO: unsuccessful opens provide a status message and the program stays live
+// TODO: successful opens return true which trigger graceful stdin passing and closing of the program
 func (m *NoteListModel) openNote(obsidian bool) bool {
 	var p string
 
@@ -397,7 +439,6 @@ func (m *NoteListModel) openNote(obsidian bool) bool {
 	}
 
 	err := zet.OpenFromPath(p, obsidian)
-
 	if err != nil {
 		m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Open Error: %s", err)))
 		return false
@@ -415,7 +456,9 @@ func (m *NoteListModel) toggleTitleBar() {
 
 func (m *NoteListModel) toggleDetails() tea.Cmd {
 	m.showDetails = !m.showDetails
-	return m.refreshItems()
+	cmd := m.refreshItems()
+	m.list.ResetSelected()
+	return cmd
 }
 
 func (m *NoteListModel) cycleView() tea.Cmd {
@@ -453,6 +496,7 @@ func (m *NoteListModel) toggleCopy() {
 		}
 	}
 }
+
 func (m *NoteListModel) toggleRename() {
 	switch m.renaming {
 	case true:
@@ -467,7 +511,7 @@ func (m *NoteListModel) toggleRename() {
 	}
 }
 
-// clear?
+// TODO: clear?
 func (m *NoteListModel) toggleCreation() {
 	switch m.creating {
 	case true:

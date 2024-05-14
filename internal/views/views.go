@@ -8,20 +8,41 @@ import (
 )
 
 var titlePrefixMap = map[string]string{
-	"default":     "✅ - Default (All)",
+	"default":     "✅ - All",
 	"orphan":      "❓ - Orphan",
 	"unfulfilled": "⬜ - Unfulfilled",
 	"archive":     "📦 - Archive",
 	"trash":       "🗑️  - Trash", // Note the extra space before the dash
 }
 
-func GetTitleForView(viewFlag string) string {
+var sortFieldMap = map[int]string{
+	0: "Title",
+	1: "Subdirectory",
+	2: "Modified",
+}
+
+func GetTitleForView(viewFlag string, sortField int, sortOrder int) string {
 	prefix, ok := titlePrefixMap[viewFlag]
 	if !ok {
 		prefix = titlePrefixMap["default"]
 	}
 
-	return prefix + " View"
+	sortFieldStr, ok := sortFieldMap[sortField]
+	if !ok {
+		sortFieldStr = "Unknown"
+	}
+
+	orderStr := "Ascending"
+	if sortOrder == 1 {
+		orderStr = "Descending"
+	}
+
+	return fmt.Sprintf(
+		"%s View \nSort: %s (%s)",
+		prefix,
+		sortFieldStr,
+		orderStr,
+	)
 }
 
 // View represents a configuration for a specific view.

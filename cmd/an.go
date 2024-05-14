@@ -53,5 +53,4 @@ func executeRoot(s *state.State) {
 
 	execErr := cmd.Execute()
 	cobra.CheckErr(execErr)
-
 }

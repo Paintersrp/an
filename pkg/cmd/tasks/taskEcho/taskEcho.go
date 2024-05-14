@@ -125,7 +125,7 @@ func run(cmd *cobra.Command, args []string, s *state.State, priority string) err
 	contentStr = contentStr[:endOfSectionIndex] + taskEntry + contentStr[endOfSectionIndex:]
 
 	// Write the updated content back to the file
-	err = os.WriteFile(targetPin, []byte(contentStr), 0644)
+	err = os.WriteFile(targetPin, []byte(contentStr), 0o644)
 	if err != nil {
 		return err
 	}
@@ -143,5 +143,4 @@ func run(cmd *cobra.Command, args []string, s *state.State, priority string) err
 		)
 	}
 	return nil
-
 }

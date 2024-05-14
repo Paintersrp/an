@@ -53,7 +53,7 @@ type FormModel struct {
 }
 
 func NewFormModel(s *state.State) FormModel {
-	var inputs = make([]textinput.Model, 5)
+	inputs := make([]textinput.Model, 5)
 	inputs[title] = textinput.New()
 	inputs[title].Placeholder = "Title"
 	inputs[title].Focus()
@@ -120,7 +120,7 @@ func (m FormModel) Init() tea.Cmd {
 }
 
 func (m FormModel) Update(msg tea.Msg) (FormModel, tea.Cmd) {
-	var cmds = make([]tea.Cmd, len(m.Inputs)+1) // +1 for the submit button
+	cmds := make([]tea.Cmd, len(m.Inputs)+1) // +1 for the submit button
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -173,7 +173,6 @@ func (m FormModel) Update(msg tea.Msg) (FormModel, tea.Cmd) {
 }
 
 func (m FormModel) View() string {
-
 	var btnView string
 
 	if m.btn.focused {

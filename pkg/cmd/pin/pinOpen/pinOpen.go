@@ -76,5 +76,4 @@ func run(cmd *cobra.Command, s *state.State, pinType string) error {
 		return fmt.Errorf("the pinned file '%s' does not exist", targetPin)
 	}
 	return zet.OpenFromPath(targetPin, false)
-
 }

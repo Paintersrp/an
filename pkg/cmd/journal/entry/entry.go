@@ -79,7 +79,6 @@ func run(
 	templateType string,
 ) error {
 	tags, err := utils.ValidateInput(strings.Join(args, " "))
-
 	if err != nil {
 		fmt.Printf("error processing tags argument: %s", err)
 		os.Exit(1)

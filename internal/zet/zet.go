@@ -125,7 +125,6 @@ func (note *ZettelkastenNote) Create(
 // Open opens the Zettelkasten note in the configured editor.
 func (note *ZettelkastenNote) Open() error {
 	exists, filePath, err := note.FileExists()
-
 	if err != nil {
 		return err
 	}
@@ -185,6 +184,7 @@ func GetNotesInDirectory(vaultDir, subDir string) ([]string, error) {
 	return notes, nil
 }
 
+// TODO: return errors
 // StaticHandleNoteLaunch handles the creation and opening of a note.
 func StaticHandleNoteLaunch(
 	note *ZettelkastenNote,

@@ -23,7 +23,7 @@ func EnsureConfigExists(homeDir string) error {
 	configPath := GetConfigPath(homeDir)
 	configDir := filepath.Dir(configPath)
 
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 

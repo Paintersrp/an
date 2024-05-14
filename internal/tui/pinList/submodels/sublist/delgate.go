@@ -17,7 +17,6 @@ func newItemDelegate(keys *delegateKeyMap, cfg *config.Config) list.DefaultDeleg
 	d.Styles.SelectedDesc = selectedItemStyle
 
 	d.UpdateFunc = func(msg tea.Msg, m *list.Model) tea.Cmd {
-
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
 

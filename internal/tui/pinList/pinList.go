@@ -303,7 +303,6 @@ func (m PinListModel) View() string {
 
 func Run(s *state.State, pinType string) tea.Model {
 	m, err := tea.NewProgram(NewPinListModel(s, pinType), tea.WithAltScreen()).Run()
-
 	if err != nil {
 		fmt.Println("Error running program:", err)
 		os.Exit(1)
@@ -327,7 +326,6 @@ func (m *PinListModel) openNote() bool {
 	}
 
 	err := zet.OpenFromPath(p, false)
-
 	if err != nil {
 		m.list.NewStatusMessage(statusMessageStyle(fmt.Sprintf("Open Error: %s", err)))
 		return false

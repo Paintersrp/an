@@ -160,7 +160,7 @@ func RenderMarkdownPreview(path string, w, h int) string {
 }
 
 func FormatBytes(size int64) string {
-	var units = []string{"B", "KB", "MB", "GB", "TB", "PB", "EB"}
+	units := []string{"B", "KB", "MB", "GB", "TB", "PB", "EB"}
 	var mod int64 = 1024
 	var i int
 	for size >= mod {

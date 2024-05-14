@@ -41,7 +41,6 @@ func NewCmdSymlink(s *state.State) *cobra.Command {
 
 func symlink(cmd *cobra.Command, args []string, s *state.State) error {
 	outputPath, err := cmd.Flags().GetString("output")
-
 	if err != nil {
 		return err
 	}

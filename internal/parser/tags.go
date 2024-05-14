@@ -75,6 +75,7 @@ func (th *TagHandler) PrintTagCounts() {
 		fmt.Printf("Tag: %s, Count: %d\n", tag, th.TagCounts[tag])
 	}
 }
+
 func (th *TagHandler) PrintSortedTagCounts(order string) {
 	th.SortTagCounts(order)
 	fmt.Println("\nSorted Tag Counts:")

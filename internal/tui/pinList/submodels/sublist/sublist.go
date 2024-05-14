@@ -98,7 +98,6 @@ func (m SubListModel) View() string {
 
 func Run(s *state.State) tea.Model {
 	m, err := tea.NewProgram(NewSubListModel(s), tea.WithAltScreen()).Run()
-
 	if err != nil {
 		fmt.Println("Error running program:", err)
 		os.Exit(1)

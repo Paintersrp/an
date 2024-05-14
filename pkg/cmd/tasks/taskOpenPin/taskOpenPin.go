@@ -13,7 +13,6 @@ import (
 )
 
 func NewCmdTaskOpenPin(s *state.State) *cobra.Command {
-
 	cmd := &cobra.Command{
 		Use:     "open-pin -n {pin-name}",
 		Aliases: []string{"op", "open-p", "o-p"},

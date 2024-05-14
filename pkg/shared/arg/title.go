@@ -9,5 +9,4 @@ func HandleTitle(args []string) (string, error) {
 		)
 	}
 	return args[0], nil
-
 }

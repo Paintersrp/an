@@ -25,13 +25,11 @@ type State struct {
 
 func NewState() (*State, error) {
 	home, err := GetHomeDir()
-
 	if err != nil {
 		return nil, err
 	}
 
 	cfg, err := LoadConfig(home)
-
 	if err != nil {
 		return nil, err
 	}

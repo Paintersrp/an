@@ -47,7 +47,6 @@ func (f *FuzzyFinder) RunWithQuery(query string, execute bool) (string, error) {
 
 func (f *FuzzyFinder) find(query string) (int, error) {
 	files, err := f.handler.WalkFiles(nil, nil, "default")
-
 	if err != nil {
 		return -1, fmt.Errorf("error listing files: %w", err)
 	}
@@ -129,7 +128,6 @@ func (f *FuzzyFinder) fuzzySelectFile(query string) (int, error) {
 				title,
 				strings.Join(tags, ", "),
 			)
-
 		}
 
 		// Append to our array of files
