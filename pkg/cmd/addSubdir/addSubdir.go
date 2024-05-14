@@ -1,3 +1,4 @@
+// words
 package addSubdir
 
 import (
