@@ -3,8 +3,10 @@ package templater
 
 import (
 	"bytes"
+	"embed"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,7 +14,8 @@ import (
 	"time"
 )
 
-// TODO: template aliases?
+//go:embed templates
+var embeddedTemplates embed.FS
 
 // AvailableTemplates defines the set of templates that are available for use
 var AvailableTemplates = map[string]bool{
@@ -33,6 +36,7 @@ var AvailableTemplates = map[string]bool{
 
 type SingleTemplate struct {
 	FilePath string
+	Content  string
 	Data     TemplateData
 }
 
@@ -72,18 +76,7 @@ func NewTemplater() (*Templater, error) {
 		AvailableTemplates[templateName] = true
 	}
 
-	var templateDir string
-	if os.Getenv("DEV_MODE") == "true" {
-		templateDir = "./internal/templater/templates"
-	} else {
-		executableDir, err := os.Executable()
-		if err != nil {
-			return nil, err
-		}
-		templateDir = filepath.Join(filepath.Dir(executableDir), "internal/templater/templates")
-	}
-
-	err = tmplMap.loadTemplates(templateDir)
+	err = tmplMap.loadEmbeddedTemplates(embeddedTemplates)
 	if err != nil {
 		return nil, err
 	}
@@ -98,10 +91,11 @@ func (t *Templater) Execute(templateName string, data interface{}) (string, erro
 		return "", errors.New("template not found")
 	}
 
-	tmpl, err := template.ParseFiles(tmplData.FilePath)
+	tmpl, err := template.New(templateName).Parse(tmplData.Content)
 	if err != nil {
 		return "", err
 	}
+	fmt.Println(data)
 
 	var renderedTemplate bytes.Buffer
 	err = tmpl.Execute(&renderedTemplate, data)
@@ -128,12 +122,42 @@ func (t *Templater) GenerateTagsAndDate(tmplName string) (string, []string) {
 	}
 }
 
+func (m TemplateMap) loadEmbeddedTemplates(embeddedFS embed.FS) error {
+	return fs.WalkDir(
+		embeddedFS,
+		"templates",
+		func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+
+			if !d.IsDir() {
+				name := strings.TrimSuffix(d.Name(), filepath.Ext(d.Name()))
+				if _, exists := m[name]; !exists {
+					data, err := fs.ReadFile(embeddedFS, path)
+					if err != nil {
+						return err
+					}
+
+					var tmplData TemplateData
+					m[name] = SingleTemplate{
+						FilePath: path,
+						Data:     tmplData,
+						Content:  string(data),
+					}
+				}
+			}
+
+			return nil
+		},
+	)
+}
+
 func (m TemplateMap) loadTemplates(dirPath string) error {
 	_, err := os.Stat(dirPath)
 	if os.IsNotExist(err) {
 		return nil
 	}
-
 	return filepath.Walk(
 		dirPath,
 		func(path string, info os.FileInfo, err error) error {
@@ -143,6 +167,7 @@ func (m TemplateMap) loadTemplates(dirPath string) error {
 
 			if !info.IsDir() && filepath.Ext(path) == ".tmpl" {
 				name := strings.TrimSuffix(info.Name(), filepath.Ext(info.Name()))
+
 				if _, exists := m[name]; !exists {
 					var data TemplateData
 					m[name] = SingleTemplate{
@@ -151,7 +176,6 @@ func (m TemplateMap) loadTemplates(dirPath string) error {
 					}
 				}
 			}
-
 			return nil
 		},
 	)
