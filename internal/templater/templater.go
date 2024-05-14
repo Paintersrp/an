@@ -67,9 +67,13 @@ func NewTemplater() (*Templater, error) {
 		return nil, err
 	}
 	userTemplateDir := filepath.Join(userHomeDir, ".an", "templates")
-	err = tmplMap.loadTemplates(userTemplateDir)
-	if err != nil {
-		return nil, err
+
+	_, userDirErr := os.Stat(userTemplateDir)
+	if !os.IsNotExist(userDirErr) {
+		err := tmplMap.loadTemplates(userTemplateDir)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	for templateName := range tmplMap {
@@ -154,10 +158,7 @@ func (m TemplateMap) loadEmbeddedTemplates(embeddedFS embed.FS) error {
 }
 
 func (m TemplateMap) loadTemplates(dirPath string) error {
-	_, err := os.Stat(dirPath)
-	if os.IsNotExist(err) {
-		return nil
-	}
+
 	return filepath.Walk(
 		dirPath,
 		func(path string, info os.FileInfo, err error) error {
