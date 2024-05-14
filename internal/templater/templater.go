@@ -129,6 +129,11 @@ func (t *Templater) GenerateTagsAndDate(tmplName string) (string, []string) {
 }
 
 func (m TemplateMap) loadTemplates(dirPath string) error {
+	_, err := os.Stat(dirPath)
+	if os.IsNotExist(err) {
+		return nil
+	}
+
 	return filepath.Walk(
 		dirPath,
 		func(path string, info os.FileInfo, err error) error {
@@ -138,7 +143,6 @@ func (m TemplateMap) loadTemplates(dirPath string) error {
 
 			if !info.IsDir() && filepath.Ext(path) == ".tmpl" {
 				name := strings.TrimSuffix(info.Name(), filepath.Ext(info.Name()))
-
 				if _, exists := m[name]; !exists {
 					var data TemplateData
 					m[name] = SingleTemplate{
@@ -147,6 +151,7 @@ func (m TemplateMap) loadTemplates(dirPath string) error {
 					}
 				}
 			}
+
 			return nil
 		},
 	)

@@ -10,8 +10,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/Paintersrp/an/internal/note"
 	"github.com/Paintersrp/an/internal/state"
-	"github.com/Paintersrp/an/internal/zet"
 	"github.com/Paintersrp/an/pkg/shared/arg"
 	"github.com/Paintersrp/an/pkg/shared/flags"
 )
@@ -103,17 +103,17 @@ func run(
 		}
 	}
 
-	var note *zet.ZettelkastenNote
+	var n *note.ZettelkastenNote
 
 	if createSymlink {
 		cwd, err := os.Getwd()
 		if err != nil {
 			return err
 		}
-		note = zet.NewZettelkastenNote(vaultDir, subDir, title, tags, links, upstream)
-
-		symlinkPath := filepath.Join(cwd, filepath.Base(note.GetFilepath()))
-		if err := os.Symlink(note.GetFilepath(), symlinkPath); err != nil {
+		n = note.NewZettelkastenNote(vaultDir, subDir, title, tags, links, upstream)
+		p := n.GetFilepath()
+		symlinkPath := filepath.Join(cwd, filepath.Base(p))
+		if err := os.Symlink(p, symlinkPath); err != nil {
 			return fmt.Errorf("failed to create symlink: %s", err)
 		}
 
@@ -123,12 +123,10 @@ func run(
 			if err != nil {
 				return err
 			}
-			note = zet.NewZettelkastenNote(cwd, "", title, tags, links, upstream)
-
-			fmt.Printf("Note path: %s", note.GetFilepath())
-
-			reverseSymlinkPath := filepath.Join(vaultDir, subDir, filepath.Base(note.GetFilepath()))
-			if err := os.Symlink(note.GetFilepath(), reverseSymlinkPath); err != nil {
+			n = note.NewZettelkastenNote(cwd, "", title, tags, links, upstream)
+			p := n.GetFilepath()
+			reverseSymlinkPath := filepath.Join(vaultDir, subDir, filepath.Base(p))
+			if err := os.Symlink(p, reverseSymlinkPath); err != nil {
 				fmt.Println(err)
 				os.Exit(1)
 				return fmt.Errorf("failed to create symlink: %s", err)
@@ -136,25 +134,26 @@ func run(
 
 			fmt.Printf("Reverse Path: %s", reverseSymlinkPath)
 		} else {
-			note = zet.NewZettelkastenNote(vaultDir, subDir, title, tags, links, upstream)
+			n = note.NewZettelkastenNote(vaultDir, subDir, title, tags, links, upstream)
 		}
 	}
 
-	conflict := note.HandleConflicts()
+	conflict := n.HandleConflicts()
 	if conflict != nil {
 		return fmt.Errorf("%s", conflict)
 	}
 
-	flags.HandlePin(cmd, s.Config, note, "text", title)
-	zet.StaticHandleNoteLaunch(note, s.Templater, tmpl, content)
+	flags.HandlePin(cmd, s.Config, n, "text", title)
+	note.StaticHandleNoteLaunch(n, s.Templater, tmpl, content)
 
 	if createSymlink {
 		cwd, err := os.Getwd()
 		if err != nil {
 			return err
 		}
-		symlinkPath := filepath.Join(cwd, filepath.Base(note.GetFilepath()))
-		if err := os.Symlink(note.GetFilepath(), symlinkPath); err != nil {
+		p := n.GetFilepath()
+		symlinkPath := filepath.Join(cwd, filepath.Base(p))
+		if err := os.Symlink(p, symlinkPath); err != nil {
 			return fmt.Errorf("failed to create symlink: %s", err)
 		}
 

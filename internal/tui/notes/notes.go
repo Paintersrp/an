@@ -14,10 +14,10 @@ import (
 	"golang.org/x/term"
 
 	"github.com/Paintersrp/an/internal/cache"
+	"github.com/Paintersrp/an/internal/note"
 	"github.com/Paintersrp/an/internal/state"
 	"github.com/Paintersrp/an/internal/tui/notes/submodels"
 	v "github.com/Paintersrp/an/internal/views"
-	"github.com/Paintersrp/an/internal/zet"
 	"github.com/Paintersrp/an/utils"
 )
 
@@ -125,6 +125,13 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleCreationUpdate(msg)
 		default:
 			m.handleDefaultUpdate(msg)
+
+			if m.state.Config.Editor == "vim" || m.state.Config.Editor == "nano" {
+				if key.Matches(msg, m.keys.openNote) {
+					return m, tea.Quit
+				}
+			}
+
 		}
 	}
 
@@ -206,6 +213,7 @@ func (m *NoteListModel) handleCreationUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd
 	return m, tea.Batch(cmds...)
 }
 
+// TODO: returns are kinda unnecessary now
 func (m *NoteListModel) handleDefaultUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.keys.openNote):
@@ -292,7 +300,7 @@ func (m *NoteListModel) handleDefaultUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 		m.sortOrder = descending
 		return m, m.refreshSort()
 	}
-	return nil, nil
+	return m, nil
 }
 
 func (m NoteListModel) View() string {
@@ -438,7 +446,7 @@ func (m *NoteListModel) openNote(obsidian bool) bool {
 		return false
 	}
 
-	err := zet.OpenFromPath(p, obsidian)
+	err := note.OpenFromPath(p, obsidian)
 	if err != nil {
 		m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Open Error: %s", err)))
 		return false

@@ -7,8 +7,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/Paintersrp/an/internal/note"
 	"github.com/Paintersrp/an/internal/state"
-	"github.com/Paintersrp/an/internal/zet"
 	"github.com/Paintersrp/an/pkg/shared/flags"
 )
 
@@ -57,5 +57,5 @@ func run(cmd *cobra.Command, s *state.State) error {
 	if _, err := os.Stat(targetPin); os.IsNotExist(err) {
 		return fmt.Errorf("the pinned task file '%s' does not exist", targetPin)
 	}
-	return zet.OpenFromPath(targetPin, false)
+	return note.OpenFromPath(targetPin, false)
 }

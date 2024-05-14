@@ -1,5 +1,5 @@
-// Package zet provides functionality for managing zettelkasten (atomic) notes.
-package zet
+// Package note provides functionality for managing zettelkasten (atomic) notes.
+package note
 
 import (
 	"errors"
@@ -216,6 +216,12 @@ func OpenFromPath(path string, obsidian bool) error {
 	switch editor {
 	case "nvim":
 		return openWithNvim(path)
+	case "vim":
+		return openWithVim(path)
+	case "nano":
+		return openWithNano(path)
+	case "vscode", "code":
+		return openWithVSCode(path)
 	case "obsidian":
 		return openWithObsidian(path)
 	default:
@@ -262,12 +268,43 @@ func openWithObsidian(path string) error {
 	return runEditorCommand(cmdArgs)
 }
 
+// openWithVim opens the note in vim.
+func openWithVim(path string) error {
+	cmdArgs := []string{"vim", path}
+	return runEditorCommand(cmdArgs)
+}
+
+// openWithNano opens the note in nano.
+func openWithNano(path string) error {
+	cmdArgs := []string{"nano", path}
+	return runEditorCommand(cmdArgs)
+}
+
+// openWithVSCode opens the note in Visual Studio Code.
+func openWithVSCode(path string) error {
+	var cmdArgs []string
+	switch runtime.GOOS {
+	case "darwin":
+		cmdArgs = []string{"open", "-n", "-b", "com.microsoft.VSCode", "--args", path}
+	case "linux":
+		cmdArgs = []string{"code", path}
+	case "windows":
+		cmdArgs = []string{"cmd", "/c", "code", path}
+	default:
+		return fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
+	}
+
+	return runEditorCommand(cmdArgs)
+}
+
+// runEditorCommand runs the editor command with the provided arguments.
 // runEditorCommand runs the editor command with the provided arguments.
 func runEditorCommand(cmdArgs []string) error {
 	cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
 
-	// If the editor is Obsidian, we want to silence the output
-	if cmdArgs[0] == "open" || cmdArgs[0] == "xdg-open" || cmdArgs[0] == "cmd" {
+	// If the editor is Obsidian or VSCode, we want to silence the output
+	if cmdArgs[0] == "open" || cmdArgs[0] == "xdg-open" || cmdArgs[0] == "cmd" ||
+		cmdArgs[0] == "code" {
 		devNull, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
 		if err != nil {
 			fmt.Printf("Error opening null device: %v\n", err)
@@ -289,8 +326,9 @@ func runEditorCommand(cmdArgs []string) error {
 		return err
 	}
 
-	// If the editor is Obsidian, we do not wait for the process to finish
-	if cmdArgs[0] == "open" || cmdArgs[0] == "xdg-open" || cmdArgs[0] == "cmd" {
+	// If the editor is VSCode or Obsidian, we do not wait for the process to finish
+	if cmdArgs[0] == "open" || cmdArgs[0] == "xdg-open" || cmdArgs[0] == "cmd" ||
+		cmdArgs[0] == "code" {
 		return nil
 	}
 

@@ -8,8 +8,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/Paintersrp/an/internal/note"
 	"github.com/Paintersrp/an/internal/state"
-	"github.com/Paintersrp/an/internal/zet"
 	"github.com/Paintersrp/an/pkg/shared/arg"
 	"github.com/Paintersrp/an/pkg/shared/flags"
 )
@@ -45,7 +45,7 @@ func run(
 
 	nextTitle := fmt.Sprintf("task-echo-%02d", highestIncrement+1)
 
-	note := zet.NewZettelkastenNote(
+	n := note.NewZettelkastenNote(
 		rootVaultDirFlag,
 		rootSubdirFlag,
 		nextTitle,
@@ -54,9 +54,9 @@ func run(
 		"",
 	)
 
-	flags.HandlePin(cmd, s.Config, note, "task", nextTitle)
+	flags.HandlePin(cmd, s.Config, n, "task", nextTitle)
 
-	zet.StaticHandleNoteLaunch(note, s.Templater, "task-echo", "")
+	note.StaticHandleNoteLaunch(n, s.Templater, "task-echo", "")
 
 	return nil
 }
@@ -65,7 +65,7 @@ func findHighestIncrement(vaultDir, molecule string) int {
 	re := regexp.MustCompile(`^task-echo-(\d{2})\.md$`)
 
 	highest := 0
-	notes, _ := zet.GetNotesInDirectory(vaultDir, molecule)
+	notes, _ := note.GetNotesInDirectory(vaultDir, molecule)
 	for _, note := range notes {
 		match := re.FindStringSubmatch(note)
 		if len(match) == 2 {

@@ -3,6 +3,7 @@ package initialize
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/cursor"
@@ -139,6 +140,13 @@ func (m InitPromptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if cfgErr != nil {
 					panic(cfgErr)
 				}
+
+				atomsDir := filepath.Join(m.inputs[0].Value(), "atoms")
+				err = os.MkdirAll(atomsDir, 0755)
+				if err != nil {
+					fmt.Printf("Error creating atoms directory: %v\n", err)
+				}
+
 				fmt.Println("Initialization complete!")
 
 				return m, tea.Quit

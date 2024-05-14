@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/Paintersrp/an/internal/handler"
+	"github.com/Paintersrp/an/internal/note"
 	"github.com/Paintersrp/an/internal/parser"
-	"github.com/Paintersrp/an/internal/zet"
 	"github.com/charmbracelet/glamour"
 	"github.com/ktr0731/go-fuzzyfinder"
 	"github.com/muesli/termenv"
@@ -178,7 +178,7 @@ func (f *FuzzyFinder) Execute(idx int) {
 	subDir := pathParts[0]
 	fileName := strings.Join(pathParts[1:], string(filepath.Separator))
 
-	n := &zet.ZettelkastenNote{
+	n := &note.ZettelkastenNote{
 		VaultDir: f.vaultDir,
 		SubDir:   subDir,
 		Filename: strings.TrimSuffix(fileName, ".md"),

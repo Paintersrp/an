@@ -9,11 +9,11 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/internal/note"
 	"github.com/Paintersrp/an/internal/state"
 	"github.com/Paintersrp/an/internal/tui/notes"
 	"github.com/Paintersrp/an/internal/tui/pinList/submodels/input"
 	"github.com/Paintersrp/an/internal/tui/pinList/submodels/sublist"
-	"github.com/Paintersrp/an/internal/zet"
 )
 
 type PinListModel struct {
@@ -325,7 +325,7 @@ func (m *PinListModel) openNote() bool {
 		return false
 	}
 
-	err := zet.OpenFromPath(p, false)
+	err := note.OpenFromPath(p, false)
 	if err != nil {
 		m.list.NewStatusMessage(statusMessageStyle(fmt.Sprintf("Open Error: %s", err)))
 		return false

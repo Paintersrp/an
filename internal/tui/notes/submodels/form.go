@@ -9,9 +9,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/Paintersrp/an/internal/note"
 	"github.com/Paintersrp/an/internal/state"
 	"github.com/Paintersrp/an/internal/templater"
-	"github.com/Paintersrp/an/internal/zet"
 	"github.com/Paintersrp/an/utils"
 )
 
@@ -284,7 +284,7 @@ func (m FormModel) handleSubmit() FormModel {
 		return m
 	}
 
-	note := zet.NewZettelkastenNote(
+	n := note.NewZettelkastenNote(
 		m.state.Vault,
 		subDir,
 		title,
@@ -293,13 +293,13 @@ func (m FormModel) handleSubmit() FormModel {
 		"",
 	)
 
-	conflict := note.HandleConflicts()
+	conflict := n.HandleConflicts()
 	if conflict != nil {
 		return m
 	}
 
 	// TODO: Content instead of "" ?
-	zet.StaticHandleNoteLaunch(note, m.state.Templater, tmpl, "")
+	note.StaticHandleNoteLaunch(n, m.state.Templater, tmpl, "")
 
 	return m
 }

@@ -10,9 +10,9 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/Paintersrp/an/internal/note"
 	"github.com/Paintersrp/an/internal/state"
 	"github.com/Paintersrp/an/internal/templater"
-	"github.com/Paintersrp/an/internal/zet"
 	"github.com/Paintersrp/an/pkg/shared/arg"
 	"github.com/Paintersrp/an/pkg/shared/flags"
 	"github.com/Paintersrp/an/utils"
@@ -104,7 +104,7 @@ func run(
 	date := utils.GenerateDate(index, templateType)
 	vaultDir := viper.GetString("vaultdir")
 
-	note := zet.NewZettelkastenNote(
+	n := note.NewZettelkastenNote(
 		vaultDir,
 		"atoms",
 		fmt.Sprintf("%s-%s", templateType, date),
@@ -113,19 +113,19 @@ func run(
 		"",
 	)
 
-	exists, _, err := note.FileExists()
+	exists, _, err := n.FileExists()
 	if err != nil {
 		return err
 	}
 
 	if exists {
-		return note.Open()
+		return n.Open()
 	}
 
-	_, createErr := note.Create(templateType, t, content)
+	_, createErr := n.Create(templateType, t, content)
 	if createErr != nil {
 		return createErr
 	}
 
-	return note.Open()
+	return n.Open()
 }

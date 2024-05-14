@@ -4,7 +4,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/Paintersrp/an/internal/config"
-	"github.com/Paintersrp/an/internal/zet"
+	"github.com/Paintersrp/an/internal/note"
 )
 
 func AddPin(cmd *cobra.Command) {
@@ -14,13 +14,13 @@ func AddPin(cmd *cobra.Command) {
 func HandlePin(
 	cmd *cobra.Command,
 	c *config.Config,
-	note *zet.ZettelkastenNote,
+	n *note.ZettelkastenNote,
 	pinType string,
 	name string,
 ) {
 	pinFlag, _ := cmd.Flags().GetBool("pin")
 
 	if pinFlag {
-		c.ChangePin(note.GetFilepath(), pinType, name)
+		c.ChangePin(n.GetFilepath(), pinType, name)
 	}
 }

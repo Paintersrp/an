@@ -103,7 +103,7 @@ func NewListModel(cfg *config.Config) ListModel {
 
 	editorSel := selection.New(
 		"Please select an editor option.",
-		[]string{"nvim", "obsidian", "vscode"},
+		[]string{"nvim", "obsidian", "vscode", "vim", "nano"},
 	)
 	editorSel.Filter = nil
 	editorSelect := selection.NewModel(editorSel)
@@ -180,7 +180,7 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 				editorSel := selection.New(
 					"Please select an editor option.",
-					[]string{"nvim", "obsidian", "vscode"},
+					[]string{"nvim", "obsidian", "vscode", "vim", "nano"},
 				)
 				editorSel.Filter = nil
 				m.editorSelect = selection.NewModel(editorSel)

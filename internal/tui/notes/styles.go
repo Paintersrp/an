@@ -9,6 +9,7 @@ var (
 
 	titleStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#0AF")).
+			Background(lipgloss.Color("transparent")).
 			Bold(true).
 			Padding(0, 1)
 
