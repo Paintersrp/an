@@ -140,8 +140,6 @@ func run(
 		}
 	}
 
-	// note = zet.NewZettelkastenNote(vaultDir, subDir, title, tags, links, upstream)
-
 	conflict := note.HandleConflicts()
 	if conflict != nil {
 		return fmt.Errorf("%s", conflict)

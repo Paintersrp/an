@@ -63,7 +63,7 @@ func GetHomeDir() (string, error) {
 }
 
 func LoadConfig(home string) (*config.Config, error) {
-	// Eventually will factor out Viper entirely
+	// TODO: Eventually will factor out Viper entirely
 	viper.AddConfigPath(home + constants.ConfigDir)
 	viper.SetConfigName(constants.ConfigFile)
 	viper.SetConfigType(constants.ConfigFileType)

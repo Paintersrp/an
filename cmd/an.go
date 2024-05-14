@@ -36,7 +36,7 @@ func Execute() {
 			cobra.CheckErr(err)
 
 			s, err := state.NewState()
-			cobra.CheckErr(err) // or loop again if failed?
+			cobra.CheckErr(err) // TODO: or loop again if failed?
 
 			executeRoot(s)
 		} else {

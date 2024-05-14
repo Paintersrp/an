@@ -36,7 +36,6 @@ func newItemDelegate(
 			case key.Matches(msg, keys.makeDefault):
 				if i, ok := m.SelectedItem().(PinListItem); ok {
 					description := i.Description()
-					// Determine the type of pin based on the title
 					pinType := ""
 
 					if m.Title == "Available Task Pins" {
@@ -45,7 +44,6 @@ func newItemDelegate(
 						pinType = "text"
 					}
 
-					// Update the relevant default pin
 					if pinType == "task" {
 						cfg.PinnedTaskFile = description
 					} else {

@@ -137,7 +137,6 @@ func (vm *ViewManager) GetFilesByView(
 		))
 
 	}
-	// Use the provided arguments if they are not empty; otherwise, use the defaults
 	if len(m.ExcludeDirs) == 0 {
 		excludeDirs = defaultExcludeDirs
 	} else {

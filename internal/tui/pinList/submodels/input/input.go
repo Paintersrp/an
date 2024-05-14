@@ -59,7 +59,6 @@ func (m NameInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c", "esc":
 			return m, tea.Quit
 
-		// Change cursor mode
 		case "ctrl+r":
 			m.cursorMode++
 			if m.cursorMode > cursor.CursorHide {
@@ -70,7 +69,6 @@ func (m NameInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// Handle character input and blinking
 	_, cmd := m.Update(msg)
 
 	return m, cmd

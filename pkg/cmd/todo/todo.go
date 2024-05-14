@@ -30,7 +30,6 @@ func NewCmdTodo(c *config.Config) *cobra.Command {
 }
 
 func run() error {
-	// Get the current working directory
 	cwd, err := os.Getwd()
 	if err != nil {
 		fmt.Println("Error getting current working directory:", err)
@@ -41,7 +40,6 @@ func run() error {
 		`(?i)(?:^|\s)(?:\/\/|#|\/\*|\*|--|<!--)\s*TODO:\s*(.+?)(?:\*\/|-->|$)`,
 	)
 
-	// Walk through the files in the directory
 	err = filepath.Walk(cwd, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			fmt.Println("Error accessing path:", path, err)
@@ -51,25 +49,20 @@ func run() error {
 			return filepath.SkipDir
 		}
 		if !info.IsDir() {
-			// Read the file
 			content, err := os.ReadFile(path)
 			if err != nil {
 				fmt.Println("Error reading file:", path, err)
 				return err
 			}
 
-			// Find all TODOs and write them to a markdown file
 			lines := strings.Split(string(content), "\n")
 			for i, line := range lines {
-				// Filter markdown task lists
 				if strings.Contains(line, "- [ ]") {
 					continue
 				}
 
-				// Find matches and print without comment markers
 				matches := todoRegex.FindStringSubmatch(line)
 				if len(matches) > 1 {
-					// Print the TODO with file name, full path, and line number
 					fmt.Printf("\n- [ ] %s\n", strings.TrimSpace(matches[1]))
 					fmt.Printf("    - File: %s\n", path)
 					fmt.Printf("    - Line: %d\n", i+1)

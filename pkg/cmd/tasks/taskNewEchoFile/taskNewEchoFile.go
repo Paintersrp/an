@@ -41,11 +41,8 @@ func run(
 	rootSubdirFlag := viper.GetString("subdir")
 	s.Config.HandleSubdir(rootSubdirFlag)
 	rootVaultDirFlag := viper.GetString("vaultdir")
-
-	// Get the highest existing increment
 	highestIncrement := findHighestIncrement(rootVaultDirFlag, rootSubdirFlag)
 
-	// Generate the next title
 	nextTitle := fmt.Sprintf("task-echo-%02d", highestIncrement+1)
 
 	note := zet.NewZettelkastenNote(
@@ -61,14 +58,12 @@ func run(
 
 	zet.StaticHandleNoteLaunch(note, s.Templater, "task-echo", "")
 
-	return nil // no errors
+	return nil
 }
 
 func findHighestIncrement(vaultDir, molecule string) int {
-	// Regular expression to match titles like "task-echo-01.md"
 	re := regexp.MustCompile(`^task-echo-(\d{2})\.md$`)
 
-	// Iterate through existing notes and find the highest increment
 	highest := 0
 	notes, _ := zet.GetNotesInDirectory(vaultDir, molecule)
 	for _, note := range notes {

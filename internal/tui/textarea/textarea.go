@@ -25,12 +25,10 @@ func initialModel(yank bool) model {
 	ti.Focus()
 
 	if yank {
-		// Get the clipboard content
 		content, err := clipboard.ReadAll()
 		if err != nil {
 			log.Fatal(err)
 		}
-		// Set the clipboard content as the initial text in the textarea
 		ti.SetValue(content)
 	}
 
@@ -67,7 +65,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
-	// We handle errors just like any other message
 	case errMsg:
 		m.err = msg
 		return m, nil

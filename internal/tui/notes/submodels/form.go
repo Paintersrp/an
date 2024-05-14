@@ -126,8 +126,6 @@ func (m FormModel) Update(msg tea.Msg) (FormModel, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyEnter:
-			// Check if the submit button is focused
-			// TODO: proper error handling and move to separate func
 			if m.btn.focused {
 				return m.handleSubmit(), tea.Quit
 			}
@@ -140,31 +138,27 @@ func (m FormModel) Update(msg tea.Msg) (FormModel, tea.Cmd) {
 			m.nextInput()
 		}
 
-		// Blur all inputs and the submit button
 		for i := range m.Inputs {
 			m.Inputs[i].Blur()
 		}
 		m.btn.Blur()
 
-		// Focus the current input or the submit button
 		if m.Focused < len(m.Inputs) {
 			m.Inputs[m.Focused].Focus()
 		} else {
 			m.btn.Focus()
 		}
 
-	// We handle errors just like any other message
+		// TODO: Proper error handling
 	case errMsg:
 		fmt.Println(msg)
 		os.Exit(1)
 	}
 
-	// Update all text inputs
 	for i := range m.Inputs {
 		m.Inputs[i], cmds[i] = m.Inputs[i].Update(msg)
 	}
 
-	// Update the submit button
 	var submitCmd tea.Cmd
 	m.btn, submitCmd = m.btn.Update(msg)
 	cmds[len(cmds)-1] = submitCmd
@@ -226,44 +220,37 @@ func (m FormModel) View() string {
 	) + "\n"
 }
 
-// nextInput focuses the next input field
 func (m *FormModel) nextInput() {
 	if m.Focused == len(m.Inputs) {
-		// if btn already focused
 		if m.btn.focused {
 			m.btn.Blur()
-			m.Focused = 0 // wrap to start
+			m.Focused = 0
 		}
 
-		// Assuming len(m.inputs) is the index before the submit button
 		m.btn.Focus()
 	} else {
 		m.Focused = (m.Focused + 1) % (len(m.Inputs) + 1) // +1 to include the submit button
 	}
 }
 
-// prevInput focuses the previous input field
 func (m *FormModel) prevInput() {
 	m.Focused--
 
 	if m.Focused == len(m.Inputs) {
 		m.btn.Blur()
 	}
-	// Wrap around
 	if m.Focused < 0 {
 		m.Focused = len(m.Inputs) + 1 - 1
 	}
 }
 
 func (m FormModel) handleSubmit() FormModel {
-	// Validate Title Exists
 	title := m.Inputs[title].Value()
 
 	if title == "" {
 		return m
 	}
 
-	// Validate Tags + Make an Array
 	tags, err := utils.ValidateInput(m.Inputs[tags].Value())
 	if err != nil {
 		return m
@@ -285,7 +272,6 @@ func (m FormModel) handleSubmit() FormModel {
 		return m
 	}
 
-	// Same for Links
 	links, err := utils.ValidateInput(m.Inputs[links].Value())
 	if err != nil {
 		return m
@@ -293,7 +279,6 @@ func (m FormModel) handleSubmit() FormModel {
 
 	subDir := m.Inputs[subdirectory].Value()
 
-	// Validate subDir exists in availableSubdirs
 	if !m.subdirectoryExists(subDir) {
 		fmt.Printf("Subdirectory '%s' does not exist.\n", subDir)
 		return m
@@ -310,7 +295,6 @@ func (m FormModel) handleSubmit() FormModel {
 
 	conflict := note.HandleConflicts()
 	if conflict != nil {
-		// HandleConflicts prints feedback if an error is encountered
 		return m
 	}
 

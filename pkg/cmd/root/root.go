@@ -37,7 +37,6 @@ func NewCmdRoot(s *state.State) (*cobra.Command, error) {
               [title]  [tags]
   an new robotics "robotics science class study-notes"
   `,
-		// Run notes tui by default, or leave as help?
 		RunE: notes.NewCmdNotes(s).RunE,
 	}
 
@@ -51,7 +50,6 @@ func NewCmdRoot(s *state.State) (*cobra.Command, error) {
 		)
 	viper.BindPFlag("subdir", cmd.PersistentFlags().Lookup("subdir"))
 
-	// Add Child Commands to Root
 	cmd.AddCommand(
 		initialize.NewCmdInit(s),
 		addSubdir.NewCmdAddSubdir(s),

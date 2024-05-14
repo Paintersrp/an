@@ -9,7 +9,6 @@ import (
 	"github.com/Paintersrp/an/internal/state"
 )
 
-// Not very useful on it's own, but quite handy for scripting
 func NewCmdUntrash(s *state.State) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "untrash [path]",

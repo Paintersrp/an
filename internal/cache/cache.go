@@ -32,7 +32,7 @@ func New(maxSizeMB int64) (*Cache, error) {
 		return nil, errors.New("cache max size must be positive")
 	}
 	return &Cache{
-		maxSizeBytes: maxSizeMB * 1024 * 1024, // Convert MB to bytes
+		maxSizeBytes: maxSizeMB * 1024 * 1024,
 		evictionList: list.New(),
 		items:        make(map[interface{}]*list.Element),
 	}, nil
@@ -78,31 +78,25 @@ func (c *Cache) Put(key, value interface{}) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	// Check if the size of the item being added is reasonable
 	itemSize := sizeof(&Entry{Key: key, Value: value})
 	if itemSize > absurdSizeLimit {
 		return errors.New("item size exceeds absurd size limit")
 	}
 
-	// Check if adding this item exceeds the maximum size of the cache
 	for c.currentSize+int64(itemSize) > c.maxSizeBytes {
-		// Evict oldest item until there's enough space
 		c.removeOldest()
 	}
 
-	// If the key already exists, update the value and move it to the front
 	if ele, hit := c.items[key]; hit {
 		c.evictionList.MoveToFront(ele)
 		ele.Value.(*Entry).Value = value
-		c.currentSize += int64(itemSize) // Update current size
+		c.currentSize += int64(itemSize)
 		return nil
 	}
 
-	// Add the new item to the cache
 	ele := c.evictionList.PushFront(&Entry{Key: key, Value: value})
 	c.items[key] = ele
-	c.currentSize += int64(itemSize) // Update current size
-
+	c.currentSize += int64(itemSize)
 	return nil
 }
 
@@ -119,7 +113,6 @@ func (c *Cache) removeElement(e *list.Element) {
 	c.evictionList.Remove(e)
 	kv := e.Value.(*Entry)
 	delete(c.items, kv.Key)
-	// Update current size
 	c.currentSize -= int64(sizeof(kv))
 }
 
@@ -131,15 +124,15 @@ func (c *Cache) SizeOf() int64 {
 // sizeof returns the approximate size of the Entry object in bytes.
 func sizeof(e *Entry) int {
 	size := int(unsafe.Sizeof(*e))
-	size += len(e.Key.(string))   // assuming key is a string
-	size += len(e.Value.(string)) // assuming value is a string
+	size += len(e.Key.(string))
+	size += len(e.Value.(string))
 	return size
 }
 
 type ByteSize float64
 
 const (
-	_           = iota // ignore first value by assigning to blank identifier
+	_           = iota
 	KB ByteSize = 1 << (10 * iota)
 	MB
 	GB

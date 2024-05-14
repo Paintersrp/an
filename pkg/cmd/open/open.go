@@ -14,8 +14,7 @@ func NewCmdOpen(c *config.Config) *cobra.Command {
 		Use:     "open",
 		Aliases: []string{"o"},
 		Short:   "Open a zettelkasten note.",
-		// Run find by default if only a query / no subcommand
-		RunE: openFind.NewCmdOpenFind(c).RunE,
+		RunE:    openFind.NewCmdOpenFind(c).RunE,
 	}
 
 	cmd.AddCommand(openFind.NewCmdOpenFind(c))

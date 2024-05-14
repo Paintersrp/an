@@ -18,7 +18,6 @@ import (
 	"github.com/Paintersrp/an/pkg/shared/flags"
 )
 
-// TODO: Templates with .Content from Echo..?
 func NewCmdEcho(s *state.State) *cobra.Command {
 	var auto bool
 
@@ -140,7 +139,6 @@ func determineTargetPin(
 func generateFileName(cfg *config.Config) (string, string) {
 	baseDir := filepath.Join(cfg.VaultDir, "echoes")
 
-	// Create the "echoes" directory if it doesn't exist
 	err := os.MkdirAll(baseDir, 0o755)
 	if err != nil {
 		fmt.Println("Error creating directory:", err)
@@ -150,7 +148,6 @@ func generateFileName(cfg *config.Config) (string, string) {
 	d := time.Now().Format("01022006_150405")
 	fileName := fmt.Sprintf("echo_%s_%s", d, ctx)
 
-	// Return the full path to the new file
 	return fileName, filepath.Join(baseDir, fileName+".md")
 }
 

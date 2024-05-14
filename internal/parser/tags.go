@@ -34,7 +34,6 @@ func (th *TagHandler) ParseTag(tag string) {
 
 // SortTagCounts sorts the tags by their counts.
 func (th *TagHandler) SortTagCounts(order string) {
-	// Convert map to a slice of key-value pairs.
 	type kv struct {
 		Key   string
 		Value int
@@ -44,7 +43,6 @@ func (th *TagHandler) SortTagCounts(order string) {
 		tagCountsSlice = append(tagCountsSlice, kv{k, v})
 	}
 
-	// Sort the slice based on the order parameter using a switch case.
 	switch order {
 	case "asc":
 		sort.Slice(tagCountsSlice, func(i, j int) bool {
@@ -61,7 +59,6 @@ func (th *TagHandler) SortTagCounts(order string) {
 		return
 	}
 
-	// Update the TagList with sorted order.
 	th.TagList = []string{}
 	for _, kv := range tagCountsSlice {
 		th.TagList = append(th.TagList, kv.Key)

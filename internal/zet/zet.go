@@ -96,7 +96,6 @@ func (note *ZettelkastenNote) Create(
 	}
 	defer file.Close()
 
-	// Setup template metadata
 	zetTime, tags := t.GenerateTagsAndDate(tmplName)
 	data := templater.TemplateData{
 		Title:     note.Filename,

@@ -81,7 +81,6 @@ func NewListModel(cfg *config.Config) ListModel {
 	listKeys := newListKeyMap()
 	configInput := initialInputModel()
 
-	// Create list items from the config
 	items := []list.Item{
 		ListItem{title: "VaultDir", description: cfg.VaultDir},
 		ListItem{title: "Editor", description: cfg.Editor},
@@ -89,7 +88,6 @@ func NewListModel(cfg *config.Config) ListModel {
 		ListItem{title: "FileSystemMode", description: cfg.FileSystemMode},
 	}
 
-	// Setup list
 	delegate := newItemDelegate(delegateKeys)
 	configList := list.New(items, delegate, 0, 0)
 	configList.Title = "Configuration"
@@ -145,24 +143,20 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.list.SetSize(msg.Width-h, msg.Height-v)
 
 	case tea.KeyMsg:
-		// Don't match any of the keys below if we're actively filtering.
 		if m.list.FilterState() == list.Filtering {
 			break
 		}
 
 		if m.editorSelectActive {
-			// Handle exiting input mode
 			if key.Matches(msg, m.keys.exitInputMode) {
 				m.editorSelectActive = false
 				return m, nil
 			}
 
-			// Update the text input and handle its commands
 			var cmd tea.Cmd
 			_, cmd = m.editorSelect.Update(msg)
 			cmds = append(cmds, cmd)
 
-			// Handle the case when Enter is pressed and the input is submitted
 			if key.Matches(msg, m.keys.toggleEditItem) {
 				c, err := m.editorSelect.Value()
 				if err != nil {
@@ -172,14 +166,12 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.config.Editor = c
 				m.editorSelectActive = false
 
-				// Save the updated config
 				saveErr := m.config.Save()
 				if saveErr != nil {
 					fmt.Println("Failed to save config file, exiting...")
 					os.Exit(1)
 				}
 
-				// Update the description of the selected item
 				index := m.list.Index()
 				items := m.list.Items()
 				items[index] = ListItem{title: "Editor", description: c}
@@ -199,18 +191,15 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		if m.modeSelectActive {
-			// Handle exiting input mode
 			if key.Matches(msg, m.keys.exitInputMode) {
 				m.modeSelectActive = false
 				return m, nil
 			}
 
-			// Update the text input and handle its commands
 			var cmd tea.Cmd
 			_, cmd = m.modeSelect.Update(msg)
 			cmds = append(cmds, cmd)
 
-			// Handle the case when Enter is pressed and the input is submitted
 			if key.Matches(msg, m.keys.toggleEditItem) {
 				c, err := m.modeSelect.Value()
 				if err != nil {
@@ -220,14 +209,12 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.config.FileSystemMode = c
 				m.modeSelectActive = false
 
-				// Save the updated config
 				saveErr := m.config.Save()
 				if saveErr != nil {
 					fmt.Println("Failed to save config file, exiting...")
 					os.Exit(1)
 				}
 
-				// Update the description of the selected item
 				index := m.list.Index()
 				items := m.list.Items()
 				items[index] = ListItem{title: "FileSystemMode", description: c}
@@ -247,19 +234,16 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		if m.inputActive {
-			// Handle exiting input mode
 			if key.Matches(msg, m.keys.exitInputMode) {
 				m.configInput.Input.Blur()
 				m.inputActive = false
 				return m, nil
 			}
 
-			// Update the text input and handle its commands
 			var cmd tea.Cmd
 			m.configInput.Input, cmd = m.configInput.Input.Update(msg)
 			cmds = append(cmds, cmd)
 
-			// Handle the case when Enter is pressed and the input is submitted
 			if key.Matches(msg, m.keys.toggleEditItem) {
 				var title string
 
@@ -281,20 +265,17 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.config.FileSystemMode = inputValue
 				}
 
-				// Save the updated config
 				err := m.config.Save()
 				if err != nil {
 					fmt.Println("Failed to save config file, exiting...")
 					os.Exit(1)
 				}
 
-				// Update the description of the selected item
 				index := m.list.Index()
 				items := m.list.Items()
 				items[index] = ListItem{title: title, description: inputValue}
 				m.list.SetItems(items)
 
-				// Reset and unfocus the text input
 				m.configInput.Input.Reset()
 				m.configInput.Input.Blur()
 				m.inputActive = false
@@ -351,7 +332,6 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// This will also call our delegate's update function.
 	newListModel, cmd := m.list.Update(msg)
 	m.list = newListModel
 	cmds = append(cmds, cmd)

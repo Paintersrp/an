@@ -86,23 +86,22 @@ func (th *TaskHandler) SortTasksByStatus(order string) []Task {
 	case "asc":
 		sort.SliceStable(tasks, func(i, j int) bool {
 			if tasks[i].Status == tasks[j].Status {
-				return tasks[i].ID < tasks[j].ID // Secondary sort by ID if statuses are equal
+				return tasks[i].ID < tasks[j].ID
 			}
-			return tasks[i].Status < tasks[j].Status // Sort by Status in ascending order
+			return tasks[i].Status < tasks[j].Status
 		})
 	case "desc":
 		sort.SliceStable(tasks, func(i, j int) bool {
 			if tasks[i].Status == tasks[j].Status {
-				// We return the IDs in ascending order, even in the desc by default. Change this?
-				return tasks[i].ID < tasks[j].ID // Secondary sort by ID if statuses are equal
+				return tasks[i].ID < tasks[j].ID
 			}
-			return tasks[i].Status > tasks[j].Status // Sort by Status in descending order
+			return tasks[i].Status > tasks[j].Status
 		})
 	default:
 		fmt.Println(
 			"Invalid sort order. Use 'asc' for ascending or 'desc' for descending.",
 		)
-		return nil // Return nil to indicate that no sorting was done due to invalid order
+		return nil
 	}
 
 	return tasks

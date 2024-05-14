@@ -118,10 +118,10 @@ func renameFile(m NoteListModel) error {
 	return nil
 }
 
+// TODO: Handle rename conflicts / file name already exists
 func copyFile(m NoteListModel) error {
 	newName := m.inputModel.Input.Value()
 
-	// Get the path of the currently selected item
 	if s, ok := m.list.SelectedItem().(ListItem); ok {
 		newPath := filepath.Join(filepath.Dir(s.path), newName+".md")
 

@@ -63,7 +63,6 @@ func symlink(cmd *cobra.Command, args []string, s *state.State) error {
 	if outputPath != "" {
 		symlinkPath = filepath.Join(outputPath, filepath.Base(selectedFile))
 	} else {
-		// Use the current working directory
 		cwd, err := os.Getwd()
 		if err != nil {
 			return err

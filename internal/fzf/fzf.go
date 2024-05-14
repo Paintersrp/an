@@ -90,25 +90,21 @@ func (f *FuzzyFinder) fuzzySelectFile(query string) (int, error) {
 		fuzzyfinder.WithPreviewWindow(f.renderMarkdownPreview),
 	}
 
-	// Append the query, if exists
 	if query != "" {
 		options = append(options, fuzzyfinder.WithQuery(query))
 	}
 
-	// Append the header, if exists
 	if f.Header != "" {
 		options = append(options, fuzzyfinder.WithHeader(f.Header))
 	}
 
-	// Collect titles and tags for fuzzy selection
 	var filesWithTitlesAndTags []string
 	for _, file := range f.files {
 		content, err := os.ReadFile(file)
 		if err != nil {
-			return -1, err // no file, unlikely
+			return -1, err
 		}
 
-		// Read in markdown frontmatter
 		title, tags := parser.ParseFrontMatter(content)
 
 		if title == "" {
@@ -130,7 +126,6 @@ func (f *FuzzyFinder) fuzzySelectFile(query string) (int, error) {
 			)
 		}
 
-		// Append to our array of files
 		filesWithTitlesAndTags = append(filesWithTitlesAndTags, titleWithTags)
 	}
 
@@ -140,35 +135,29 @@ func (f *FuzzyFinder) fuzzySelectFile(query string) (int, error) {
 	}, options...)
 }
 
-// renderMarkdownPreview handles rendering the colorized preview display with glamour,
-// adding formatting and styling to the terminal display.
 func (f *FuzzyFinder) renderMarkdownPreview(
 	i, w, h int,
 ) string {
 	if i == -1 {
-		return "" // show nothing
+		return ""
 	}
 
-	// Read file from system
 	content, err := os.ReadFile(f.files[i])
 	if err != nil {
 		return "Error reading file"
 	}
 
-	// Initiate glamour renderer to add colors to our markdown preview
 	r, _ := glamour.NewTermRenderer(
 		glamour.WithStandardStyle("dracula"),
 		glamour.WithWordWrap(100),
 		glamour.WithColorProfile(termenv.ANSI256),
 	)
 
-	// Render formatted and styled markdown content
 	markdown, err := r.Render(string(content))
 	if err != nil {
-		return "Error rendering markdown" // Displayed in Preview Pane
+		return "Error rendering markdown"
 	}
 
-	// Return markdown output
 	return markdown
 }
 
@@ -184,26 +173,16 @@ func (f *FuzzyFinder) handleFuzzySelectError(err error) {
 // Execute opens the target file selected by the fuzzy finder in the configured editor with arguments
 func (f *FuzzyFinder) Execute(idx int) {
 	selectedFile := f.files[idx]
-
-	// Remove the vault directory from the file path
 	fileWithoutVault := strings.TrimPrefix(selectedFile, f.vaultDir+"/")
-
-	// Split the file path by the path separator
 	pathParts := strings.Split(fileWithoutVault, string(filepath.Separator))
-
-	// The first part is the subdirectory
 	subDir := pathParts[0]
-
-	// The remaining parts joined together form the filename
 	fileName := strings.Join(pathParts[1:], string(filepath.Separator))
 
-	// Setup temporary struct to launch with the internal Open functionality
 	n := &zet.ZettelkastenNote{
 		VaultDir: f.vaultDir,
 		SubDir:   subDir,
 		Filename: strings.TrimSuffix(fileName, ".md"),
 	}
 
-	// Opens the note in the configured editor
 	n.Open()
 }

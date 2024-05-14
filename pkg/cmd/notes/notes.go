@@ -9,12 +9,10 @@ import (
 	v "github.com/Paintersrp/an/internal/views"
 )
 
-// TODO: Could also allow shorthands for view flag with parsing
-
 func NewCmdNotes(s *state.State) *cobra.Command {
 	var viewFlag string
 	cmd := &cobra.Command{
-		Use:     "notes",
+		Use:     "notes --view {view_name}",
 		Aliases: []string{"n"},
 		Short:   "Manage and interact with your notes vault",
 		Long: heredoc.Doc(`
@@ -54,7 +52,6 @@ func NewCmdNotes(s *state.State) *cobra.Command {
 }
 
 func run(s *state.State, views map[string]v.View, viewFlag string) error {
-	// Pass modeConfig to your list model or wherever it's needed
 	if err := notes.Run(s, views, viewFlag); err != nil {
 		return err
 	}

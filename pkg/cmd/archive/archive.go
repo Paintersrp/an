@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Not very useful on it's own, but quite handy for scripting
 func NewCmdArchive(s *state.State) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "archive [path]",

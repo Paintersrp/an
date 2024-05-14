@@ -31,7 +31,6 @@ func (i ListItem) Title() string {
 func (i ListItem) Description() string {
 	description := ""
 
-	// Existing logic for showing full path or tags
 	if i.showFullPath {
 		description += fmt.Sprintf(
 			"Size: %s, Last Modified: %s",
@@ -39,7 +38,6 @@ func (i ListItem) Description() string {
 			i.lastModified,
 		)
 	} else {
-		// Include the subdirectory in the description if it exists
 		if i.subdirectory != "" {
 			description += fmt.Sprintf("[%s] ", i.subdirectory)
 		}

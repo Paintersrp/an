@@ -47,7 +47,6 @@ func (p *Parser) Walk() error {
 	)
 }
 
-// parse is a private method that reads and parses a Markdown file into an AST.
 func (p *Parser) parse(path string) error {
 	source, err := os.ReadFile(path)
 	if err != nil {
@@ -69,10 +68,8 @@ func (p *Parser) parse(path string) error {
 					content := strings.TrimSpace(string(n.Text(source)))
 
 					if inTagsSection {
-						// Handle tag parsing using TagHandler
 						p.TagHandler.ParseTag(content)
 					} else {
-						// Handle task parsing using TaskHandler
 						p.TaskHandler.ParseTask(content)
 					}
 				case *ast.Text:

@@ -28,7 +28,6 @@ func EnsureConfigExists(homeDir string) error {
 	}
 
 	if _, err := os.Stat(configPath); errors.Is(err, os.ErrNotExist) {
-		// Config file does not exist, create it
 		file, err := os.Create(configPath)
 		if err != nil {
 			return fmt.Errorf("failed to create config file: %w", err)

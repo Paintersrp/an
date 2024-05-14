@@ -88,7 +88,6 @@ func (h *FileHandler) WalkFiles(
 				return err
 			}
 
-			// Calculate the depth of the current path
 			depth := len(strings.Split(path, string(os.PathSeparator)))
 
 			// Skip files that are directly in the vaultDir
@@ -96,7 +95,6 @@ func (h *FileHandler) WalkFiles(
 				return nil
 			}
 
-			// Check if the current directory is in the excluded list
 			dir := filepath.Dir(path)
 			for _, d := range excludeDirs {
 				if dir == filepath.Join(h.vaultDir, d) {
@@ -107,7 +105,6 @@ func (h *FileHandler) WalkFiles(
 				}
 			}
 
-			// Check if the current file is in the list of files to exclude
 			file := filepath.Base(path)
 			for _, f := range excludeFiles {
 				if file == f {
@@ -115,7 +112,6 @@ func (h *FileHandler) WalkFiles(
 				}
 			}
 
-			// Skip hidden files or directories
 			if strings.HasPrefix(file, ".") {
 				if info.IsDir() {
 					return filepath.SkipDir
@@ -123,7 +119,6 @@ func (h *FileHandler) WalkFiles(
 				return nil
 			}
 
-			// Verify that the file has a .md extension (Markdown file)
 			if !info.IsDir() && filepath.Ext(file) == ".md" {
 				content, err := os.ReadFile(path)
 				if err != nil {
@@ -133,7 +128,6 @@ func (h *FileHandler) WalkFiles(
 
 				switch modeFlag {
 				case "orphan":
-					// Append the file if it does not contain note links
 					if !parser.HasNoteLinks(content) {
 						files = append(files, path)
 					}
@@ -156,7 +150,7 @@ func (h *FileHandler) WalkFiles(
 func (h *FileHandler) GetSubdirectories(directory, excludeDir string) []string {
 	files, err := os.ReadDir(directory)
 	if err != nil {
-		// Should probably properly propagate this error back up the application
+		// TODO: Should probably properly propagate this error back up the application
 		log.Fatalf("Failed to read directory: %v", err)
 	}
 
