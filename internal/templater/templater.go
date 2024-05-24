@@ -99,7 +99,6 @@ func (t *Templater) Execute(templateName string, data interface{}) (string, erro
 	if err != nil {
 		return "", err
 	}
-	fmt.Println(data)
 
 	var renderedTemplate bytes.Buffer
 	err = tmpl.Execute(&renderedTemplate, data)

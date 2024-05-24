@@ -298,7 +298,6 @@ func openWithVSCode(path string) error {
 }
 
 // runEditorCommand runs the editor command with the provided arguments.
-// runEditorCommand runs the editor command with the provided arguments.
 func runEditorCommand(cmdArgs []string) error {
 	cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
 

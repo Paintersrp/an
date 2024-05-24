@@ -25,6 +25,7 @@ type Config struct {
 	PinnedFile     string          `yaml:"pinned_file"      json:"pinned_file"`
 	PinnedTaskFile string          `yaml:"pinned_task_file" json:"pinned_task_file"`
 	SubDirs        []string        `yaml:"subdirs"          json:"sub_dirs"`
+	Token          string          `yaml:"token"            json:"token"`
 }
 
 var ValidModes = map[string]bool{
@@ -82,6 +83,11 @@ func (cfg *Config) AddSubdir(name string) error {
 	}
 
 	cfg.SubDirs = append(cfg.SubDirs, name)
+	return cfg.Save()
+}
+
+func (cfg *Config) ChangeToken(token string) error {
+	cfg.Token = token
 	return cfg.Save()
 }
 

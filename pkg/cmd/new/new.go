@@ -127,7 +127,6 @@ func run(
 			p := n.GetFilepath()
 			reverseSymlinkPath := filepath.Join(vaultDir, subDir, filepath.Base(p))
 			if err := os.Symlink(p, reverseSymlinkPath); err != nil {
-				fmt.Println(err)
 				os.Exit(1)
 				return fmt.Errorf("failed to create symlink: %s", err)
 			}

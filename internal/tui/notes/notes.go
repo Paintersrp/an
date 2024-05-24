@@ -304,7 +304,7 @@ func (m *NoteListModel) handleDefaultUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 }
 
 func (m NoteListModel) View() string {
-	list := listStyle.MaxWidth(m.width / 2).Render(m.list.View())
+	list := listStyle.Width(m.width / 2).Render(m.list.View())
 
 	if m.copying {
 		textPrompt := textPromptStyle.Render(
@@ -343,6 +343,7 @@ func (m NoteListModel) View() string {
 		lipgloss.NewStyle().
 			Height(m.list.Height()).
 			MaxHeight(m.list.Height()).
+			MaxWidth(800).
 			Render(fmt.Sprintf("%s\n%s", titleStyle.Render("Preview"), m.preview)),
 	)
 
@@ -404,6 +405,7 @@ func (m *NoteListModel) handlePreview() {
 
 func (m *NoteListModel) refresh() tea.Cmd {
 	m.list.Title = v.GetTitleForView(m.viewName, int(m.sortField), int(m.sortOrder))
+	m.list.ResetFilter()
 	m.refreshDelegate()
 	cmd := m.refreshItems()
 	m.list.ResetSelected()
@@ -426,6 +428,7 @@ func (m *NoteListModel) refreshDelegate() {
 
 func (m *NoteListModel) refreshSort() tea.Cmd {
 	m.list.Title = v.GetTitleForView(m.viewName, int(m.sortField), int(m.sortOrder))
+	m.list.ResetFilter()
 	items := castToListItems(m.list.Items())
 	sortedItems := sortItems(items, m.sortField, m.sortOrder)
 	m.list.ResetSelected()
@@ -465,7 +468,7 @@ func (m *NoteListModel) toggleTitleBar() {
 func (m *NoteListModel) toggleDetails() tea.Cmd {
 	m.showDetails = !m.showDetails
 	cmd := m.refreshItems()
-	m.list.ResetSelected()
+	// m.list.ResetSelected()
 	return cmd
 }
 

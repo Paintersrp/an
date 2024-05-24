@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/charmbracelet/glamour"
+	"github.com/golang-jwt/jwt"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/muesli/termenv"
 )
 
@@ -168,4 +170,31 @@ func FormatBytes(size int64) string {
 		i++
 	}
 	return fmt.Sprintf("%d %s", size, units[i])
+}
+
+type Claims struct {
+	jwt.StandardClaims
+	UserID   int64       `json:"user_id"`
+	Username string      `json:"username"`
+	Email    string      `json:"email"`
+	RoleID   pgtype.Int4 `json:"role_id"`
+}
+
+func ValidateToken(tokenString, secret string) (*Claims, error) {
+	token, err := jwt.ParseWithClaims(
+		tokenString,
+		&Claims{},
+		func(token *jwt.Token) (interface{}, error) {
+			return []byte(secret), nil
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if claims, ok := token.Claims.(*Claims); ok && token.Valid {
+		return claims, nil
+	}
+
+	return nil, err
 }
