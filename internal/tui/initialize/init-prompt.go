@@ -43,7 +43,7 @@ type InitPromptModel struct {
 
 func InitialPrompt(cfgPath string) InitPromptModel {
 	m := InitPromptModel{
-		inputs:     make([]textinput.Model, 3),
+		inputs:     make([]textinput.Model, 4),
 		configPath: cfgPath,
 	}
 
@@ -60,19 +60,25 @@ func InitialPrompt(cfgPath string) InitPromptModel {
 
 		switch i {
 		case 0:
-			t.Prompt = "Notes (Vault) Directory: "
-			t.Placeholder = fmt.Sprintf("%s/notes", home)
+			t.Prompt = "Root Vaults Directory: "
+			t.Placeholder = fmt.Sprintf("%s/vaults", home)
 			t.Focus()
 			t.PlaceholderStyle = focusedDimStyle
 			t.PromptStyle = focusedStyle
 			t.TextStyle = focusedStyle
 			t.CharLimit = 64
 		case 1:
+			t.Prompt = "Vault Name: "
+			t.Placeholder = "zettel"
+			t.PlaceholderStyle = focusedDimStyle
+			t.PromptStyle = noStyle
+			t.CharLimit = 64
+		case 2:
 			t.Prompt = "Editor: "
 			t.Placeholder = "nvim"
 			t.PlaceholderStyle = focusedDimStyle
 			t.PromptStyle = noStyle
-		case 2:
+		case 3:
 			t.Prompt = "Editor Arguments: "
 			t.Placeholder = "none"
 			t.PlaceholderStyle = focusedDimStyle
@@ -127,13 +133,14 @@ func (m InitPromptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 				cfg := &config.Config{
-					VaultDir:       m.inputs[0].Value(),
-					Editor:         m.inputs[1].Value(),
-					NvimArgs:       m.inputs[2].Value(),
-					SubDirs:        []string{defaults[3]},
-					FileSystemMode: defaults[4],
-					PinnedFile:     defaults[5],
-					PinnedTaskFile: defaults[6],
+					RootDir:        m.inputs[0].Value(),
+					ActiveVault:    m.inputs[1].Value(),
+					Editor:         m.inputs[2].Value(),
+					NvimArgs:       m.inputs[3].Value(),
+					SubDirs:        []string{defaults[4]},
+					FileSystemMode: defaults[5],
+					PinnedFile:     defaults[6],
+					PinnedTaskFile: defaults[7],
 				}
 
 				cfgErr := cfg.Save()
@@ -224,7 +231,8 @@ func (m InitPromptModel) View() string {
 
 func SetupDefaults(path string) []string {
 	return []string{
-		fmt.Sprintf("%s/notes", path),
+		fmt.Sprintf("%s/vaults", path),
+		"zettel",
 		"nvim",
 		"",
 		"atoms",

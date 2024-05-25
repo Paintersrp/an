@@ -13,7 +13,6 @@ import (
 	"github.com/atotto/clipboard"
 	"github.com/spf13/cobra"
 
-	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/internal/note"
 	"github.com/Paintersrp/an/internal/state"
 	"github.com/Paintersrp/an/pkg/shared/flags"
@@ -87,7 +86,7 @@ func run(
 		return err
 	}
 
-	title, targetPin, err := determineTargetPin(name, auto, git, s.Config)
+	title, targetPin, err := determineTargetPin(name, auto, git, s)
 	if err != nil {
 		return err
 	}
@@ -127,29 +126,29 @@ func determineTargetPin(
 	name string,
 	auto bool,
 	git bool,
-	c *config.Config,
+	s *state.State,
 ) (string, string, error) {
 	if auto || git {
-		title, targetPin := generateFileName(c, git)
+		title, targetPin := generateFileName(s, git)
 		return title, targetPin, nil
 	}
 
 	if name != "" {
-		pin := c.NamedPins[name]
+		pin := s.Config.NamedPins[name]
 		if pin == "" {
 			return "", "", fmt.Errorf("no file pinned for the name '%s'", name)
 		}
 		return "", pin, nil
 	}
 
-	if c.PinnedFile == "" {
+	if s.Config.PinnedFile == "" {
 		return "", "", errors.New("no file pinned")
 	}
-	return "", c.PinnedFile, nil
+	return "", s.Config.PinnedFile, nil
 }
 
-func generateFileName(cfg *config.Config, gitScoped bool) (string, string) {
-	baseDir := filepath.Join(cfg.VaultDir, "echoes")
+func generateFileName(s *state.State, gitScoped bool) (string, string) {
+	baseDir := filepath.Join(s.Vault, "echoes")
 
 	err := os.MkdirAll(baseDir, 0o755)
 	if err != nil {

@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/spf13/cobra"
 
@@ -30,6 +31,7 @@ func Execute() {
 	s, err := state.NewState()
 
 	if err != nil {
+		fmt.Println(err)
 		var initErr *config.ConfigInitError
 		if errors.As(err, &initErr) {
 			err := initialize.Run()

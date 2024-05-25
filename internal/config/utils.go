@@ -42,7 +42,7 @@ func EnsureConfigExists(homeDir string) error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	requiredVars := []string{"VaultDir", "Editor", "FileSystemMode"}
+	requiredVars := []string{"RootDir", "ActiveVault", "Editor", "FileSystemMode"}
 	for _, varName := range requiredVars {
 		value, err := getVarValue(cfg, varName)
 		if err != nil {

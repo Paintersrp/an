@@ -18,7 +18,9 @@ type Config struct {
 	PinManager     *pin.PinManager `yaml:"-"`
 	NamedPins      PinMap          `yaml:"named_pins"       json:"named_pins"`
 	NamedTaskPins  PinMap          `yaml:"named_task_pins"  json:"named_task_pins"`
-	VaultDir       string          `yaml:"vaultdir"         json:"vault_dir"`
+	RootDir        string          `yaml:"rootdir"          json:"root_dir"`
+	ActiveVault    string          `yaml:"activevault"      json:"active_vault"`
+	VaultID        int32           `yaml:"vault_id"         json:"vault_id"`
 	Editor         string          `yaml:"editor"           json:"editor"`
 	NvimArgs       string          `yaml:"nvimargs"         json:"nvim_args"`
 	FileSystemMode string          `yaml:"fsmode"           json:"fs_mode"`
@@ -88,6 +90,22 @@ func (cfg *Config) AddSubdir(name string) error {
 
 func (cfg *Config) ChangeToken(token string) error {
 	cfg.Token = token
+	return cfg.Save()
+}
+
+func (cfg *Config) ChangeVault(name string, id int32) error {
+	cfg.ActiveVault = name
+	cfg.VaultID = id
+	return cfg.Save()
+}
+
+func (cfg *Config) ChangeVaultName(vault string) error {
+	cfg.ActiveVault = vault
+	return cfg.Save()
+}
+
+func (cfg *Config) ChangeVaultID(id int32) error {
+	cfg.VaultID = id
 	return cfg.Save()
 }
 

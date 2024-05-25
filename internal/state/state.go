@@ -39,8 +39,10 @@ func NewState() (*State, error) {
 		return nil, fmt.Errorf("failed to create templater: %v", err)
 	}
 
-	h := handler.NewFileHandler(cfg.VaultDir)
-	vm := views.NewViewManager(h, cfg.VaultDir)
+	vaultDir := fmt.Sprintf("%s/%s", cfg.RootDir, cfg.ActiveVault)
+
+	h := handler.NewFileHandler(vaultDir)
+	vm := views.NewViewManager(h, vaultDir)
 
 	return &State{
 		Config:      cfg,
@@ -49,7 +51,7 @@ func NewState() (*State, error) {
 		ViewManager: vm,
 		Views:       vm.Views,
 		Home:        home,
-		Vault:       cfg.VaultDir,
+		Vault:       vaultDir,
 	}, nil
 }
 
@@ -70,6 +72,7 @@ func LoadConfig(home string) (*config.Config, error) {
 	viper.ReadInConfig()
 
 	err := config.EnsureConfigExists(home)
+
 	if err != nil {
 		return nil, err
 	}

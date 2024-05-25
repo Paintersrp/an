@@ -82,7 +82,8 @@ func NewListModel(cfg *config.Config) ListModel {
 	configInput := initialInputModel()
 
 	items := []list.Item{
-		ListItem{title: "VaultDir", description: cfg.VaultDir},
+		ListItem{title: "RootDir", description: cfg.RootDir},
+		ListItem{title: "ActiveVault", description: cfg.ActiveVault},
 		ListItem{title: "Editor", description: cfg.Editor},
 		ListItem{title: "NvimArgs", description: cfg.NvimArgs},
 		ListItem{title: "FileSystemMode", description: cfg.FileSystemMode},
@@ -255,8 +256,10 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 				inputValue := m.configInput.Input.Value()
 				switch title {
-				case "VaultDir":
-					m.config.VaultDir = inputValue
+				case "RootDir":
+					m.config.RootDir = inputValue
+				case "ActiveVault":
+					m.config.ActiveVault = inputValue
 				case "Editor":
 					m.config.Editor = inputValue
 				case "NvimArgs":
