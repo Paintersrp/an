@@ -132,7 +132,7 @@ func initVaultRepo(
 	}
 
 	// Sync notes after the commit
-	err = sync.SyncNotes(vaultPath, repo, commit, s, claims)
+	err = sync.BulkSyncNotes(vaultPath, repo, commit, s, claims)
 	if err != nil {
 		return err
 	}

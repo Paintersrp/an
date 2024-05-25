@@ -80,7 +80,7 @@ func NewCmdVaultSync(s *state.State) *cobra.Command {
 				return err
 			}
 
-			syncErr := sync.SyncNotes(vaultPath, repo, commit, s, claims)
+			syncErr := sync.BulkSyncNotes(vaultPath, repo, commit, s, claims)
 			if syncErr != nil {
 				return syncErr
 			}
