@@ -191,15 +191,51 @@ func SyncNotesInit(
 		return err
 	}
 
+	var operations []NoteOperation
+
 	for _, file := range files {
-		err := SyncNote(vaultPath, file, s, claims)
+		noteContent, err := os.ReadFile(filepath.Join(vaultPath, file))
 		if err != nil {
-			fmt.Printf("failed to sync note %s: %v", file, err)
+			fmt.Printf("failed to read file %s: %v", file, err)
 			continue
 		}
+
+		if noteContent == nil {
+			continue
+		}
+
+		note := string(noteContent)
+		frontMatter, content := splitFrontMatter(note)
+		metadata, err := parseFrontMatter(frontMatter)
+		if err != nil {
+			fmt.Printf("failed to parse frontmatter for %s: %v", file, err)
+			continue
+		}
+
+		if content == "" {
+			continue
+		}
+
+		// TODO: Fix how LinkedNotes are sent, by title not ID
+		// metadata.LinkedNotes = parseLinkedNotes(content)
+		metadata.Upstream = strings.TrimPrefix(
+			strings.TrimSuffix(metadata.Upstream, "]]"),
+			"[[",
+		)
+
+		operations = append(operations, NoteOperation{
+			Operation: "create",
+			UpdatePayload: &NotePayload{
+				Title:   strings.TrimSuffix(filepath.Base(file), ".md"),
+				Tags:    metadata.Tags,
+				Content: content,
+				VaultID: s.Config.VaultID,
+				UserID:  int32(claims.UserID),
+			},
+		})
 	}
 
-	return nil
+	return BulkSyncNotesInit(operations, s, claims)
 }
 
 func SyncNoteDelete(noteTitle string, s *state.State, claims *utils.Claims) error {
@@ -319,6 +355,7 @@ func SyncNoteUpdate(
 	return nil
 }
 
+// Unused...atm
 // TODO: Our endpoint should probably update my title by default, rather than ID. We are more likely to have the matching title.
 // TODO: In the event that a file changes names, we delete the old title record then create the new note record
 func SyncNote(vaultPath, file string, s *state.State, claims *utils.Claims) error {
@@ -341,16 +378,8 @@ func SyncNote(vaultPath, file string, s *state.State, claims *utils.Claims) erro
 		"[[",
 	)
 
-	var title string
-
-	if metadata.Title == "" {
-		title = file
-	} else {
-		title = metadata.Title
-	}
-
 	data := map[string]interface{}{
-		"title":    title,
+		"title":    strings.TrimSuffix(filepath.Base(file), ".md"),
 		"tags":     metadata.Tags,
 		"vault_id": s.Config.VaultID,
 		"user_id":  claims.UserID,

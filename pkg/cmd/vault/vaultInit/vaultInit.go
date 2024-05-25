@@ -1,7 +1,6 @@
 package vaultInit
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -41,7 +40,6 @@ func NewCmdVaultInit(s *state.State) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Println(vault.ID, vault.Name, "vault")
 
 			cfgErr := s.Config.ChangeVault(name, vault.ID)
 			if cfgErr != nil {
@@ -51,7 +49,6 @@ func NewCmdVaultInit(s *state.State) *cobra.Command {
 			rootDir := s.Config.RootDir
 			vaultPath := filepath.Join(rootDir, name)
 
-			// Check if the directory already exists
 			_, dirErr := os.Stat(vaultPath)
 			if dirErr != nil {
 				if os.IsNotExist(dirErr) {
@@ -62,14 +59,12 @@ func NewCmdVaultInit(s *state.State) *cobra.Command {
 				return dirErr
 			}
 
-			// Initialize Git repository
 			repo, err := git.PlainInit(vaultPath, false)
 			if err != nil {
 				cmd.Println("Error:", err)
 				return err
 			}
 
-			// Commit existing Markdown files
 			worktree, err := repo.Worktree()
 			if err != nil {
 				cmd.Println("Error:", err)
@@ -82,14 +77,12 @@ func NewCmdVaultInit(s *state.State) *cobra.Command {
 				return err
 			}
 
-			// Sync notes after the commit
 			err = sync.SyncNotesInit(vaultPath, repo, commit, s, claims)
 			if err != nil {
 				cmd.Println("Error:", err)
 				return err
 			}
 
-			// Update vault commit
 			err = sync.UpdateVaultCommit(commit.String(), s)
 			if err != nil {
 				return err
@@ -108,13 +101,6 @@ func commitMarkdownFiles(
 	vaultPath string,
 	claims *utils.Claims,
 ) (plumbing.Hash, error) {
-	// Create .gitignore file
-	gitignorePath := filepath.Join(vaultPath, ".gitignore")
-	err := os.WriteFile(gitignorePath, []byte("*\n!*.md"), 0644)
-	if err != nil {
-		return plumbing.Hash{}, err
-	}
-
 	_, addErr := worktree.Add(".")
 	if addErr != nil {
 		return plumbing.Hash{}, addErr
