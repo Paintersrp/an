@@ -8,6 +8,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/Paintersrp/an/internal/constants"
 	"github.com/Paintersrp/an/internal/pin"
 	"github.com/spf13/cobra"
 )
@@ -22,22 +23,12 @@ type Config struct {
 	ActiveVault    string          `yaml:"activevault"      json:"active_vault"`
 	VaultID        int32           `yaml:"vault_id"         json:"vault_id"`
 	Editor         string          `yaml:"editor"           json:"editor"`
-	NvimArgs       string          `yaml:"nvimargs"         json:"nvim_args"`
+	Args           string          `yaml:"args"             json:"args"`
 	FileSystemMode string          `yaml:"fsmode"           json:"fs_mode"`
 	PinnedFile     string          `yaml:"pinned_file"      json:"pinned_file"`
 	PinnedTaskFile string          `yaml:"pinned_task_file" json:"pinned_task_file"`
 	SubDirs        []string        `yaml:"subdirs"          json:"sub_dirs"`
 	Token          string          `yaml:"token"            json:"token"`
-}
-
-var ValidModes = map[string]bool{
-	"strict":  true,
-	"confirm": true,
-	"free":    true,
-}
-
-var ValidEditors = map[string]bool{
-	"nvim": true, // The one true god
 }
 
 func Load(home string) (*Config, error) {
@@ -110,10 +101,10 @@ func (cfg *Config) ChangeVaultID(id int32) error {
 }
 
 func (cfg *Config) ChangeMode(mode string) error {
-	if _, valid := ValidModes[mode]; !valid {
+	if _, valid := constants.ValidModes[mode]; !valid {
 		return fmt.Errorf(
-			"invalid mode: %q. Please choose from 'strict', 'confirm', or 'free'",
-			mode,
+			"invalid mode: %q. Valid options are: %s",
+			mode, strings.Join(constants.AvailableModes, ", "),
 		)
 	}
 
@@ -122,10 +113,12 @@ func (cfg *Config) ChangeMode(mode string) error {
 }
 
 func (cfg *Config) ChangeEditor(editor string) error {
-	if _, valid := ValidEditors[editor]; !valid {
-		return fmt.Errorf("invalid editor: %q. The only valid option is 'nvim'", editor)
+	if _, valid := constants.ValidEditors[editor]; !valid {
+		return fmt.Errorf("invalid editor: %q. Valid options are: %s",
+			editor,
+			strings.Join(constants.AvailableEditors, ", "),
+		)
 	}
-
 	cfg.Editor = editor
 	return cfg.Save()
 }

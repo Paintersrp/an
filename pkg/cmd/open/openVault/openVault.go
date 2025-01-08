@@ -41,6 +41,6 @@ func run() error {
 		fmt.Println("No vault directory configured.\nExiting")
 		return errors.New("no vault directory")
 	}
-	note.OpenFromPath(vaultDir, false)
+	note.OpenFromPath(vaultDir)
 	return nil
 }

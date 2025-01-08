@@ -24,7 +24,6 @@ type listKeyMap struct {
 	switchToTrashView     key.Binding
 	switchToUnfulfillView key.Binding
 	updatePreview         key.Binding
-	openNoteInObsidian    key.Binding
 	sortByTitle           key.Binding
 	sortBySubdir          key.Binding
 	sortByModifiedAt      key.Binding
@@ -57,10 +56,6 @@ func newListKeyMap() *listKeyMap {
 		openNote: key.NewBinding(
 			key.WithKeys("enter"),
 			key.WithHelp("↵", "open"),
-		),
-		openNoteInObsidian: key.NewBinding(
-			key.WithKeys("G"),
-			key.WithHelp("G", "open in obsidian"),
 		),
 		changeView: key.NewBinding(
 			key.WithKeys("V"),
@@ -151,7 +146,6 @@ func (m listKeyMap) fullHelp() []key.Binding {
 		m.switchToUnfulfillView,
 		m.exitAltView,
 		m.submitAltView,
-		m.openNoteInObsidian,
 		m.sortByTitle,
 		m.sortBySubdir,
 	}

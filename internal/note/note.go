@@ -7,13 +7,16 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/viper"
 
+	"github.com/Paintersrp/an/internal/constants"
 	"github.com/Paintersrp/an/internal/templater"
 )
+
+type editorFinishedMsg struct{ err error }
 
 // ZettelkastenNote represents a zettelkasten note with its metadata.
 type ZettelkastenNote struct {
@@ -139,7 +142,7 @@ func (note *ZettelkastenNote) Open() error {
 		os.Exit(1)
 	}
 
-	if err := OpenFromPath(filePath, false); err != nil {
+	if err := OpenFromPath(filePath); err != nil {
 		// TODO: fix - print is too specific
 		fmt.Println(
 			"Error opening note in Neovim:",
@@ -205,137 +208,55 @@ func StaticHandleNoteLaunch(
 }
 
 // OpenFromPath opens the note in the configured editor.
-func OpenFromPath(path string, obsidian bool) error {
-	var editor string
-	if obsidian {
-		editor = "obsidian"
-	} else {
-		editor = viper.GetString("editor")
+func OpenFromPath(path string) error {
+	editor := viper.GetString("editor")
+	if editor == "" {
+		return fmt.Errorf("no editor configured")
 	}
 
-	switch editor {
-	case "nvim":
-		return openWithNvim(path)
-	case "vim":
-		return openWithVim(path)
-	case "nano":
-		return openWithNano(path)
-	case "vscode", "code":
-		return openWithVSCode(path)
-	case "obsidian":
-		return openWithObsidian(path)
-	default:
+	if !constants.ValidEditors[editor] {
 		return fmt.Errorf("unsupported editor: %s", editor)
 	}
-}
 
-// openWithNvim opens the note in Neovim.
-func openWithNvim(path string) error {
-	nvimArgs := viper.GetString("nvimargs")
-	cmdArgs := []string{"nvim", path}
-
-	if nvimArgs != "" {
-		cmdArgs = append(cmdArgs, strings.Fields(nvimArgs)...)
+	cmdArgs := []string{editor, path}
+	if args := viper.GetString("args"); args != "" {
+		cmdArgs = append(cmdArgs, strings.Fields(args)...)
 	}
 
-	return runEditorCommand(cmdArgs)
-}
-
-// openWithObsidian opens the note in Obsidian.
-func openWithObsidian(path string) error {
-	fullVaultDir := viper.GetString("vaultdir")
-	vaultName := filepath.Base(fullVaultDir)
-	relativePath := strings.TrimPrefix(path, fullVaultDir+"/")
-
-	obsidianURI := fmt.Sprintf(
-		"obsidian://open?vault=%s&file=%s",
-		vaultName,
-		relativePath,
-	)
-
-	var cmdArgs []string
-	switch runtime.GOOS {
-	case "darwin":
-		cmdArgs = []string{"open", obsidianURI}
-	case "linux":
-		cmdArgs = []string{"xdg-open", obsidianURI}
-	case "windows":
-		cmdArgs = []string{"cmd", "/c", "start", obsidianURI}
-	default:
-		return fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
-	}
-
-	return runEditorCommand(cmdArgs)
-}
-
-// openWithVim opens the note in vim.
-func openWithVim(path string) error {
-	cmdArgs := []string{"vim", path}
-	return runEditorCommand(cmdArgs)
-}
-
-// openWithNano opens the note in nano.
-func openWithNano(path string) error {
-	cmdArgs := []string{"nano", path}
-	return runEditorCommand(cmdArgs)
-}
-
-// openWithVSCode opens the note in Visual Studio Code.
-func openWithVSCode(path string) error {
-	var cmdArgs []string
-	switch runtime.GOOS {
-	case "darwin":
-		cmdArgs = []string{"open", "-n", "-b", "com.microsoft.VSCode", "--args", path}
-	case "linux":
-		cmdArgs = []string{"code", path}
-	case "windows":
-		cmdArgs = []string{"cmd", "/c", "code", path}
-	default:
-		return fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
-	}
-
-	return runEditorCommand(cmdArgs)
-}
-
-// runEditorCommand runs the editor command with the provided arguments.
-func runEditorCommand(cmdArgs []string) error {
 	cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 
-	// If the editor is Obsidian or VSCode, we want to silence the output
-	if cmdArgs[0] == "open" || cmdArgs[0] == "xdg-open" || cmdArgs[0] == "cmd" ||
-		cmdArgs[0] == "code" {
-		devNull, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
-		if err != nil {
-			fmt.Printf("Error opening null device: %v\n", err)
-			return err
-		}
-		defer devNull.Close()
-
-		cmd.Stdout = devNull
-		cmd.Stderr = devNull
-	} else {
-		cmd.Stdin = os.Stdin
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("error starting editor: %w", err)
 	}
 
-	err := cmd.Start()
-	if err != nil {
-		fmt.Printf("Error starting editor: %v\n", err)
-		return err
-	}
-
-	// If the editor is VSCode or Obsidian, we do not wait for the process to finish
-	if cmdArgs[0] == "open" || cmdArgs[0] == "xdg-open" || cmdArgs[0] == "cmd" ||
-		cmdArgs[0] == "code" {
-		return nil
-	}
-
-	err = cmd.Wait()
-	if err != nil {
-		fmt.Printf("Error waiting for editor to close: %v\n", err)
-		return err
+	if err := cmd.Wait(); err != nil {
+		return fmt.Errorf("error waiting for editor to close: %w", err)
 	}
 
 	return nil
+}
+
+// BubbleteaOpenFromPath opens the note in the configured editor.
+func BubbleteaOpenFromPath(path string) tea.Cmd {
+	editor := viper.GetString("editor")
+
+	if !constants.ValidEditors[editor] {
+		// TODO: handle errors
+		return nil
+	}
+
+	cmdArgs := []string{editor, path}
+	if args := viper.GetString("args"); args != "" {
+		cmdArgs = append(cmdArgs, strings.Fields(args)...)
+	}
+
+	return tea.ExecProcess(
+		exec.Command(cmdArgs[0], cmdArgs[1:]...),
+		func(err error) tea.Msg {
+			return editorFinishedMsg{err}
+		},
+	)
 }

@@ -11,7 +11,6 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"golang.org/x/term"
 
 	"github.com/Paintersrp/an/internal/cache"
 	"github.com/Paintersrp/an/internal/note"
@@ -20,6 +19,12 @@ import (
 	v "github.com/Paintersrp/an/internal/views"
 	"github.com/Paintersrp/an/utils"
 )
+
+// TODO:
+// Fix sortation
+// Handle untitled (no frontmatter) better when sorting
+// Handle subdirectory sorting correctly (it currently is not in any sort of alphabetical order, however they are grouped correctly)
+// Fix ordering to be more logical to defaults (Modified Date at F1, Descending at F5?)
 
 var maxCacheSizeMB int64 = 50
 
@@ -103,6 +108,7 @@ func (m NoteListModel) Init() tea.Cmd {
 
 func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
+	var retCmd tea.Cmd
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -124,22 +130,25 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case m.creating:
 			return m.handleCreationUpdate(msg)
 		default:
-			m.handleDefaultUpdate(msg)
-
-			if m.state.Config.Editor == "vim" || m.state.Config.Editor == "nano" {
-				if key.Matches(msg, m.keys.openNote) {
-					return m, tea.Quit
-				}
-			}
-
+			// TODO: handle errors
+			// NOTE:
+			// Why are we returning? The bubbletea process did not seem to function correctly
+			// unless the return from ExecProcess happens after any sublist update.
+			// Not doing so leads to problems with the underlying UI updating bubbletea
+			// when resizing an opened nvim window, when it should not be updating.
+			// Updating the underlying bubbletea app while the editor is open
+			// breaks the stdin and doesn't pass correctly back when quitting the editor
+			_, retCmd = m.handleDefaultUpdate(msg)
 		}
 	}
 
 	nl, cmd := m.list.Update(msg)
 	m.list = nl
-	cmds = append(cmds, cmd)
+	cmds = append(cmds, cmd, retCmd)
 
-	// TODO: need to asyncronously stream in the markdown preview
+	// TODO:
+	// Asyncronously streaming in the markdown preview is a better solution
+	// than our current implementation which only displays 1000 preview characters
 	m.handlePreview()
 	return m, tea.Batch(cmds...)
 }
@@ -217,18 +226,7 @@ func (m *NoteListModel) handleCreationUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd
 func (m *NoteListModel) handleDefaultUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.keys.openNote):
-		if ok := m.openNote(false); ok {
-			return m, tea.Quit
-		} else {
-			return m, nil
-		}
-
-	case key.Matches(msg, m.keys.openNoteInObsidian):
-		if ok := m.openNote(true); ok {
-			return m, tea.Quit
-		} else {
-			return m, nil
-		}
+		return m, m.openNote()
 
 	case key.Matches(msg, m.keys.toggleTitleBar):
 		m.toggleTitleBar()
@@ -300,6 +298,7 @@ func (m *NoteListModel) handleDefaultUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 		m.sortOrder = descending
 		return m, m.refreshSort()
 	}
+
 	return m, nil
 }
 
@@ -352,28 +351,16 @@ func (m NoteListModel) View() string {
 }
 
 func Run(s *state.State, views map[string]v.View, viewFlag string) error {
-	originalState, err := term.GetState(int(os.Stdin.Fd()))
-	if err != nil {
-		log.Fatalf("Failed to get original terminal state: %v", err)
-	}
-
-	defer func() {
-		// we attempt to recover original state so that we can terminate gracefully
-		if err := term.Restore(int(os.Stdin.Fd()), originalState); err != nil {
-			log.Fatalf("Failed to restore original terminal state: %v", err)
-		}
-	}()
-
 	m, err := NewNoteListModel(s, viewFlag)
 	if err != nil {
 		return err
 	}
 
 	if _, err := tea.NewProgram(m, tea.WithInput(os.Stdin), tea.WithAltScreen()).Run(); err != nil {
-		// handle error for instances where neovim/editor doesn't pass stdin back in time to close gracefully with bubbletea
 		if strings.Contains(err.Error(), "resource temporarily unavailable") {
 			os.Exit(0)
 		} else {
+			println("FATAL")
 			log.Fatalf("Error running program: %v", err)
 		}
 	}
@@ -437,25 +424,17 @@ func (m *NoteListModel) refreshSort() tea.Cmd {
 	return cmd
 }
 
-// TODO: should prob use an error over a bool but a "success" flag sort of feels more natural for the context.
-// TODO: unsuccessful opens provide a status message and the program stays live
-// TODO: successful opens return true which trigger graceful stdin passing and closing of the program
-func (m *NoteListModel) openNote(obsidian bool) bool {
+func (m *NoteListModel) openNote() tea.Cmd {
 	var p string
 
 	if i, ok := m.list.SelectedItem().(ListItem); ok {
 		p = i.path
 	} else {
-		return false
+		return nil
 	}
 
-	err := note.OpenFromPath(p, obsidian)
-	if err != nil {
-		m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Open Error: %s", err)))
-		return false
-	}
+	return note.BubbleteaOpenFromPath(p)
 
-	return true
 }
 
 func (m *NoteListModel) toggleTitleBar() {
@@ -468,7 +447,6 @@ func (m *NoteListModel) toggleTitleBar() {
 func (m *NoteListModel) toggleDetails() tea.Cmd {
 	m.showDetails = !m.showDetails
 	cmd := m.refreshItems()
-	// m.list.ResetSelected()
 	return cmd
 }
 

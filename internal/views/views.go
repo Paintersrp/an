@@ -5,44 +5,94 @@ import (
 	"strings"
 
 	"github.com/Paintersrp/an/internal/handler"
+	"github.com/charmbracelet/lipgloss"
 )
 
 var titlePrefixMap = map[string]string{
-	"default":     "✅ - All",
-	"orphan":      "❓ - Orphan",
-	"unfulfilled": "⬜ - Unfulfilled",
-	"archive":     "📦 - Archive",
-	"trash":       "🗑️  - Trash", // Note the extra space before the dash
+	"default":     "[1] All",
+	"orphan":      "[2] Orphan",
+	"unfulfilled": "[3] Unfulfilled",
+	"archive":     "[4] Archive",
+	"trash":       "[5] Trash",
 }
 
 var sortFieldMap = map[int]string{
-	0: "Title",
-	1: "Subdirectory",
-	2: "Modified",
+	0: " [F1] Title",
+	1: " [F2] Subdirectory",
+	2: " [F3] Modified Date",
 }
 
+var sortOrderMap = map[int]string{
+	0: "[F5] Ascending",
+	1: "[F6] Descending",
+}
+
+var (
+	titleStyle = lipgloss.NewStyle().
+			Bold(true)
+	activeViewStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#0AF")).
+			Padding(0, 1)
+	inactiveViewStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#666666")).
+				Padding(0, 1)
+	dividerStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#666666")).
+			SetString("│")
+	sortStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#0AF")).
+			Bold(true)
+)
+
 func GetTitleForView(viewFlag string, sortField int, sortOrder int) string {
-	prefix, ok := titlePrefixMap[viewFlag]
-	if !ok {
-		prefix = titlePrefixMap["default"]
+	// Handle view status
+	views := []string{"default", "orphan", "unfulfilled", "archive", "trash"}
+	var viewStatus []string
+	for _, v := range views {
+		prefix := titlePrefixMap[v]
+		if v == viewFlag {
+			viewStatus = append(viewStatus, activeViewStyle.Render(prefix))
+		} else {
+			viewStatus = append(viewStatus, inactiveViewStyle.Render(prefix))
+		}
 	}
 
-	sortFieldStr, ok := sortFieldMap[sortField]
-	if !ok {
-		sortFieldStr = "Unknown"
+	// Handle sort fields
+	var sortStatus []string
+	for i := 0; i < len(sortFieldMap); i++ {
+		sortStr := sortFieldMap[i]
+		if i == sortField {
+			sortStatus = append(sortStatus, activeViewStyle.Render(sortStr))
+		} else {
+			sortStatus = append(sortStatus, inactiveViewStyle.Render(sortStr))
+		}
 	}
 
-	orderStr := "Ascending"
-	if sortOrder == 1 {
-		orderStr = "Descending"
+	// Handle sort order
+	var orderStatus []string
+	for i := 0; i < len(sortOrderMap); i++ {
+		orderStr := sortOrderMap[i]
+		if i == sortOrder {
+			orderStatus = append(orderStatus, activeViewStyle.Render(orderStr))
+		} else {
+			orderStatus = append(orderStatus, inactiveViewStyle.Render(orderStr))
+		}
 	}
 
-	return fmt.Sprintf(
-		"%s View \nSort: %s (%s)",
-		prefix,
-		sortFieldStr,
-		orderStr,
+	viewLine := fmt.Sprintf("%s %s",
+		titleStyle.Render("Views:"),
+		strings.Join(viewStatus, dividerStyle.String()),
 	)
+
+	sortLine := fmt.Sprintf("%s %s %s %s",
+		titleStyle.Render("Sort:"),
+		strings.Join(sortStatus, dividerStyle.String()),
+		dividerStyle.String(),
+		strings.Join(orderStatus, dividerStyle.String()),
+	)
+
+	return fmt.Sprintf("%s\n%s", viewLine, sortLine)
 }
 
 // View represents a configuration for a specific view.

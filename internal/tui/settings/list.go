@@ -10,6 +10,7 @@ import (
 	"github.com/erikgeiser/promptkit/selection"
 
 	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/internal/constants"
 )
 
 // TODO: Clean and Organize
@@ -85,7 +86,7 @@ func NewListModel(cfg *config.Config) ListModel {
 		ListItem{title: "RootDir", description: cfg.RootDir},
 		ListItem{title: "ActiveVault", description: cfg.ActiveVault},
 		ListItem{title: "Editor", description: cfg.Editor},
-		ListItem{title: "NvimArgs", description: cfg.NvimArgs},
+		ListItem{title: "Args", description: cfg.Args},
 		ListItem{title: "FileSystemMode", description: cfg.FileSystemMode},
 	}
 
@@ -104,7 +105,7 @@ func NewListModel(cfg *config.Config) ListModel {
 
 	editorSel := selection.New(
 		"Please select an editor option.",
-		[]string{"nvim", "obsidian", "vscode", "vim", "nano"},
+		constants.AvailableEditors,
 	)
 	editorSel.Filter = nil
 	editorSelect := selection.NewModel(editorSel)
@@ -181,7 +182,7 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 				editorSel := selection.New(
 					"Please select an editor option.",
-					[]string{"nvim", "obsidian", "vscode", "vim", "nano"},
+					constants.AvailableEditors,
 				)
 				editorSel.Filter = nil
 				m.editorSelect = selection.NewModel(editorSel)
@@ -262,8 +263,8 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.config.ActiveVault = inputValue
 				case "Editor":
 					m.config.Editor = inputValue
-				case "NvimArgs":
-					m.config.NvimArgs = inputValue
+				case "Args":
+					m.config.Args = inputValue
 				case "MoleculeMode":
 					m.config.FileSystemMode = inputValue
 				}

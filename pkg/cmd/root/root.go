@@ -32,7 +32,7 @@ func NewCmdRoot(s *state.State) (*cobra.Command, error) {
 	cmd := &cobra.Command{
 		Use:     "atomic",
 		Aliases: []string{"an", "a-n"},
-		Short:   "Launch into writing atomic notes, blended into integration with Obsidian.",
+		Short:   "Launch into writing atomic notes, blended into integration.",
 		Long: `A utility to help you get into the habit of writing notes by providing ways to quickly
   get up and writing with atomic notes. 
 

@@ -136,7 +136,7 @@ func (m InitPromptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					RootDir:        m.inputs[0].Value(),
 					ActiveVault:    m.inputs[1].Value(),
 					Editor:         m.inputs[2].Value(),
-					NvimArgs:       m.inputs[3].Value(),
+					Args:           m.inputs[3].Value(),
 					SubDirs:        []string{defaults[4]},
 					FileSystemMode: defaults[5],
 					PinnedFile:     defaults[6],

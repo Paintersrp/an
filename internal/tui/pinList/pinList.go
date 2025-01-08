@@ -325,7 +325,7 @@ func (m *PinListModel) openNote() bool {
 		return false
 	}
 
-	err := note.OpenFromPath(p, false)
+	err := note.OpenFromPath(p)
 	if err != nil {
 		m.list.NewStatusMessage(statusMessageStyle(fmt.Sprintf("Open Error: %s", err)))
 		return false
