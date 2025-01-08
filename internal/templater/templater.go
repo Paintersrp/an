@@ -49,13 +49,12 @@ type Templater struct {
 
 // TemplateData defines the structure for data that will be passed to templates during rendering.
 type TemplateData struct {
-	Title     string
-	Date      string
-	Upstream  string
-	Content   string
-	Tags      []string
-	Links     []string
-	Fulfilled bool
+	Title    string
+	Date     string
+	Upstream string
+	Content  string
+	Tags     []string
+	Links    []string
 }
 
 func NewTemplater() (*Templater, error) {

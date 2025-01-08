@@ -17,34 +17,6 @@ func NewFileHandler(vaultDir string) *FileHandler {
 	return &FileHandler{vaultDir: vaultDir}
 }
 
-// Archive moves a note file to the archive subdirectory.
-func (h *FileHandler) Archive(path string) error {
-	subDir, err := filepath.Rel(h.vaultDir, filepath.Dir(path))
-	if err != nil {
-		return err
-	}
-
-	archiveSubDir := filepath.Join(h.vaultDir, "archive", subDir)
-	if err := os.MkdirAll(archiveSubDir, os.ModePerm); err != nil {
-		return err
-	}
-
-	newPath := filepath.Join(archiveSubDir, filepath.Base(path))
-	return os.Rename(path, newPath)
-}
-
-// Unarchive moves a note file from the archive subdirectory to its original location.
-func (h *FileHandler) Unarchive(path string) error {
-	subDir, err := filepath.Rel(filepath.Join(h.vaultDir, "archive"), filepath.Dir(path))
-	if err != nil {
-		return err
-	}
-
-	originalDir := filepath.Join(h.vaultDir, subDir)
-	newPath := filepath.Join(originalDir, filepath.Base(path))
-	return os.Rename(path, newPath)
-}
-
 // Trash moves a note file to the trash subdirectory.
 func (h *FileHandler) Trash(path string) error {
 	subDir, err := filepath.Rel(h.vaultDir, filepath.Dir(path))
@@ -129,10 +101,6 @@ func (h *FileHandler) WalkFiles(
 				switch modeFlag {
 				case "orphan":
 					if !parser.HasNoteLinks(content) {
-						files = append(files, path)
-					}
-				case "unfulfilled":
-					if parser.CheckFulfillment(content, "false") {
 						files = append(files, path)
 					}
 				default:

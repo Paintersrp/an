@@ -12,15 +12,6 @@ func HasNoteLinks(content []byte) bool {
 	return re.Match(content)
 }
 
-func CheckFulfillment(content []byte, check string) bool {
-	re := regexp.MustCompile(`(?m)^fulfilled:\s*(true|false)$`)
-	matches := re.FindSubmatch(content)
-	if len(matches) > 1 {
-		return string(matches[1]) == check
-	}
-	return false
-}
-
 func ParseFrontMatter(
 	content []byte,
 ) (title string, tags []string) {

@@ -6,7 +6,6 @@ import (
 
 	"github.com/Paintersrp/an/internal/state"
 	"github.com/Paintersrp/an/pkg/cmd/addSubdir"
-	"github.com/Paintersrp/an/pkg/cmd/archive"
 	"github.com/Paintersrp/an/pkg/cmd/auth"
 	"github.com/Paintersrp/an/pkg/cmd/echo"
 	"github.com/Paintersrp/an/pkg/cmd/initialize"
@@ -21,7 +20,6 @@ import (
 	"github.com/Paintersrp/an/pkg/cmd/tasks"
 	"github.com/Paintersrp/an/pkg/cmd/todo"
 	"github.com/Paintersrp/an/pkg/cmd/trash"
-	"github.com/Paintersrp/an/pkg/cmd/unarchive"
 	"github.com/Paintersrp/an/pkg/cmd/untrash"
 	"github.com/Paintersrp/an/pkg/cmd/vault"
 )
@@ -65,8 +63,6 @@ func NewCmdRoot(s *state.State) (*cobra.Command, error) {
 		symlink.NewCmdSymlink(s),
 		notes.NewCmdNotes(s),
 		todo.NewCmdTodo(s.Config),
-		archive.NewCmdArchive(s),
-		unarchive.NewCmdUnarchive(s),
 		trash.NewCmdTrash(s),
 		untrash.NewCmdUntrash(s),
 		journal.NewCmdJournal(s),

@@ -27,17 +27,14 @@ func NewCmdNotes(s *state.State) *cobra.Command {
             - Editing note metadata and contents
             - Fuzzy finding notes by title or content
             - Viewing and managing orphan notes
-            - Viewing and managing unfulfilled notes
             - And more!
 
             Use the '--view' flag to select the initial view you want to start with.
             The available views are:
 
             - 1. 'default': The default view showing all your notes.
-            - 2. 'archive': A view displaying archived notes.
-            - 3. 'orphan': A view for finding and managing orphan (notes with no links to other notes).
-            - 4. 'unfulfilled': A view focused on notes marked as unfulfilled.
-            - 5. 'trash': A view showing trashed notes.
+            - 2. 'orphan': A view for finding and managing orphan (notes with no links to other notes).
+            - 3. 'trash': A view showing trashed notes.
 
             Navigate through the TUI using your keyboard, and follow the on-screen
             instructions to perform various actions on your notes.

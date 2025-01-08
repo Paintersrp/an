@@ -3,32 +3,30 @@ package notes
 import "github.com/charmbracelet/bubbles/key"
 
 type listKeyMap struct {
-	toggleTitleBar        key.Binding
-	toggleStatusBar       key.Binding
-	togglePagination      key.Binding
-	toggleHelpMenu        key.Binding
-	openNote              key.Binding
-	toggleFocus           key.Binding
-	quit                  key.Binding
-	changeView            key.Binding
-	rename                key.Binding
-	create                key.Binding
-	copy                  key.Binding
-	link                  key.Binding
-	submitAltView         key.Binding
-	exitAltView           key.Binding
-	toggleDisplayView     key.Binding
-	switchToDefaultView   key.Binding
-	switchToArchiveView   key.Binding
-	switchToOrphanView    key.Binding
-	switchToTrashView     key.Binding
-	switchToUnfulfillView key.Binding
-	updatePreview         key.Binding
-	sortByTitle           key.Binding
-	sortBySubdir          key.Binding
-	sortByModifiedAt      key.Binding
-	sortAscending         key.Binding
-	sortDescending        key.Binding
+	toggleTitleBar      key.Binding
+	toggleStatusBar     key.Binding
+	togglePagination    key.Binding
+	toggleHelpMenu      key.Binding
+	openNote            key.Binding
+	toggleFocus         key.Binding
+	quit                key.Binding
+	changeView          key.Binding
+	rename              key.Binding
+	create              key.Binding
+	copy                key.Binding
+	link                key.Binding
+	submitAltView       key.Binding
+	exitAltView         key.Binding
+	toggleDisplayView   key.Binding
+	switchToDefaultView key.Binding
+	switchToOrphanView  key.Binding
+	switchToTrashView   key.Binding
+	updatePreview       key.Binding
+	sortByTitle         key.Binding
+	sortBySubdir        key.Binding
+	sortByModifiedAt    key.Binding
+	sortAscending       key.Binding
+	sortDescending      key.Binding
 }
 
 func newListKeyMap() *listKeyMap {
@@ -89,17 +87,9 @@ func newListKeyMap() *listKeyMap {
 			key.WithKeys("2"),
 			key.WithHelp("2", "switch to orphan view"),
 		),
-		switchToUnfulfillView: key.NewBinding(
-			key.WithKeys("3"),
-			key.WithHelp("3", "switch to unfulfilled view"),
-		),
-		switchToArchiveView: key.NewBinding(
-			key.WithKeys("4"),
-			key.WithHelp("4", "switch to archive view"),
-		),
 		switchToTrashView: key.NewBinding(
-			key.WithKeys("5"),
-			key.WithHelp("5", "switch to trash view"),
+			key.WithKeys("3"),
+			key.WithHelp("3", "switch to trash view"),
 		),
 		updatePreview: key.NewBinding(
 			key.WithKeys("f9"),
@@ -140,10 +130,8 @@ func (m listKeyMap) fullHelp() []key.Binding {
 		m.copy,
 		m.changeView,
 		m.switchToDefaultView,
-		m.switchToArchiveView,
 		m.switchToOrphanView,
 		m.switchToTrashView,
-		m.switchToUnfulfillView,
 		m.exitAltView,
 		m.submitAltView,
 		m.sortByTitle,

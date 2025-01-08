@@ -253,14 +253,8 @@ func (m *NoteListModel) handleDefaultUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 	case key.Matches(msg, m.keys.switchToDefaultView):
 		return m, m.swapView("default")
 
-	case key.Matches(msg, m.keys.switchToUnfulfillView):
-		return m, m.swapView("unfulfilled")
-
 	case key.Matches(msg, m.keys.switchToOrphanView):
 		return m, m.swapView("orphan")
-
-	case key.Matches(msg, m.keys.switchToArchiveView):
-		return m, m.swapView("archive")
 
 	case key.Matches(msg, m.keys.switchToTrashView):
 		return m, m.swapView("trash")
@@ -453,8 +447,6 @@ func (m *NoteListModel) toggleDetails() tea.Cmd {
 func (m *NoteListModel) cycleView() tea.Cmd {
 	switch m.viewName {
 	case "default":
-		m.viewName = "archive"
-	case "archive":
 		m.viewName = "orphan"
 	case "orphan":
 		m.viewName = "trash"

@@ -9,11 +9,9 @@ import (
 )
 
 var titlePrefixMap = map[string]string{
-	"default":     "[1] All",
-	"orphan":      "[2] Orphan",
-	"unfulfilled": "[3] Unfulfilled",
-	"archive":     "[4] Archive",
-	"trash":       "[5] Trash",
+	"default": "[1] All",
+	"orphan":  "[2] Orphan",
+	"trash":   "[3] Trash",
 }
 
 var sortFieldMap = map[int]string{
@@ -47,7 +45,7 @@ var (
 
 func GetTitleForView(viewFlag string, sortField int, sortOrder int) string {
 	// Handle view status
-	views := []string{"default", "orphan", "unfulfilled", "archive", "trash"}
+	views := []string{"default", "orphan", "trash"}
 	var viewStatus []string
 	for _, v := range views {
 		prefix := titlePrefixMap[v]
@@ -116,27 +114,15 @@ func NewViewManager(h *handler.FileHandler, vaultDir string) *ViewManager {
 	}
 
 	vm.Views["default"] = View{
-		ExcludeDirs:  []string{"archive", "trash"},
+		ExcludeDirs:  []string{"trash"},
 		ExcludeFiles: []string{},
 		OrphanOnly:   false,
 	}
 
 	vm.Views["orphan"] = View{
-		ExcludeDirs:  []string{"archive", "trash"},
+		ExcludeDirs:  []string{"trash"},
 		ExcludeFiles: []string{},
 		OrphanOnly:   true,
-	}
-
-	vm.Views["unfulfilled"] = View{
-		ExcludeDirs:  []string{"archive", "trash"},
-		ExcludeFiles: []string{},
-		OrphanOnly:   false,
-	}
-
-	vm.Views["archive"] = View{
-		ExcludeDirs:  h.GetSubdirectories(vaultDir, "archive"),
-		ExcludeFiles: []string{},
-		OrphanOnly:   false,
 	}
 
 	vm.Views["trash"] = View{
@@ -169,7 +155,7 @@ func (vm *ViewManager) GetFilesByView(
 	viewFlag string,
 	vaultDir string,
 ) ([]string, error) {
-	defaultExcludeDirs := []string{"archive"}
+	defaultExcludeDirs := []string{}
 	defaultExcludeFiles := []string{}
 
 	var (

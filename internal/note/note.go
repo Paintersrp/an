@@ -101,13 +101,12 @@ func (note *ZettelkastenNote) Create(
 
 	zetTime, tags := t.GenerateTagsAndDate(tmplName)
 	data := templater.TemplateData{
-		Title:     note.Filename,
-		Date:      zetTime,
-		Tags:      append(note.OriginalTags, tags...),
-		Links:     note.OriginalLinks,
-		Upstream:  note.Upstream,
-		Content:   content,
-		Fulfilled: false,
+		Title:    note.Filename,
+		Date:     zetTime,
+		Tags:     append(note.OriginalTags, tags...),
+		Links:    note.OriginalLinks,
+		Upstream: note.Upstream,
+		Content:  content,
 	}
 
 	output, err := t.Execute(tmplName, data)

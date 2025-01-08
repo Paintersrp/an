@@ -39,16 +39,6 @@ func newItemDelegate(
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
 			switch {
-			case key.Matches(msg, keys.archive):
-				if currView == "default" || currView == "orphan" {
-					if err := h.Archive(p); err != nil {
-						return m.NewStatusMessage(statusStyle("Failed to archive " + n))
-					}
-					i := m.Index()
-					m.RemoveItem(i)
-					return m.NewStatusMessage(statusStyle("Archived " + n))
-				}
-
 			case key.Matches(msg, keys.delete):
 				if currView == "trash" { // Ensure we're in trash view
 					if err := os.Remove(p); err != nil {
@@ -69,14 +59,6 @@ func newItemDelegate(
 
 			case key.Matches(msg, keys.undo):
 				switch currView {
-				case "archive":
-					if err := h.Unarchive(p); err != nil {
-						return m.NewStatusMessage(statusStyle("Failed to unarchive " + n))
-					}
-					i := m.Index()
-					m.RemoveItem(i)
-					return m.NewStatusMessage(statusStyle("Restored " + n))
-
 				case "trash":
 					if err := h.Untrash(p); err != nil {
 						return m.NewStatusMessage(statusStyle("Failed to restore " + n))
@@ -117,18 +99,15 @@ func newItemDelegate(
 	)
 
 	switch view {
-	case "archive":
-		shortHelp = []key.Binding{keys.trash, keys.undo}
-		longHelp = [][]key.Binding{{keys.trash, keys.undo, keys.keypadDelete}}
 	case "orphan":
-		shortHelp = []key.Binding{keys.trash, keys.archive}
-		longHelp = [][]key.Binding{{keys.trash, keys.archive, keys.keypadDelete}}
+		shortHelp = []key.Binding{keys.trash}
+		longHelp = [][]key.Binding{{keys.trash, keys.keypadDelete}}
 	case "trash":
 		shortHelp = []key.Binding{keys.delete, keys.undo}
 		longHelp = [][]key.Binding{{keys.delete, keys.undo, keys.keypadDelete}}
 	default:
-		shortHelp = []key.Binding{keys.trash, keys.archive}
-		longHelp = [][]key.Binding{{keys.trash, keys.archive, keys.keypadDelete}}
+		shortHelp = []key.Binding{keys.trash}
+		longHelp = [][]key.Binding{{keys.trash, keys.keypadDelete}}
 	}
 
 	d.ShortHelpFunc = func() []key.Binding {
@@ -142,7 +121,6 @@ func newItemDelegate(
 }
 
 type delegateKeyMap struct {
-	archive      key.Binding
 	undo         key.Binding
 	delete       key.Binding
 	trash        key.Binding
@@ -151,10 +129,6 @@ type delegateKeyMap struct {
 
 func newDelegateKeyMap() *delegateKeyMap {
 	return &delegateKeyMap{
-		archive: key.NewBinding(
-			key.WithKeys("A"),
-			key.WithHelp("A", "archive"),
-		),
 		undo: key.NewBinding(
 			key.WithKeys("U"),
 			key.WithHelp("U", "undo"),
