@@ -5,6 +5,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/Paintersrp/an/internal/state"
+	cmdpkg "github.com/Paintersrp/an/pkg/cmd"
 	"github.com/spf13/cobra"
 )
 
@@ -24,7 +25,10 @@ func NewCmdArchive(s *state.State) *cobra.Command {
 				fmt.Println("Please provide the path to the note you want to archive.")
 				return nil
 			}
-			path := args[0]
+			path, err := cmdpkg.ResolveVaultPath(cmd, s, args[0])
+			if err != nil {
+				return err
+			}
 			return s.Handler.Archive(path)
 		},
 	}
