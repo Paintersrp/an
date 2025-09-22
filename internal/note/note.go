@@ -12,6 +12,7 @@ import (
 
 	"github.com/spf13/viper"
 
+	"github.com/Paintersrp/an/internal/pathutil"
 	"github.com/Paintersrp/an/internal/templater"
 )
 
@@ -244,8 +245,13 @@ func openWithNvim(path string) error {
 // openWithObsidian opens the note in Obsidian.
 func openWithObsidian(path string) error {
 	fullVaultDir := viper.GetString("vaultdir")
-	vaultName := filepath.Base(fullVaultDir)
-	relativePath := strings.TrimPrefix(path, fullVaultDir+"/")
+	normalizedVaultDir := pathutil.NormalizePath(fullVaultDir)
+	vaultName := filepath.Base(normalizedVaultDir)
+
+	relativePath, err := pathutil.VaultRelative(fullVaultDir, path)
+	if err != nil {
+		return fmt.Errorf("unable to determine relative path for obsidian: %w", err)
+	}
 
 	obsidianURI := fmt.Sprintf(
 		"obsidian://open?vault=%s&file=%s",

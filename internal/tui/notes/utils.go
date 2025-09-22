@@ -13,35 +13,35 @@ import (
 
 	"github.com/charmbracelet/bubbles/list"
 	"gopkg.in/yaml.v2"
+
+	"github.com/Paintersrp/an/internal/pathutil"
 )
 
 func ParseNoteFiles(noteFiles []string, vaultDir string, asFileDetails bool) []list.Item {
 	var items []list.Item
 	for _, p := range noteFiles {
-		fileWithoutVault := strings.TrimPrefix(p, vaultDir+"/")
-
-		parts := strings.Split(fileWithoutVault, string(filepath.Separator))
-
-		var (
-			n  string
-			sd string
-		)
-
-		if len(parts) < 2 {
-			n = parts[0]
-		} else {
-			sd = parts[0]
-			n = strings.Join(parts[1:], string(filepath.Separator))
+		normalizedPath := pathutil.NormalizePath(p)
+		subDir, remainder, err := pathutil.VaultRelativeComponents(vaultDir, normalizedPath)
+		if err != nil {
+			continue
 		}
 
-		info, err := os.Stat(p)
+		if remainder == "" {
+			remainder = filepath.Base(normalizedPath)
+			subDir = ""
+		}
+
+		sd := filepath.FromSlash(subDir)
+		n := strings.ReplaceAll(remainder, "/", string(filepath.Separator))
+
+		info, err := os.Stat(normalizedPath)
 		if err != nil {
 			continue
 		}
 		size := info.Size()
 		last := info.ModTime().Format(time.RFC1123)
 
-		c, err := os.ReadFile(p)
+		c, err := os.ReadFile(normalizedPath)
 		if err != nil {
 			continue
 		}
@@ -50,7 +50,7 @@ func ParseNoteFiles(noteFiles []string, vaultDir string, asFileDetails bool) []l
 
 		items = append(items, ListItem{
 			fileName:     n,
-			path:         p,
+			path:         normalizedPath,
 			size:         size,
 			lastModified: last,
 			title:        title,
