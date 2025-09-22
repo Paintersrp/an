@@ -99,8 +99,6 @@ func (t *Templater) Execute(templateName string, data interface{}) (string, erro
 	if err != nil {
 		return "", err
 	}
-	fmt.Println(data)
-
 	var renderedTemplate bytes.Buffer
 	err = tmpl.Execute(&renderedTemplate, data)
 	if err != nil {
@@ -170,10 +168,16 @@ func (m TemplateMap) loadTemplates(dirPath string) error {
 				name := strings.TrimSuffix(info.Name(), filepath.Ext(info.Name()))
 
 				if _, exists := m[name]; !exists {
+					contents, readErr := os.ReadFile(path)
+					if readErr != nil {
+						return readErr
+					}
+
 					var data TemplateData
 					m[name] = SingleTemplate{
 						FilePath: path,
 						Data:     data,
+						Content:  string(contents),
 					}
 				}
 			}
