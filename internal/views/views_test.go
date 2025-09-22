@@ -90,6 +90,42 @@ func TestGetFilesByView_DefaultAndArchive(t *testing.T) {
 	})
 }
 
+func TestGetTitleForView(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		viewFlag  string
+		sortField int
+		sortOrder int
+		want      string
+	}{{
+		name:      "known view and sort field ascending",
+		viewFlag:  "default",
+		sortField: 0,
+		sortOrder: 0,
+		want:      "✅ - All View \nSort: Title (Ascending)",
+	}, {
+		name:      "unknown view falls back to default prefix",
+		viewFlag:  "mystery",
+		sortField: 5,
+		sortOrder: 1,
+		want:      "✅ - All View \nSort: Unknown (Descending)",
+	}}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := GetTitleForView(tc.viewFlag, tc.sortField, tc.sortOrder)
+			if got != tc.want {
+				t.Fatalf("GetTitleForView(%q, %d, %d) = %q, want %q",
+					tc.viewFlag, tc.sortField, tc.sortOrder, got, tc.want)
+			}
+		})
+	}
+}
+
 func mustMkdirAll(t *testing.T, path string) {
 	t.Helper()
 	if err := os.MkdirAll(path, 0o755); err != nil {
