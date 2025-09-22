@@ -13,10 +13,11 @@ import (
 	"github.com/Paintersrp/an/internal/note"
 	"github.com/Paintersrp/an/internal/state"
 	"github.com/Paintersrp/an/internal/templater"
-	"github.com/Paintersrp/an/pkg/shared/arg"
 	"github.com/Paintersrp/an/pkg/shared/flags"
 	"github.com/Paintersrp/an/utils"
 )
+
+var readClipboard = clipboard.ReadAll
 
 // TODO: adding links/tags/content after note already exists?
 
@@ -78,7 +79,12 @@ func run(
 	index int,
 	templateType string,
 ) error {
-	tags, err := utils.ValidateInput(strings.Join(args, " "))
+	tagInput := ""
+	if len(args) > 0 {
+		tagInput = args[0]
+	}
+
+	tags, err := utils.ValidateInput(tagInput)
 	if err != nil {
 		fmt.Printf("error processing tags argument: %s", err)
 		os.Exit(1)
@@ -92,12 +98,14 @@ func run(
 	}
 
 	if paste {
-		msg, err := clipboard.ReadAll()
+		msg, err := readClipboard()
 		if err == nil && msg != "" {
 			content = msg
 		}
 	} else {
-		content = arg.HandleContent(args)
+		if len(args) >= 2 {
+			content = args[1]
+		}
 	}
 
 	links := flags.HandleLinks(cmd)
