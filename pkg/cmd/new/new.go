@@ -97,10 +97,8 @@ func run(
 		if err == nil && msg != "" {
 			content = msg
 		}
-	} else {
-		if len(args) < 1 {
-			content = arg.HandleContent(args)
-		}
+	} else if len(args) >= 3 {
+		content = arg.HandleContent(args)
 	}
 
 	var (

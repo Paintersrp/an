@@ -3,7 +3,7 @@ package arg
 func HandleContent(args []string) string {
 	content := ""
 
-	if len(args) > 1 {
+	if len(args) >= 3 {
 		content = args[2]
 	}
 
