@@ -2,7 +2,9 @@ package notes
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -85,12 +87,26 @@ func parseFrontMatter(
 	return strings.TrimSpace(data.Title), data.Tags
 }
 
-// TODO: Handle rename conflicts / file name already exists
 func renameFile(m NoteListModel) error {
 	newName := m.inputModel.Input.Value()
 
 	if s, ok := m.list.SelectedItem().(ListItem); ok {
 		newPath := filepath.Join(filepath.Dir(s.path), newName+".md")
+		needsRename := newPath != s.path
+
+		if needsRename {
+			if _, err := os.Stat(newPath); err == nil {
+				m.list.NewStatusMessage(
+					statusStyle(fmt.Sprintf("File already exists: %s", newName+".md")),
+				)
+				return fmt.Errorf("destination file %q already exists: %w", newPath, fs.ErrExist)
+			} else if !errors.Is(err, fs.ErrNotExist) {
+				m.list.NewStatusMessage(
+					statusStyle(fmt.Sprintf("Error checking destination file: %s", err)),
+				)
+				return err
+			}
+		}
 
 		content, err := os.ReadFile(s.path)
 		if err != nil {
@@ -110,20 +126,33 @@ func renameFile(m NoteListModel) error {
 			return err
 		}
 
-		if err := os.Rename(s.path, newPath); err != nil {
-			m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Error renaming: %s", err)))
-			return err
+		if needsRename {
+			if err := os.Rename(s.path, newPath); err != nil {
+				m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Error renaming: %s", err)))
+				return err
+			}
 		}
 	}
 	return nil
 }
 
-// TODO: Handle rename conflicts / file name already exists
 func copyFile(m NoteListModel) error {
 	newName := m.inputModel.Input.Value()
 
 	if s, ok := m.list.SelectedItem().(ListItem); ok {
 		newPath := filepath.Join(filepath.Dir(s.path), newName+".md")
+
+		if _, err := os.Stat(newPath); err == nil {
+			m.list.NewStatusMessage(
+				statusStyle(fmt.Sprintf("File already exists: %s", newName+".md")),
+			)
+			return fmt.Errorf("destination file %q already exists: %w", newPath, fs.ErrExist)
+		} else if !errors.Is(err, fs.ErrNotExist) {
+			m.list.NewStatusMessage(
+				statusStyle(fmt.Sprintf("Error checking destination file: %s", err)),
+			)
+			return err
+		}
 
 		content, err := os.ReadFile(s.path)
 		if err != nil {
@@ -136,7 +165,7 @@ func copyFile(m NoteListModel) error {
 		title, _ := parseFrontMatter(content, s.path)
 		updatedContent := bytes.Replace(content, []byte(title), []byte(newName), 1)
 
-		destFile, err := os.Create(newPath)
+		destFile, err := os.OpenFile(newPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
 		if err != nil {
 			m.list.NewStatusMessage(
 				statusStyle(fmt.Sprintf("Error creating destination file: %s", err)),
