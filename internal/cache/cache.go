@@ -138,9 +138,28 @@ func (c *Cache) SizeOf() int64 {
 // sizeof returns the approximate size of the Entry object in bytes.
 func sizeof(e *Entry) int {
 	size := int(unsafe.Sizeof(*e))
-	size += len(e.Key.(string))
-	size += len(e.Value.(string))
+	size += approxSize(e.Key)
+	size += approxSize(e.Value)
 	return size
+}
+
+func approxSize(v interface{}) int {
+	if v == nil {
+		return 0
+	}
+
+	switch val := v.(type) {
+	case string:
+		return len(val)
+	case []byte:
+		return len(val)
+	case fmt.Stringer:
+		return len(val.String())
+	case error:
+		return len(val.Error())
+	default:
+		return len(fmt.Sprint(val))
+	}
 }
 
 type ByteSize float64
