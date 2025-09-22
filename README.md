@@ -65,6 +65,16 @@ When the Bubble Tea interface opens you will see a scrollable list of notes, a p
 
 Run `an --help` or any subcommand with `--help` to explore the rest of the command surface (journal, todo, settings, pin management, symlinks, etc.).
 
+## Testing
+
+Run the unit suite before sending a pull request to confirm core flows still pass:
+
+```bash
+go test ./...
+```
+
+This exercises the configuration loader, view selection helpers, the Markdown parser, and the templating system so regressions in those critical packages are caught early.
+
 ## Roadmap & Further Reading
 
 For upcoming features, architecture notes, and broader project context, read the [Planning roadmap](Planning%20v3.md) document in the repository root.

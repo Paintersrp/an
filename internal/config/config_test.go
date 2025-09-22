@@ -3,6 +3,7 @@ package config_test
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -89,5 +90,41 @@ func TestLoadRejectsUnsupportedEditor(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "invalid editor") {
 		t.Fatalf("expected invalid editor error, got %v", err)
+	}
+}
+
+func TestConfigAddSubdirPersistsChanges(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	cfg := &config.Config{
+		Editor:         "nvim",
+		FileSystemMode: "strict",
+		SubDirs:        []string{"existing"},
+	}
+
+	if err := cfg.AddSubdir("atoms"); err != nil {
+		t.Fatalf("AddSubdir returned error: %v", err)
+	}
+
+	if !slices.Contains(cfg.SubDirs, "atoms") {
+		t.Fatalf("expected in-memory SubDirs to include 'atoms': %#v", cfg.SubDirs)
+	}
+
+	data, err := os.ReadFile(cfg.GetConfigPath())
+	if err != nil {
+		t.Fatalf("reading persisted config: %v", err)
+	}
+
+	var persisted config.Config
+	if err := yaml.Unmarshal(data, &persisted); err != nil {
+		t.Fatalf("unmarshal persisted config: %v", err)
+	}
+
+	if !slices.Contains(persisted.SubDirs, "atoms") {
+		t.Fatalf("expected persisted SubDirs to include 'atoms': %#v", persisted.SubDirs)
+	}
+
+	if err := cfg.AddSubdir("atoms"); err == nil {
+		t.Fatal("expected error when adding duplicate subdir, got nil")
 	}
 }
