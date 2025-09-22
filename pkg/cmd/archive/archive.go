@@ -22,8 +22,8 @@ func NewCmdArchive(s *state.State) *cobra.Command {
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) < 1 {
-				fmt.Println("Please provide the path to the note you want to archive.")
-				return nil
+				_ = cmd.Help()
+				return fmt.Errorf("path argument is required")
 			}
 			path, err := cmdpkg.ResolveVaultPath(cmd, s, args[0])
 			if err != nil {
