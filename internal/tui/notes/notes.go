@@ -478,6 +478,8 @@ func (m *NoteListModel) toggleDetails() tea.Cmd {
 func (m *NoteListModel) cycleView() tea.Cmd {
 	switch m.viewName {
 	case "default":
+		m.viewName = "unfulfilled"
+	case "unfulfilled":
 		m.viewName = "archive"
 	case "archive":
 		m.viewName = "orphan"
