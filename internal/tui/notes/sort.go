@@ -30,10 +30,12 @@ func sortItems(items []ListItem, field sortField, order sortOrder) []list.Item {
 	sort.Slice(sortedItems, func(i, j int) bool {
 		switch field {
 		case sortByTitle:
+			iTitle := titleForSort(sortedItems[i])
+			jTitle := titleForSort(sortedItems[j])
 			if order == ascending {
-				return strings.Compare(sortedItems[i].title, sortedItems[j].title) < 0
+				return strings.Compare(iTitle, jTitle) < 0
 			}
-			return strings.Compare(sortedItems[i].title, sortedItems[j].title) > 0
+			return strings.Compare(iTitle, jTitle) > 0
 		case sortBySubdir:
 			if order == ascending {
 				return strings.Compare(
@@ -70,4 +72,11 @@ func parseDate(dateStr string) time.Time {
 	layout := "Mon, 02 Jan 2006 15:04:05 MST"
 	t, _ := time.Parse(layout, dateStr)
 	return t
+}
+
+func titleForSort(item ListItem) string {
+	if item.title == "" {
+		return strings.TrimSuffix(item.fileName, ".md")
+	}
+	return item.title
 }
