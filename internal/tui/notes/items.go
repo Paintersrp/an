@@ -52,13 +52,13 @@ func (i ListItem) Description() string {
 }
 
 func (i ListItem) FilterValue() string {
-	str := strings.Join(i.tags, " ")
-	return fmt.Sprintf(
-		"%s [%s] [%s]",
-		i.title,
-		str,
-		i.subdirectory,
-	)
+        str := strings.Join(i.tags, " ")
+        return fmt.Sprintf(
+                "%s [%s] [%s]",
+                i.Title(),
+                str,
+                i.subdirectory,
+        )
 }
 
 func (i ListItem) Path() string {
