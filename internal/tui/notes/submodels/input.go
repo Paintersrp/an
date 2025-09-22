@@ -59,7 +59,8 @@ func (m InputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	_, cmd := m.Update(msg)
+	var cmd tea.Cmd
+	m.Input, cmd = m.Input.Update(msg)
 
 	return m, cmd
 }
