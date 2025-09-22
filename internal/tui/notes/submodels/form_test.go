@@ -22,6 +22,7 @@ func TestHandleSubmitUsesDefaultTemplateWhenEmpty(t *testing.T) {
 	inputs[tags] = textinput.New()
 	inputs[links] = textinput.New()
 	inputs[template] = textinput.New()
+	inputs[template].SetValue("   ")
 	inputs[subdirectory] = textinput.New()
 	inputs[subdirectory].SetValue("notes")
 
@@ -36,7 +37,7 @@ func TestHandleSubmitUsesDefaultTemplateWhenEmpty(t *testing.T) {
 
 	var capturedTemplate string
 	originalLauncher := noteLauncher
-	noteLauncher = func(_ *note.ZettelkastenNote, _ *templater.Templater, tmpl, _ string) {
+	noteLauncher = func(_ *note.ZettelkastenNote, _ *templater.Templater, tmpl string, _ string) {
 		capturedTemplate = tmpl
 	}
 	defer func() {
@@ -62,8 +63,8 @@ func TestHandleSubmitUsesDefaultTemplateWhenEmpty(t *testing.T) {
 	_ = r.Close()
 	output := buf.String()
 
-	if capturedTemplate != "zet" {
-		t.Fatalf("expected default template 'zet', got %q", capturedTemplate)
+	if capturedTemplate != defaultTemplate {
+		t.Fatalf("expected default template %q, got %q", defaultTemplate, capturedTemplate)
 	}
 
 	if output != "" {
