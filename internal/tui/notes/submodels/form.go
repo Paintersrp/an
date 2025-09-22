@@ -283,7 +283,7 @@ func (m FormModel) handleSubmit() FormModel {
 		return m
 	}
 
-	subDir := m.Inputs[subdirectory].Value()
+	subDir := strings.TrimSpace(m.Inputs[subdirectory].Value())
 
 	if !m.subdirectoryExists(subDir) {
 		fmt.Printf("Subdirectory '%s' does not exist.\n", subDir)
@@ -311,6 +311,10 @@ func (m FormModel) handleSubmit() FormModel {
 }
 
 func (m FormModel) subdirectoryExists(subDir string) bool {
+	if strings.TrimSpace(subDir) == "" {
+		return true
+	}
+
 	for _, dir := range m.availableSubdirs {
 		if dir == subDir {
 			return true
