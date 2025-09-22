@@ -140,3 +140,42 @@ func TestTemplaterExecuteRendersTemplate(t *testing.T) {
 		t.Fatalf("expected rendered template to include title, got %q", rendered)
 	}
 }
+
+func TestTemplaterExecuteUsesUserTemplateContent(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	templatesDir := filepath.Join(os.Getenv("HOME"), ".an", "templates")
+	if err := os.MkdirAll(templatesDir, 0o755); err != nil {
+		t.Fatalf("failed to create user template directory: %v", err)
+	}
+
+	const templateBody = "User template body"
+
+	customTemplatePath := filepath.Join(templatesDir, "custom.tmpl")
+	if err := os.WriteFile(customTemplatePath, []byte(templateBody), 0o644); err != nil {
+		t.Fatalf("failed to write user template: %v", err)
+	}
+
+	prevValue, hadPrev := AvailableTemplates["custom"]
+	defer func() {
+		if hadPrev {
+			AvailableTemplates["custom"] = prevValue
+		} else {
+			delete(AvailableTemplates, "custom")
+		}
+	}()
+
+	templater, err := NewTemplater()
+	if err != nil {
+		t.Fatalf("NewTemplater returned error: %v", err)
+	}
+
+	rendered, err := templater.Execute("custom", TemplateData{})
+	if err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+
+	if rendered != templateBody {
+		t.Fatalf("expected rendered template to match template body %q, got %q", templateBody, rendered)
+	}
+}
