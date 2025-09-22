@@ -83,15 +83,29 @@ func (c *Cache) Put(key, value interface{}) error {
 		return errors.New("item size exceeds absurd size limit")
 	}
 
-	for c.currentSize+int64(itemSize) > c.maxSizeBytes {
-		c.removeOldest()
+	if ele, hit := c.items[key]; hit {
+		entry := ele.Value.(*Entry)
+		previousSize := sizeof(entry)
+
+		c.evictionList.Remove(ele)
+		delete(c.items, key)
+		c.currentSize -= int64(previousSize)
+
+		entry.Value = value
+		updatedSize := sizeof(entry)
+
+		for c.currentSize+int64(updatedSize) > c.maxSizeBytes {
+			c.removeOldest()
+		}
+
+		ele = c.evictionList.PushFront(entry)
+		c.items[key] = ele
+		c.currentSize += int64(updatedSize)
+		return nil
 	}
 
-	if ele, hit := c.items[key]; hit {
-		c.evictionList.MoveToFront(ele)
-		ele.Value.(*Entry).Value = value
-		c.currentSize += int64(itemSize)
-		return nil
+	for c.currentSize+int64(itemSize) > c.maxSizeBytes {
+		c.removeOldest()
 	}
 
 	ele := c.evictionList.PushFront(&Entry{Key: key, Value: value})
