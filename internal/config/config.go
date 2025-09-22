@@ -203,8 +203,10 @@ func (cfg *Config) ListPins(pinType string) error {
 }
 
 func (cfg *Config) Save() error {
-	if err := ValidateEditor(cfg.Editor); err != nil {
-		return err
+	if cfg.Editor != "" {
+		if err := ValidateEditor(cfg.Editor); err != nil {
+			return err
+		}
 	}
 
 	data, err := yaml.Marshal(cfg)

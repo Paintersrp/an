@@ -93,6 +93,52 @@ func TestLoadRejectsUnsupportedEditor(t *testing.T) {
 	}
 }
 
+func TestSaveWithNoEditorSkipsValidation(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	configPath := config.GetConfigPath(home)
+	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
+		t.Fatalf("failed to create config directory: %v", err)
+	}
+
+	cfgData := map[string]any{
+		"vaultdir": filepath.Join(home, "vault"),
+		"subdirs":  []string{},
+	}
+
+	data, err := yaml.Marshal(cfgData)
+	if err != nil {
+		t.Fatalf("failed to marshal config data: %v", err)
+	}
+
+	if err := os.WriteFile(configPath, data, 0o644); err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	cfg, err := config.Load(home)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+
+	if cfg.Editor != "" {
+		t.Fatalf("expected empty editor, got %q", cfg.Editor)
+	}
+
+	if err := cfg.AddSubdir("atoms"); err != nil {
+		t.Fatalf("AddSubdir returned error: %v", err)
+	}
+
+	reloaded, err := config.Load(home)
+	if err != nil {
+		t.Fatalf("reloading config: %v", err)
+	}
+
+	if !slices.Contains(reloaded.SubDirs, "atoms") {
+		t.Fatalf("expected persisted SubDirs to include 'atoms': %#v", reloaded.SubDirs)
+	}
+}
+
 func TestConfigAddSubdirPersistsChanges(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
