@@ -33,8 +33,44 @@ var ValidModes = map[string]bool{
 	"free":    true,
 }
 
-var ValidEditors = map[string]bool{
-	"nvim": true, // The one true god
+var validEditorNames = []string{"nvim", "obsidian", "vscode", "vim", "nano"}
+
+var ValidEditors = func() map[string]bool {
+	editors := make(map[string]bool, len(validEditorNames))
+	for _, editor := range validEditorNames {
+		editors[editor] = true
+	}
+
+	return editors
+}()
+
+func ValidateEditor(editor string) error {
+	if _, valid := ValidEditors[editor]; valid {
+		return nil
+	}
+
+	return fmt.Errorf(
+		"invalid editor: %q. Please choose from %s.",
+		editor,
+		validEditorList(),
+	)
+}
+
+func validEditorList() string {
+	quoted := make([]string, len(validEditorNames))
+	for i, name := range validEditorNames {
+		quoted[i] = fmt.Sprintf("'%s'", name)
+	}
+
+	if len(quoted) == 0 {
+		return ""
+	}
+
+	if len(quoted) == 1 {
+		return quoted[0]
+	}
+
+	return strings.Join(quoted[:len(quoted)-1], ", ") + ", or " + quoted[len(quoted)-1]
 }
 
 func Load(home string) (*Config, error) {
@@ -47,6 +83,12 @@ func Load(home string) (*Config, error) {
 	cfg := &Config{}
 	if err := yaml.Unmarshal(data, cfg); err != nil {
 		return nil, err
+	}
+
+	if cfg.Editor != "" {
+		if err := ValidateEditor(cfg.Editor); err != nil {
+			return nil, err
+		}
 	}
 
 	if cfg.NamedPins == nil {
@@ -98,8 +140,8 @@ func (cfg *Config) ChangeMode(mode string) error {
 }
 
 func (cfg *Config) ChangeEditor(editor string) error {
-	if _, valid := ValidEditors[editor]; !valid {
-		return fmt.Errorf("invalid editor: %q. The only valid option is 'nvim'", editor)
+	if err := ValidateEditor(editor); err != nil {
+		return err
 	}
 
 	cfg.Editor = editor
@@ -161,6 +203,10 @@ func (cfg *Config) ListPins(pinType string) error {
 }
 
 func (cfg *Config) Save() error {
+	if err := ValidateEditor(cfg.Editor); err != nil {
+		return err
+	}
+
 	data, err := yaml.Marshal(cfg)
 	if err != nil {
 		return err

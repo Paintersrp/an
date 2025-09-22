@@ -136,6 +136,11 @@ func (m InitPromptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					PinnedTaskFile: defaults[6],
 				}
 
+				if err := config.ValidateEditor(cfg.Editor); err != nil {
+					fmt.Println(err)
+					return m, nil
+				}
+
 				cfgErr := cfg.Save()
 				if cfgErr != nil {
 					panic(cfgErr)
