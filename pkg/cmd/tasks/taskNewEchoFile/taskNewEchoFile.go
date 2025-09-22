@@ -62,7 +62,7 @@ func run(
 }
 
 func findHighestIncrement(vaultDir, molecule string) int {
-	re := regexp.MustCompile(`^task-echo-(\d{2})\.md$`)
+	re := regexp.MustCompile(`^task-echo-(\d{2})$`)
 
 	highest := 0
 	notes, _ := note.GetNotesInDirectory(vaultDir, molecule)
