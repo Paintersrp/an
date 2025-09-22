@@ -119,7 +119,7 @@ func (t *Templater) GenerateTagsAndDate(tmplName string) (string, []string) {
 	hour := fmt.Sprintf("%02dh", cur.Hour())
 
 	switch tmplName {
-	case "daily":
+	case "day", "daily":
 		return zetTime, []string{"daily", day, hour}
 	default:
 		return zetTime, []string{}

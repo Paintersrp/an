@@ -1,10 +1,12 @@
 package templater
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestNewTemplaterRegistersUserTemplate(t *testing.T) {
@@ -77,6 +79,40 @@ func TestGenerateTagsAndDateDefaultTemplate(t *testing.T) {
 
 	if len(tags) != 0 {
 		t.Fatalf("expected non-daily template to have zero tags, got %#v", tags)
+	}
+}
+
+func TestGenerateTagsAndDateDayTemplate(t *testing.T) {
+	t.Setenv("TZ", "UTC")
+
+	templater := &Templater{}
+
+	before := time.Now().UTC()
+	date, tags := templater.GenerateTagsAndDate("day")
+	after := time.Now().UTC()
+
+	if len(date) == 0 {
+		t.Fatal("expected generated date to be non-empty")
+	}
+
+	if len(tags) != 3 {
+		t.Fatalf("expected day template to have three tags, got %#v", tags)
+	}
+
+	if tags[0] != "daily" {
+		t.Fatalf("expected first tag to be 'daily', got %q", tags[0])
+	}
+
+	beforeDay := strings.ToLower(before.Weekday().String())
+	afterDay := strings.ToLower(after.Weekday().String())
+	if tags[1] != beforeDay && tags[1] != afterDay {
+		t.Fatalf("expected second tag to match weekday, got %q (expected %q or %q)", tags[1], beforeDay, afterDay)
+	}
+
+	beforeHour := fmt.Sprintf("%02dh", before.Hour())
+	afterHour := fmt.Sprintf("%02dh", after.Hour())
+	if tags[2] != beforeHour && tags[2] != afterHour {
+		t.Fatalf("expected third tag to match hour, got %q (expected %q or %q)", tags[2], beforeHour, afterHour)
 	}
 }
 
