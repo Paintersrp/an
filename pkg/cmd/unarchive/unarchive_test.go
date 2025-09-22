@@ -15,7 +15,12 @@ func TestUnarchiveCommandRequiresArgument(t *testing.T) {
 	cmd.SilenceUsage = true
 
 	cmd.SetArgs([]string{})
-	if err := cmd.Execute(); err == nil {
+	err := cmd.Execute()
+	if err == nil {
 		t.Fatalf("expected an error when no path argument is provided")
+	}
+
+	if err.Error() != "path argument is required" {
+		t.Fatalf("expected error message %q, got %q", "path argument is required", err.Error())
 	}
 }
