@@ -508,7 +508,19 @@ func (m *NoteListModel) toggleCopy() {
 		m.copying = true
 		m.inputModel.Input.Focus()
 		if s, ok := m.list.SelectedItem().(ListItem); ok {
-			m.inputModel.Input.SetValue(s.title + "-copy")
+			base := s.Title()
+			if base == "" {
+				base = strings.TrimSuffix(s.fileName, ".md")
+			}
+			if base == "" {
+				break
+			}
+
+			const suffix = "-copy"
+			if !strings.HasSuffix(base, suffix) {
+				base += suffix
+			}
+			m.inputModel.Input.SetValue(base)
 		}
 	}
 }
@@ -522,7 +534,11 @@ func (m *NoteListModel) toggleRename() {
 		m.renaming = true
 		m.inputModel.Input.Focus()
 		if s, ok := m.list.SelectedItem().(ListItem); ok {
-			m.inputModel.Input.SetValue(s.title)
+			value := s.Title()
+			if value == "" {
+				value = strings.TrimSuffix(s.fileName, ".md")
+			}
+			m.inputModel.Input.SetValue(value)
 		}
 	}
 }
