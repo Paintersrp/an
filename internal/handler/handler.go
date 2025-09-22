@@ -41,6 +41,9 @@ func (h *FileHandler) Unarchive(path string) error {
 	}
 
 	originalDir := filepath.Join(h.vaultDir, subDir)
+	if err := os.MkdirAll(originalDir, os.ModePerm); err != nil {
+		return err
+	}
 	newPath := filepath.Join(originalDir, filepath.Base(path))
 	return os.Rename(path, newPath)
 }
@@ -69,6 +72,9 @@ func (h *FileHandler) Untrash(path string) error {
 	}
 
 	originalDir := filepath.Join(h.vaultDir, subDir)
+	if err := os.MkdirAll(originalDir, os.ModePerm); err != nil {
+		return err
+	}
 	newPath := filepath.Join(originalDir, filepath.Base(path))
 	return os.Rename(path, newPath)
 }

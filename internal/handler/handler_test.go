@@ -71,3 +71,95 @@ func TestWalkFilesExcludesArchiveAndTrash(t *testing.T) {
 		}
 	}
 }
+
+func TestUnarchiveRecreatesOriginalDir(t *testing.T) {
+	vaultDir := t.TempDir()
+	handler := NewFileHandler(vaultDir)
+
+	originalDir := filepath.Join(vaultDir, "projects", "sub")
+	if err := os.MkdirAll(originalDir, 0o755); err != nil {
+		t.Fatalf("failed to create original directory: %v", err)
+	}
+
+	originalPath := filepath.Join(originalDir, "note.md")
+	content := []byte("archived content")
+	if err := os.WriteFile(originalPath, content, 0o644); err != nil {
+		t.Fatalf("failed to write original file: %v", err)
+	}
+
+	archivePath := filepath.Join(vaultDir, "archive", "projects", "sub", "note.md")
+	if err := os.MkdirAll(filepath.Dir(archivePath), 0o755); err != nil {
+		t.Fatalf("failed to create archive directory: %v", err)
+	}
+
+	if err := os.Rename(originalPath, archivePath); err != nil {
+		t.Fatalf("failed to move file to archive: %v", err)
+	}
+
+	if err := os.RemoveAll(originalDir); err != nil {
+		t.Fatalf("failed to remove original directory: %v", err)
+	}
+
+	if err := handler.Unarchive(archivePath); err != nil {
+		t.Fatalf("Unarchive returned error: %v", err)
+	}
+
+	if _, err := os.Stat(originalDir); err != nil {
+		t.Fatalf("expected original directory to exist: %v", err)
+	}
+
+	restored, err := os.ReadFile(originalPath)
+	if err != nil {
+		t.Fatalf("failed to read restored file: %v", err)
+	}
+
+	if string(restored) != string(content) {
+		t.Fatalf("restored file content mismatch: got %q, want %q", string(restored), string(content))
+	}
+}
+
+func TestUntrashRecreatesOriginalDir(t *testing.T) {
+	vaultDir := t.TempDir()
+	handler := NewFileHandler(vaultDir)
+
+	originalDir := filepath.Join(vaultDir, "projects", "sub")
+	if err := os.MkdirAll(originalDir, 0o755); err != nil {
+		t.Fatalf("failed to create original directory: %v", err)
+	}
+
+	originalPath := filepath.Join(originalDir, "note.md")
+	content := []byte("trashed content")
+	if err := os.WriteFile(originalPath, content, 0o644); err != nil {
+		t.Fatalf("failed to write original file: %v", err)
+	}
+
+	trashPath := filepath.Join(vaultDir, "trash", "projects", "sub", "note.md")
+	if err := os.MkdirAll(filepath.Dir(trashPath), 0o755); err != nil {
+		t.Fatalf("failed to create trash directory: %v", err)
+	}
+
+	if err := os.Rename(originalPath, trashPath); err != nil {
+		t.Fatalf("failed to move file to trash: %v", err)
+	}
+
+	if err := os.RemoveAll(originalDir); err != nil {
+		t.Fatalf("failed to remove original directory: %v", err)
+	}
+
+	if err := handler.Untrash(trashPath); err != nil {
+		t.Fatalf("Untrash returned error: %v", err)
+	}
+
+	if _, err := os.Stat(originalDir); err != nil {
+		t.Fatalf("expected original directory to exist: %v", err)
+	}
+
+	restored, err := os.ReadFile(originalPath)
+	if err != nil {
+		t.Fatalf("failed to read restored file: %v", err)
+	}
+
+	if string(restored) != string(content) {
+		t.Fatalf("restored file content mismatch: got %q, want %q", string(restored), string(content))
+	}
+}
