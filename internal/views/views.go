@@ -130,22 +130,23 @@ func (vm *ViewManager) GetFilesByView(
 	m, ok := vm.Views[viewFlag]
 	if !ok {
 		availableViews := vm.GetAvailableViews()
-		panic(fmt.Errorf(
+		return nil, fmt.Errorf(
 			"invalid view: %s. Available views are: %s",
 			viewFlag,
 			availableViews,
-		))
-
+		)
 	}
+
 	if len(m.ExcludeDirs) == 0 {
 		excludeDirs = defaultExcludeDirs
 	} else {
 		excludeDirs = m.ExcludeDirs
 	}
-	if len(excludeFiles) == 0 {
+
+	if len(m.ExcludeFiles) == 0 {
 		excludeFiles = defaultExcludeFiles
 	} else {
-		excludeDirs = m.ExcludeFiles
+		excludeFiles = m.ExcludeFiles
 	}
 
 	return vm.Handler.WalkFiles(excludeDirs, excludeFiles, viewFlag)

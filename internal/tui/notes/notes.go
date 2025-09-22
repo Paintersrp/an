@@ -49,7 +49,7 @@ func NewNoteListModel(
 ) (*NoteListModel, error) {
 	files, err := s.ViewManager.GetFilesByView(viewName, s.Vault)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load files for view %q: %w", viewName, err)
 	}
 
 	items := ParseNoteFiles(files, s.Vault, false)
@@ -412,7 +412,13 @@ func (m *NoteListModel) refresh() tea.Cmd {
 }
 
 func (m *NoteListModel) refreshItems() tea.Cmd {
-	files, _ := m.state.ViewManager.GetFilesByView(m.viewName, m.state.Vault)
+	files, err := m.state.ViewManager.GetFilesByView(m.viewName, m.state.Vault)
+	if err != nil {
+		m.list.NewStatusMessage(
+			statusStyle(fmt.Sprintf("Failed to load %s view: %v", m.viewName, err)),
+		)
+		return nil
+	}
 	items := ParseNoteFiles(files, m.state.Vault, m.showDetails)
 	sortedItems := sortItems(castToListItems(items), m.sortField, m.sortOrder)
 	return m.list.SetItems(sortedItems)
