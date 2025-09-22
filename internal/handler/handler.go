@@ -79,20 +79,12 @@ func (h *FileHandler) WalkFiles(
 	modeFlag string,
 ) ([]string, error) {
 	var files []string
-	baseDepth := len(strings.Split(h.vaultDir, string(os.PathSeparator)))
 
 	err := filepath.Walk(
 		h.vaultDir,
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
-			}
-
-			depth := len(strings.Split(path, string(os.PathSeparator)))
-
-			// Skip files that are directly in the vaultDir
-			if depth == baseDepth+1 && !info.IsDir() {
-				return nil
 			}
 
 			dir := filepath.Dir(path)
