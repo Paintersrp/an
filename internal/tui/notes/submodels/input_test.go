@@ -11,9 +11,9 @@ func TestInputModelUpdateHandlesKeyMessages(t *testing.T) {
 	m := NewInputModel()
 
 	model, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlR})
-	updated, ok := model.(InputModel)
+	updated, ok := model.(*InputModel)
 	if !ok {
-		t.Fatalf("expected InputModel, got %T", model)
+		t.Fatalf("expected *InputModel, got %T", model)
 	}
 
 	if updated.cursorMode != cursor.CursorStatic {
@@ -21,9 +21,9 @@ func TestInputModelUpdateHandlesKeyMessages(t *testing.T) {
 	}
 
 	nextModel, _ := updated.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
-	next, ok := nextModel.(InputModel)
+	next, ok := nextModel.(*InputModel)
 	if !ok {
-		t.Fatalf("expected InputModel, got %T", nextModel)
+		t.Fatalf("expected *InputModel, got %T", nextModel)
 	}
 
 	if next.Input.Value() != "a" {
