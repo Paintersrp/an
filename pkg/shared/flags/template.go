@@ -25,7 +25,7 @@ func AddTemplate(cmd *cobra.Command, def string) {
 			"template",
 			"t",
 			defaultTemplate,
-			"Specify the template to use (default is 'zet'). Available templates: daily, roadmap, zet",
+			"Specify the template to use (default is 'zet'). Available templates: day, roadmap, zet",
 		)
 	viper.BindPFlag(
 		"template",
