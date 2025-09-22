@@ -40,6 +40,7 @@ var (
 			Padding(1, 0)
 
 	continueStyle = lipgloss.NewStyle().Foreground(darkGray)
+	noteLauncher  = note.StaticHandleNoteLaunch
 )
 
 type FormModel struct {
@@ -257,8 +258,9 @@ func (m FormModel) handleSubmit() FormModel {
 	}
 
 	tmpl := m.Inputs[template].Value()
-
-	if _, ok := templater.AvailableTemplates[tmpl]; !ok {
+	if tmpl == "" {
+		tmpl = "zet"
+	} else if _, ok := templater.AvailableTemplates[tmpl]; !ok {
 		var templateNames []string
 		for name := range templater.AvailableTemplates {
 			templateNames = append(templateNames, name)
@@ -299,7 +301,7 @@ func (m FormModel) handleSubmit() FormModel {
 	}
 
 	// TODO: Content instead of "" ?
-	note.StaticHandleNoteLaunch(n, m.state.Templater, tmpl, "")
+	noteLauncher(n, m.state.Templater, tmpl, "")
 
 	return m
 }
