@@ -37,3 +37,88 @@ func TestCycleViewOrder(t *testing.T) {
 		}
 	}
 }
+
+func TestToggleRenameSeedsInputValue(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name string
+		item ListItem
+		want string
+	}{
+		{
+			name: "with title",
+			item: ListItem{title: "Front Matter Title", fileName: "front-matter-title.md"},
+			want: "Front Matter Title",
+		},
+		{
+			name: "without title",
+			item: ListItem{title: "", fileName: "plain-note.md"},
+			want: "plain-note",
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			model := newTestNoteListModel(t, tc.item, "")
+
+			model.toggleRename()
+
+			if !model.renaming {
+				t.Fatalf("expected renaming to be true")
+			}
+
+			if got := model.inputModel.Input.Value(); got != tc.want {
+				t.Fatalf("expected input value %q, got %q", tc.want, got)
+			}
+		})
+	}
+}
+
+func TestToggleCopySeedsInputValue(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name string
+		item ListItem
+		want string
+	}{
+		{
+			name: "with title",
+			item: ListItem{title: "Front Matter Title", fileName: "front-matter-title.md"},
+			want: "Front Matter Title-copy",
+		},
+		{
+			name: "without title",
+			item: ListItem{title: "", fileName: "plain-note.md"},
+			want: "plain-note-copy",
+		},
+		{
+			name: "already suffixed",
+			item: ListItem{title: "Front Matter Title-copy", fileName: "front-matter-title-copy.md"},
+			want: "Front Matter Title-copy",
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			model := newTestNoteListModel(t, tc.item, "")
+
+			model.toggleCopy()
+
+			if !model.copying {
+				t.Fatalf("expected copying to be true")
+			}
+
+			if got := model.inputModel.Input.Value(); got != tc.want {
+				t.Fatalf("expected input value %q, got %q", tc.want, got)
+			}
+		})
+	}
+}
