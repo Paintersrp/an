@@ -103,39 +103,28 @@ func run(
 		}
 	}
 
-	var n *note.ZettelkastenNote
+	var (
+		n                *note.ZettelkastenNote
+		currentDir       string
+		reverseDir       string
+		errGetWorkingDir error
+	)
 
 	if createSymlink {
-		cwd, err := os.Getwd()
-		if err != nil {
-			return err
+		currentDir, errGetWorkingDir = os.Getwd()
+		if errGetWorkingDir != nil {
+			return errGetWorkingDir
 		}
 		n = note.NewZettelkastenNote(vaultDir, subDir, title, tags, links, upstream)
-		p := n.GetFilepath()
-		symlinkPath := filepath.Join(cwd, filepath.Base(p))
-		if err := os.Symlink(p, symlinkPath); err != nil {
-			return fmt.Errorf("failed to create symlink: %s", err)
+	} else if reverseSymlink {
+		currentDir, errGetWorkingDir = os.Getwd()
+		if errGetWorkingDir != nil {
+			return errGetWorkingDir
 		}
-
+		n = note.NewZettelkastenNote(currentDir, "", title, tags, links, upstream)
+		reverseDir = filepath.Join(vaultDir, subDir)
 	} else {
-		if reverseSymlink {
-			cwd, err := os.Getwd()
-			if err != nil {
-				return err
-			}
-			n = note.NewZettelkastenNote(cwd, "", title, tags, links, upstream)
-			p := n.GetFilepath()
-			reverseSymlinkPath := filepath.Join(vaultDir, subDir, filepath.Base(p))
-			if err := os.Symlink(p, reverseSymlinkPath); err != nil {
-				fmt.Println(err)
-				os.Exit(1)
-				return fmt.Errorf("failed to create symlink: %s", err)
-			}
-
-			fmt.Printf("Reverse Path: %s", reverseSymlinkPath)
-		} else {
-			n = note.NewZettelkastenNote(vaultDir, subDir, title, tags, links, upstream)
-		}
+		n = note.NewZettelkastenNote(vaultDir, subDir, title, tags, links, upstream)
 	}
 
 	conflict := n.HandleConflicts()
@@ -147,16 +136,23 @@ func run(
 	note.StaticHandleNoteLaunch(n, s.Templater, tmpl, content)
 
 	if createSymlink {
-		cwd, err := os.Getwd()
-		if err != nil {
-			return err
+		notePath := n.GetFilepath()
+		symlinkPath := filepath.Join(currentDir, filepath.Base(notePath))
+		if err := os.Symlink(notePath, symlinkPath); err != nil {
+			return fmt.Errorf("failed to create symlink: %s", err)
 		}
-		p := n.GetFilepath()
-		symlinkPath := filepath.Join(cwd, filepath.Base(p))
-		if err := os.Symlink(p, symlinkPath); err != nil {
+	}
+
+	if reverseSymlink {
+		notePath := n.GetFilepath()
+		reverseSymlinkPath := filepath.Join(reverseDir, filepath.Base(notePath))
+		if err := os.Symlink(notePath, reverseSymlinkPath); err != nil {
+			fmt.Println(err)
+			os.Exit(1)
 			return fmt.Errorf("failed to create symlink: %s", err)
 		}
 
+		fmt.Printf("Reverse Path: %s", reverseSymlinkPath)
 	}
 	return nil
 }
