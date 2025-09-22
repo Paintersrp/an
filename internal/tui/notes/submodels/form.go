@@ -32,6 +32,8 @@ const (
 	darkGray = lipgloss.Color("#767676")
 )
 
+const defaultTemplate = "zet"
+
 var (
 	formInputStyle = lipgloss.NewStyle().Foreground(hotPink)
 	formTitleStyle = lipgloss.NewStyle().
@@ -257,10 +259,12 @@ func (m FormModel) handleSubmit() FormModel {
 		return m
 	}
 
-	tmpl := m.Inputs[template].Value()
+	tmpl := strings.TrimSpace(m.Inputs[template].Value())
 	if tmpl == "" {
-		tmpl = "zet"
-	} else if _, ok := templater.AvailableTemplates[tmpl]; !ok {
+		tmpl = defaultTemplate
+	}
+
+	if _, ok := templater.AvailableTemplates[tmpl]; !ok {
 		var templateNames []string
 		for name := range templater.AvailableTemplates {
 			templateNames = append(templateNames, name)
