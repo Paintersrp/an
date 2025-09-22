@@ -163,14 +163,12 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, nil
 				}
 
-				m.config.Editor = c
-				m.editorSelectActive = false
-
-				saveErr := m.config.Save()
-				if saveErr != nil {
-					fmt.Println("Failed to save config file, exiting...")
-					os.Exit(1)
+				if err := m.config.ChangeEditor(c); err != nil {
+					m.list.NewStatusMessage(statusMessageStyle(err.Error()))
+					return m, nil
 				}
+
+				m.editorSelectActive = false
 
 				index := m.list.Index()
 				items := m.list.Items()
@@ -254,21 +252,26 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 				inputValue := m.configInput.Input.Value()
-				switch title {
-				case "VaultDir":
-					m.config.VaultDir = inputValue
-				case "Editor":
-					m.config.Editor = inputValue
-				case "NvimArgs":
-					m.config.NvimArgs = inputValue
-				case "MoleculeMode":
-					m.config.FileSystemMode = inputValue
-				}
+				if title == "Editor" {
+					if err := m.config.ChangeEditor(inputValue); err != nil {
+						m.list.NewStatusMessage(statusMessageStyle(err.Error()))
+						return m, nil
+					}
+				} else {
+					switch title {
+					case "VaultDir":
+						m.config.VaultDir = inputValue
+					case "NvimArgs":
+						m.config.NvimArgs = inputValue
+					case "MoleculeMode":
+						m.config.FileSystemMode = inputValue
+					}
 
-				err := m.config.Save()
-				if err != nil {
-					fmt.Println("Failed to save config file, exiting...")
-					os.Exit(1)
+					err := m.config.Save()
+					if err != nil {
+						fmt.Println("Failed to save config file, exiting...")
+						os.Exit(1)
+					}
 				}
 
 				index := m.list.Index()
