@@ -46,7 +46,7 @@ func ParseNoteFiles(noteFiles []string, vaultDir string, asFileDetails bool) []l
 			continue
 		}
 
-		title, tags := parseFrontMatter(c, n)
+		title, tags, _, _ := parseFrontMatter(c, n)
 
 		items = append(items, ListItem{
 			fileName:     n,
@@ -65,26 +65,103 @@ func ParseNoteFiles(noteFiles []string, vaultDir string, asFileDetails bool) []l
 func parseFrontMatter(
 	content []byte,
 	fileName string,
-) (title string, tags []string) {
+) (title string, tags []string, start, end int) {
 	// Get everything between the --- block in the markdown
 	re := regexp.MustCompile(`(?ms)^---\n(.+?)\n---`)
-	m := re.FindSubmatch(content)
-	if len(m) < 2 {
-		return "", nil
+	loc := re.FindSubmatchIndex(content)
+	if len(loc) < 4 {
+		return "", nil, -1, -1
 	}
 
-	yamlContent := m[1]
+	start = loc[2]
+	end = loc[3]
+	yamlContent := content[start:end]
 
-	var data struct {
-		Title string   `yaml:"title"`
-		Tags  []string `yaml:"tags"`
-	}
+	var data yaml.MapSlice
 
 	if err := yaml.Unmarshal(yamlContent, &data); err != nil {
-		return fileName, nil
+		return fileName, nil, start, end
 	}
 
-	return strings.TrimSpace(data.Title), data.Tags
+	for _, item := range data {
+		key, ok := item.Key.(string)
+		if !ok {
+			continue
+		}
+
+		switch key {
+		case "title":
+			if value, ok := item.Value.(string); ok {
+				title = strings.TrimSpace(value)
+			}
+		case "tags":
+			switch value := item.Value.(type) {
+			case []interface{}:
+				for _, tag := range value {
+					if tagStr, ok := tag.(string); ok {
+						tags = append(tags, tagStr)
+					}
+				}
+			case []string:
+				tags = append(tags, value...)
+			}
+		}
+	}
+
+	return title, tags, start, end
+}
+
+func updateFrontMatterTitle(content []byte, start, end int, newTitle string) ([]byte, bool, error) {
+	if start < 0 || end < 0 || start >= end || end > len(content) {
+		return content, false, nil
+	}
+
+	original := content[start:end]
+
+	var data yaml.MapSlice
+	if err := yaml.Unmarshal(original, &data); err != nil {
+		return content, false, nil
+	}
+
+	updated := false
+	for i, item := range data {
+		key, ok := item.Key.(string)
+		if !ok {
+			continue
+		}
+		if key == "title" {
+			data[i].Value = newTitle
+			updated = true
+			break
+		}
+	}
+
+	if !updated {
+		return content, false, nil
+	}
+
+	marshaled, err := yaml.Marshal(data)
+	if err != nil {
+		return content, false, err
+	}
+
+	trailingNewlines := 0
+	for trailingNewlines < len(original) && original[len(original)-1-trailingNewlines] == '\n' {
+		trailingNewlines++
+	}
+
+	marshaled = bytes.TrimSuffix(marshaled, []byte("\n"))
+	if trailingNewlines > 0 {
+		marshaled = append(marshaled, bytes.Repeat([]byte("\n"), trailingNewlines)...)
+	}
+
+	var buf bytes.Buffer
+	buf.Grow(len(content) - (end - start) + len(marshaled))
+	buf.Write(content[:start])
+	buf.Write(marshaled)
+	buf.Write(content[end:])
+
+	return buf.Bytes(), true, nil
 }
 
 func renameFile(m NoteListModel) error {
@@ -116,16 +193,20 @@ func renameFile(m NoteListModel) error {
 			return err
 		}
 
-		title, _ := parseFrontMatter(content, s.fileName)
-		if title != "" {
-			updatedContent := bytes.Replace(content, []byte(title), []byte(newName), 1)
-
+		_, _, start, end := parseFrontMatter(content, s.fileName)
+		if updatedContent, updated, err := updateFrontMatterTitle(content, start, end, newName); err != nil {
+			m.list.NewStatusMessage(
+				statusStyle(fmt.Sprintf("Error updating title: %s", err)),
+			)
+			return err
+		} else if updated {
 			if err := os.WriteFile(s.path, updatedContent, 0o644); err != nil {
 				m.list.NewStatusMessage(
 					statusStyle(fmt.Sprintf("Error writing file: %s", err)),
 				)
 				return err
 			}
+			content = updatedContent
 		}
 
 		if needsRename {
@@ -164,10 +245,13 @@ func copyFile(m NoteListModel) error {
 			return err
 		}
 
-		title, _ := parseFrontMatter(content, s.fileName)
-		updatedContent := content
-		if title != "" {
-			updatedContent = bytes.Replace(content, []byte(title), []byte(newName), 1)
+		_, _, start, end := parseFrontMatter(content, s.fileName)
+		updatedContent, _, err := updateFrontMatterTitle(content, start, end, newName)
+		if err != nil {
+			m.list.NewStatusMessage(
+				statusStyle(fmt.Sprintf("Error updating title: %s", err)),
+			)
+			return err
 		}
 
 		destFile, err := os.OpenFile(newPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)

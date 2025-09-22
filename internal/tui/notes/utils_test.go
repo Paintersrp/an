@@ -66,6 +66,38 @@ func TestRenameFileSuccess(t *testing.T) {
 	}
 }
 
+func TestRenameFilePreservesBodyTitleOccurrences(t *testing.T) {
+	dir := t.TempDir()
+
+	originalContent := "---\ntitle: Original\n---\nOriginal body mentions Original multiple times.\n"
+	originalPath := filepath.Join(dir, "original.md")
+	if err := os.WriteFile(originalPath, []byte(originalContent), 0o644); err != nil {
+		t.Fatalf("failed to write original file: %v", err)
+	}
+
+	item := ListItem{
+		fileName: "original.md",
+		path:     originalPath,
+	}
+
+	model := newTestNoteListModel(t, item, "Renamed")
+
+	if err := renameFile(model); err != nil {
+		t.Fatalf("renameFile returned error: %v", err)
+	}
+
+	renamedPath := filepath.Join(dir, "Renamed.md")
+	data, err := os.ReadFile(renamedPath)
+	if err != nil {
+		t.Fatalf("failed to read renamed file: %v", err)
+	}
+
+	expected := "---\ntitle: Renamed\n---\nOriginal body mentions Original multiple times.\n"
+	if string(data) != expected {
+		t.Fatalf("unexpected renamed file contents: %q", string(data))
+	}
+}
+
 func TestRenameFileWithoutTitle(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -185,6 +217,47 @@ func TestCopyFileSuccess(t *testing.T) {
 
 	if string(data) != "---\ntitle: Copy\n---\nbody" {
 		t.Fatalf("unexpected copied file contents: %q", string(data))
+	}
+}
+
+func TestCopyFilePreservesBodyTitleOccurrences(t *testing.T) {
+	dir := t.TempDir()
+
+	originalContent := "---\ntitle: Original\n---\nBody keeps Original references intact.\n"
+	originalPath := filepath.Join(dir, "original.md")
+	if err := os.WriteFile(originalPath, []byte(originalContent), 0o644); err != nil {
+		t.Fatalf("failed to write original file: %v", err)
+	}
+
+	item := ListItem{
+		fileName: "original.md",
+		path:     originalPath,
+	}
+
+	model := newTestNoteListModel(t, item, "Copy")
+
+	if err := copyFile(model); err != nil {
+		t.Fatalf("copyFile returned error: %v", err)
+	}
+
+	copyPath := filepath.Join(dir, "Copy.md")
+	data, err := os.ReadFile(copyPath)
+	if err != nil {
+		t.Fatalf("failed to read copied file: %v", err)
+	}
+
+	expected := "---\ntitle: Copy\n---\nBody keeps Original references intact.\n"
+	if string(data) != expected {
+		t.Fatalf("unexpected copied file contents: %q", string(data))
+	}
+
+	originalData, err := os.ReadFile(originalPath)
+	if err != nil {
+		t.Fatalf("failed to read original file: %v", err)
+	}
+
+	if string(originalData) != originalContent {
+		t.Fatalf("original file contents changed: %q", string(originalData))
 	}
 }
 
