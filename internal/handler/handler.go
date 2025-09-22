@@ -80,6 +80,11 @@ func (h *FileHandler) WalkFiles(
 ) ([]string, error) {
 	var files []string
 
+	var excludePaths []string
+	for _, d := range excludeDirs {
+		excludePaths = append(excludePaths, filepath.Clean(filepath.Join(h.vaultDir, d)))
+	}
+
 	err := filepath.Walk(
 		h.vaultDir,
 		func(path string, info os.FileInfo, err error) error {
@@ -87,12 +92,17 @@ func (h *FileHandler) WalkFiles(
 				return err
 			}
 
-			dir := filepath.Dir(path)
-			for _, d := range excludeDirs {
-				if dir == filepath.Join(h.vaultDir, d) {
-					if info.IsDir() {
+			cleanedPath := filepath.Clean(path)
+
+			for _, excludePath := range excludePaths {
+				if info.IsDir() {
+					if cleanedPath == excludePath {
 						return filepath.SkipDir
 					}
+					continue
+				}
+
+				if filepath.Dir(cleanedPath) == excludePath {
 					return nil
 				}
 			}
