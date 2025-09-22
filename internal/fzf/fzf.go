@@ -9,6 +9,7 @@ import (
 	"github.com/Paintersrp/an/internal/handler"
 	"github.com/Paintersrp/an/internal/note"
 	"github.com/Paintersrp/an/internal/parser"
+	"github.com/Paintersrp/an/internal/pathutil"
 	"github.com/charmbracelet/glamour"
 	"github.com/ktr0731/go-fuzzyfinder"
 	"github.com/muesli/termenv"
@@ -173,15 +174,28 @@ func (f *FuzzyFinder) handleFuzzySelectError(err error) {
 // Execute opens the target file selected by the fuzzy finder in the configured editor with arguments
 func (f *FuzzyFinder) Execute(idx int) {
 	selectedFile := f.files[idx]
-	fileWithoutVault := strings.TrimPrefix(selectedFile, f.vaultDir+"/")
-	pathParts := strings.Split(fileWithoutVault, string(filepath.Separator))
-	subDir := pathParts[0]
-	fileName := strings.Join(pathParts[1:], string(filepath.Separator))
+	normalizedVault := pathutil.NormalizePath(f.vaultDir)
+	normalizedPath := pathutil.NormalizePath(selectedFile)
+
+	subDir, remainder, err := pathutil.VaultRelativeComponents(normalizedVault, normalizedPath)
+	if err != nil {
+		fmt.Println("Error determining relative path:", err)
+		return
+	}
+
+	if remainder == "" {
+		remainder = filepath.Base(normalizedPath)
+		subDir = ""
+	}
+
+	subDir = filepath.FromSlash(subDir)
+	trimmedName := strings.TrimSuffix(remainder, ".md")
+	trimmedName = filepath.FromSlash(trimmedName)
 
 	n := &note.ZettelkastenNote{
-		VaultDir: f.vaultDir,
+		VaultDir: normalizedVault,
 		SubDir:   subDir,
-		Filename: strings.TrimSuffix(fileName, ".md"),
+		Filename: trimmedName,
 	}
 
 	n.Open()

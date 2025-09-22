@@ -28,6 +28,63 @@ func newTestNoteListModel(t *testing.T, item ListItem, inputValue string) NoteLi
 	}
 }
 
+func TestParseNoteFilesHandlesRootAndNestedPaths(t *testing.T) {
+	dir := t.TempDir()
+
+	rootFile := filepath.Join(dir, "root.md")
+	nestedDir := filepath.Join(dir, "sub")
+	deepDir := filepath.Join(dir, "sub", "deep")
+	nestedFile := filepath.Join(nestedDir, "child.md")
+	deepFile := filepath.Join(deepDir, "grand.md")
+
+	if err := os.MkdirAll(deepDir, 0o755); err != nil {
+		t.Fatalf("failed to create nested directories: %v", err)
+	}
+
+	files := map[string]string{
+		rootFile:   "---\ntitle: Root\n---\n",
+		nestedFile: "---\ntitle: Child\n---\n",
+		deepFile:   "---\ntitle: Grand\n---\n",
+	}
+
+	for path, contents := range files {
+		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
+			t.Fatalf("failed to write file %s: %v", path, err)
+		}
+	}
+
+	noteFiles := []string{rootFile, nestedFile, deepFile}
+	items := ParseNoteFiles(noteFiles, dir, false)
+
+	if len(items) != 3 {
+		t.Fatalf("expected 3 items, got %d", len(items))
+	}
+
+	item0 := items[0].(ListItem)
+	if item0.subdirectory != "" {
+		t.Fatalf("expected empty subdirectory for root file, got %q", item0.subdirectory)
+	}
+	if item0.fileName != "root.md" {
+		t.Fatalf("expected root fileName 'root.md', got %q", item0.fileName)
+	}
+
+	item1 := items[1].(ListItem)
+	if item1.subdirectory != "sub" {
+		t.Fatalf("expected subdirectory 'sub', got %q", item1.subdirectory)
+	}
+	if item1.fileName != "child.md" {
+		t.Fatalf("expected fileName 'child.md', got %q", item1.fileName)
+	}
+
+	item2 := items[2].(ListItem)
+	if item2.subdirectory != "sub" {
+		t.Fatalf("expected top-level subdirectory 'sub', got %q", item2.subdirectory)
+	}
+	if item2.fileName != filepath.Join("deep", "grand.md") {
+		t.Fatalf("expected fileName 'deep/grand.md', got %q", item2.fileName)
+	}
+}
+
 func TestRenameFileSuccess(t *testing.T) {
 	dir := t.TempDir()
 
