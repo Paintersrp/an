@@ -66,6 +66,54 @@ func TestRenameFileSuccess(t *testing.T) {
 	}
 }
 
+func TestRenameFileWithoutTitle(t *testing.T) {
+	tests := []struct {
+		name     string
+		contents string
+	}{
+		{
+			name:     "no front matter",
+			contents: "body only",
+		},
+		{
+			name:     "front matter without title",
+			contents: "---\ntags:\n  - tag\n---\nbody",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+
+			originalPath := filepath.Join(dir, "original.md")
+			if err := os.WriteFile(originalPath, []byte(tt.contents), 0o644); err != nil {
+				t.Fatalf("failed to write original file: %v", err)
+			}
+
+			item := ListItem{
+				fileName: "original.md",
+				path:     originalPath,
+			}
+
+			model := newTestNoteListModel(t, item, "Renamed")
+
+			if err := renameFile(model); err != nil {
+				t.Fatalf("renameFile returned error: %v", err)
+			}
+
+			newPath := filepath.Join(dir, "Renamed.md")
+			data, err := os.ReadFile(newPath)
+			if err != nil {
+				t.Fatalf("failed to read renamed file: %v", err)
+			}
+
+			if string(data) != tt.contents {
+				t.Fatalf("expected contents to remain unchanged, got %q", string(data))
+			}
+		})
+	}
+}
+
 func TestRenameFileCollision(t *testing.T) {
 	dir := t.TempDir()
 
@@ -137,6 +185,54 @@ func TestCopyFileSuccess(t *testing.T) {
 
 	if string(data) != "---\ntitle: Copy\n---\nbody" {
 		t.Fatalf("unexpected copied file contents: %q", string(data))
+	}
+}
+
+func TestCopyFileWithoutTitle(t *testing.T) {
+	tests := []struct {
+		name     string
+		contents string
+	}{
+		{
+			name:     "no front matter",
+			contents: "body only",
+		},
+		{
+			name:     "front matter without title",
+			contents: "---\ntags:\n  - tag\n---\nbody",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+
+			originalPath := filepath.Join(dir, "original.md")
+			if err := os.WriteFile(originalPath, []byte(tt.contents), 0o644); err != nil {
+				t.Fatalf("failed to write original file: %v", err)
+			}
+
+			item := ListItem{
+				fileName: "original.md",
+				path:     originalPath,
+			}
+
+			model := newTestNoteListModel(t, item, "Copy")
+
+			if err := copyFile(model); err != nil {
+				t.Fatalf("copyFile returned error: %v", err)
+			}
+
+			copyPath := filepath.Join(dir, "Copy.md")
+			data, err := os.ReadFile(copyPath)
+			if err != nil {
+				t.Fatalf("failed to read copied file: %v", err)
+			}
+
+			if string(data) != tt.contents {
+				t.Fatalf("expected contents to remain unchanged, got %q", string(data))
+			}
+		})
 	}
 }
 

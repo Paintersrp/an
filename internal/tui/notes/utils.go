@@ -116,14 +116,16 @@ func renameFile(m NoteListModel) error {
 			return err
 		}
 
-		title, _ := parseFrontMatter(content, s.path)
-		updatedContent := bytes.Replace(content, []byte(title), []byte(newName), 1)
+		title, _ := parseFrontMatter(content, s.fileName)
+		if title != "" {
+			updatedContent := bytes.Replace(content, []byte(title), []byte(newName), 1)
 
-		if err := os.WriteFile(s.path, updatedContent, 0o644); err != nil {
-			m.list.NewStatusMessage(
-				statusStyle(fmt.Sprintf("Error writing file: %s", err)),
-			)
-			return err
+			if err := os.WriteFile(s.path, updatedContent, 0o644); err != nil {
+				m.list.NewStatusMessage(
+					statusStyle(fmt.Sprintf("Error writing file: %s", err)),
+				)
+				return err
+			}
 		}
 
 		if needsRename {
@@ -162,8 +164,11 @@ func copyFile(m NoteListModel) error {
 			return err
 		}
 
-		title, _ := parseFrontMatter(content, s.path)
-		updatedContent := bytes.Replace(content, []byte(title), []byte(newName), 1)
+		title, _ := parseFrontMatter(content, s.fileName)
+		updatedContent := content
+		if title != "" {
+			updatedContent = bytes.Replace(content, []byte(title), []byte(newName), 1)
+		}
 
 		destFile, err := os.OpenFile(newPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
 		if err != nil {
