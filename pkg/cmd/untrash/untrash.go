@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/Paintersrp/an/internal/state"
+	cmdpkg "github.com/Paintersrp/an/pkg/cmd"
 )
 
 func NewCmdUntrash(s *state.State) *cobra.Command {
@@ -27,7 +28,10 @@ func NewCmdUntrash(s *state.State) *cobra.Command {
 				)
 				return nil
 			}
-			path := args[0]
+			path, err := cmdpkg.ResolveVaultPath(cmd, s, args[0])
+			if err != nil {
+				return err
+			}
 			return s.Handler.Untrash(path)
 		},
 	}

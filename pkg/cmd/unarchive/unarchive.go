@@ -5,6 +5,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/Paintersrp/an/internal/state"
+	cmdpkg "github.com/Paintersrp/an/pkg/cmd"
 	"github.com/spf13/cobra"
 )
 
@@ -26,7 +27,10 @@ func NewCmdUnarchive(s *state.State) *cobra.Command {
 				)
 				return nil
 			}
-			path := args[0]
+			path, err := cmdpkg.ResolveVaultPath(cmd, s, args[0])
+			if err != nil {
+				return err
+			}
 			return s.Handler.Unarchive(path)
 		},
 	}
