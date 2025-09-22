@@ -279,7 +279,7 @@ func (m FormModel) handleSubmit() FormModel {
 
 	subDir := m.Inputs[subdirectory].Value()
 
-	if !m.subdirectoryExists(subDir) {
+	if subDir != "" && !m.subdirectoryExists(subDir) {
 		fmt.Printf("Subdirectory '%s' does not exist.\n", subDir)
 		return m
 	}
@@ -305,6 +305,10 @@ func (m FormModel) handleSubmit() FormModel {
 }
 
 func (m FormModel) subdirectoryExists(subDir string) bool {
+	if subDir == "" {
+		return true
+	}
+
 	for _, dir := range m.availableSubdirs {
 		if dir == subDir {
 			return true
