@@ -79,7 +79,7 @@ func run(
 	index int,
 	templateType string,
 ) error {
-	tagInput := ""
+	var tagInput string
 	if len(args) > 0 {
 		tagInput = args[0]
 	}
@@ -91,7 +91,12 @@ func run(
 		return err
 	}
 
-	content := ""
+	var inlineContent string
+	if len(args) > 1 {
+		inlineContent = args[1]
+	}
+
+	content := inlineContent
 	paste, err := flags.HandlePaste(cmd)
 	if err != nil {
 		return err
@@ -101,10 +106,6 @@ func run(
 		msg, err := readClipboard()
 		if err == nil && msg != "" {
 			content = msg
-		}
-	} else {
-		if len(args) >= 2 {
-			content = args[1]
 		}
 	}
 

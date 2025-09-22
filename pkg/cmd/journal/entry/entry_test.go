@@ -88,8 +88,14 @@ func TestRunWithTagsAndInlineContent(t *testing.T) {
 		t.Fatalf("failed to read note: %v", err)
 	}
 
-	if !strings.Contains(string(content), "Inline content! #1") {
+	raw := string(content)
+	if !strings.Contains(raw, "Inline content! #1") {
 		t.Fatalf("expected note to contain inline content, content: %s", string(content))
+	}
+
+	frontMatter := strings.SplitN(raw, "---", 2)[0]
+	if strings.Contains(frontMatter, "Inline content! #1") {
+		t.Fatalf("inline content should not appear in front matter, content: %s", frontMatter)
 	}
 }
 
@@ -123,7 +129,13 @@ func TestRunWithPasteContent(t *testing.T) {
 		t.Fatalf("failed to read note: %v", err)
 	}
 
-	if !strings.Contains(string(content), "Pasted content!") {
+	raw := string(content)
+	if !strings.Contains(raw, "Pasted content!") {
 		t.Fatalf("expected note to contain pasted content, content: %s", string(content))
+	}
+
+	frontMatter := strings.SplitN(raw, "---", 2)[0]
+	if strings.Contains(frontMatter, "Pasted content!") {
+		t.Fatalf("pasted content should not appear in front matter, content: %s", frontMatter)
 	}
 }
