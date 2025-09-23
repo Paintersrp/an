@@ -3,6 +3,7 @@ package pinList
 import (
 	"fmt"
 	"os"
+	"sort"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
@@ -371,7 +372,14 @@ func getItemsByType(cfg *config.Config, pinType string) []list.Item {
 
 	switch pinType {
 	case "text":
-		for name, path := range cfg.NamedPins {
+		names := make([]string, 0, len(cfg.NamedPins))
+		for name := range cfg.NamedPins {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+
+		for _, name := range names {
+			path := cfg.NamedPins[name]
 			items = append(items, PinListItem{title: name, description: path})
 		}
 
@@ -387,7 +395,14 @@ func getItemsByType(cfg *config.Config, pinType string) []list.Item {
 			)
 		}
 	case "task":
-		for name, path := range cfg.NamedTaskPins {
+		names := make([]string, 0, len(cfg.NamedTaskPins))
+		for name := range cfg.NamedTaskPins {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+
+		for _, name := range names {
+			path := cfg.NamedTaskPins[name]
 			items = append(items, PinListItem{title: name, description: path})
 		}
 

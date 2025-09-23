@@ -152,6 +152,56 @@ func TestUpdateChangePinErrorShowsStatusAndKeepsDialog(t *testing.T) {
 	}
 }
 
+func TestRefreshItemsSortsPins(t *testing.T) {
+	newConfig := func() *config.Config {
+		cfg := &config.Config{
+			NamedPins: config.PinMap{
+				"gamma": "/notes/gamma.md",
+				"alpha": "/notes/alpha.md",
+				"beta":  "/notes/beta.md",
+			},
+			NamedTaskPins: config.PinMap{
+				"task-c": "/tasks/c.md",
+				"task-a": "/tasks/a.md",
+				"task-b": "/tasks/b.md",
+			},
+			PinnedFile:     "/notes/default.md",
+			PinnedTaskFile: "/tasks/default.md",
+		}
+		cfg.PinManager = pin.NewPinManager(
+			pin.PinMap(cfg.NamedPins),
+			pin.PinMap(cfg.NamedTaskPins),
+			cfg.PinnedFile,
+			cfg.PinnedTaskFile,
+		)
+		return cfg
+	}
+
+	t.Run("text pins are sorted", func(t *testing.T) {
+		cfg := newConfig()
+		model := newTestPinListModel(cfg, "text")
+
+		model.refreshItems("text")
+		assertItemTitles(t, model.list.Items(), []string{"alpha", "beta", "gamma", "default"})
+
+		cfg.NamedPins["aardvark"] = "/notes/aardvark.md"
+		model.refreshItems("text")
+		assertItemTitles(t, model.list.Items(), []string{"aardvark", "alpha", "beta", "gamma", "default"})
+	})
+
+	t.Run("task pins are sorted", func(t *testing.T) {
+		cfg := newConfig()
+		model := newTestPinListModel(cfg, "task")
+
+		model.refreshItems("task")
+		assertItemTitles(t, model.list.Items(), []string{"task-a", "task-b", "task-c", "default"})
+
+		cfg.NamedTaskPins["task-0"] = "/tasks/0.md"
+		model.refreshItems("task")
+		assertItemTitles(t, model.list.Items(), []string{"task-0", "task-a", "task-b", "task-c", "default"})
+	})
+}
+
 func newTestPinListModel(cfg *config.Config, pinType string) PinListModel {
 	state := &state.State{Config: cfg}
 	return PinListModel{
@@ -180,4 +230,22 @@ func readStatusMessage(l list.Model) string {
 func setUnexportedString(target interface{}, field, value string) {
 	v := reflect.ValueOf(target).Elem().FieldByName(field)
 	reflect.NewAt(v.Type(), unsafe.Pointer(v.UnsafeAddr())).Elem().SetString(value)
+}
+
+func assertItemTitles(t *testing.T, items []list.Item, expected []string) {
+	t.Helper()
+	if len(items) != len(expected) {
+		t.Fatalf("expected %d items, got %d", len(expected), len(items))
+	}
+
+	for i, item := range items {
+		pinItem, ok := item.(PinListItem)
+		if !ok {
+			t.Fatalf("unexpected item type %T", item)
+		}
+
+		if pinItem.Title() != expected[i] {
+			t.Fatalf("expected item %d to be %q, got %q", i, expected[i], pinItem.Title())
+		}
+	}
 }
