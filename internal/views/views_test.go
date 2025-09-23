@@ -78,6 +78,14 @@ func TestGetFilesByView_DefaultAndArchive(t *testing.T) {
 			t.Fatalf("custom view unexpectedly contained excluded file %s", skipPath)
 		}
 
+		if contains(files, trashedPath) {
+			t.Fatalf("custom view unexpectedly contained trashed file %s", trashedPath)
+		}
+
+		if contains(files, archivedPath) {
+			t.Fatalf("custom view unexpectedly contained archived file %s", archivedPath)
+		}
+
 		if !contains(files, keepPath) {
 			t.Fatalf("custom view missing expected file %s", keepPath)
 		}
