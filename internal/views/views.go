@@ -88,23 +88,30 @@ type ViewManager struct {
 	Views   map[string]View
 	Handler *handler.FileHandler
 
-	config   *config.Config
-	vaultDir string
-	order    []string
+	config    *config.Config
+	workspace *config.Workspace
+	vaultDir  string
+	order     []string
 }
 
 var defaultViewOrder = []string{"default", "unfulfilled", "archive", "orphan", "trash"}
 
 // NewViewManager creates a new ViewManager instance with default views merged with user configuration.
 func NewViewManager(h *handler.FileHandler, cfg *config.Config) (*ViewManager, error) {
-	vm := &ViewManager{
-		Views:   make(map[string]View),
-		Handler: h,
-		config:  cfg,
+	ws, err := cfg.ActiveWorkspace()
+	if err != nil {
+		return nil, err
 	}
 
-	if cfg != nil {
-		vm.vaultDir = cfg.VaultDir
+	vm := &ViewManager{
+		Views:     make(map[string]View),
+		Handler:   h,
+		config:    cfg,
+		workspace: ws,
+	}
+
+	if ws != nil {
+		vm.vaultDir = ws.VaultDir
 	}
 
 	if vm.vaultDir == "" {
@@ -258,8 +265,8 @@ func (vm *ViewManager) reload() error {
 		views[name] = view
 	}
 
-	if vm.config != nil {
-		for name, definition := range vm.config.Views {
+	if vm.workspace != nil {
+		for name, definition := range vm.workspace.Views {
 			view, err := vm.viewFromDefinition(name, definition)
 			if err != nil {
 				return fmt.Errorf("view %s: %w", name, err)
@@ -277,8 +284,8 @@ func (vm *ViewManager) reload() error {
 
 func (vm *ViewManager) defaultViews() map[string]View {
 	vaultDir := vm.vaultDir
-	if vaultDir == "" && vm.config != nil {
-		vaultDir = vm.config.VaultDir
+	if vaultDir == "" && vm.workspace != nil {
+		vaultDir = vm.workspace.VaultDir
 	}
 
 	var archiveExclude, trashExclude []string
@@ -352,8 +359,8 @@ func (vm *ViewManager) viewFromDefinition(name string, definition config.ViewDef
 
 func (vm *ViewManager) computeOrder(views map[string]View) []string {
 	var base []string
-	if vm.config != nil && len(vm.config.ViewOrder) > 0 {
-		base = vm.config.ViewOrder
+	if vm.workspace != nil && len(vm.workspace.ViewOrder) > 0 {
+		base = vm.workspace.ViewOrder
 	} else {
 		base = defaultViewOrder
 	}

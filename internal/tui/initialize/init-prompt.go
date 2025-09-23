@@ -126,7 +126,8 @@ func (m InitPromptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 
-				cfg := &config.Config{
+				workspaceName := "default"
+				ws := &config.Workspace{
 					VaultDir:       m.inputs[0].Value(),
 					Editor:         m.inputs[1].Value(),
 					NvimArgs:       m.inputs[2].Value(),
@@ -136,9 +137,20 @@ func (m InitPromptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					PinnedTaskFile: defaults[6],
 				}
 
-				if err := config.ValidateEditor(cfg.Editor); err != nil {
+				cfg := &config.Config{
+					Workspaces: map[string]*config.Workspace{
+						workspaceName: ws,
+					},
+					CurrentWorkspace: workspaceName,
+				}
+
+				if err := config.ValidateEditor(ws.Editor); err != nil {
 					fmt.Println(err)
 					return m, nil
+				}
+
+				if err := cfg.ActivateWorkspace(workspaceName); err != nil {
+					panic(err)
 				}
 
 				cfgErr := cfg.Save()

@@ -136,7 +136,8 @@ func (m *NoteListModel) rebuildSearch(paths []string) {
 		return
 	}
 
-	cfg := m.state.Config.Search
+	ws := m.state.Config.MustWorkspace()
+	cfg := ws.Search
 	searchCfg := search.Config{
 		EnableBody:     cfg.EnableBody,
 		IgnoredFolders: append([]string(nil), cfg.IgnoredFolders...),
@@ -340,7 +341,7 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		default:
 			m.handleDefaultUpdate(msg)
 
-			if m.state.Config.Editor == "vim" || m.state.Config.Editor == "nano" {
+			if ws := m.state.Config.MustWorkspace(); ws.Editor == "vim" || ws.Editor == "nano" {
 				if key.Matches(msg, m.keys.openNote) {
 					return m, tea.Quit
 				}

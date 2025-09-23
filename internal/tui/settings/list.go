@@ -72,6 +72,7 @@ type ListModel struct {
 	delegateKeys       *delegateKeyMap
 	config             *config.Config
 	state              *state.State
+	workspace          *config.Workspace
 	configInput        ListInputModel
 	inputActive        bool
 	editorSelect       *selection.Model[string]
@@ -92,12 +93,16 @@ func NewListModel(s *state.State) ListModel {
 	configInput := initialInputModel()
 
 	cfg := s.Config
+	ws := s.Workspace
+	if ws == nil {
+		ws = cfg.MustWorkspace()
+	}
 
 	items := []list.Item{
-		ListItem{title: "VaultDir", description: cfg.VaultDir},
-		ListItem{title: "Editor", description: cfg.Editor},
-		ListItem{title: "NvimArgs", description: cfg.NvimArgs},
-		ListItem{title: "FileSystemMode", description: cfg.FileSystemMode},
+		ListItem{title: "VaultDir", description: ws.VaultDir},
+		ListItem{title: "Editor", description: ws.Editor},
+		ListItem{title: "NvimArgs", description: ws.NvimArgs},
+		ListItem{title: "FileSystemMode", description: ws.FileSystemMode},
 		ListItem{title: "Add Custom View", description: "name|include|exclude|sortField|sortOrder|predicates"},
 		ListItem{title: "Remove Custom View", description: "name"},
 	}
@@ -138,6 +143,7 @@ func NewListModel(s *state.State) ListModel {
 		inputActive:        false,
 		config:             cfg,
 		state:              s,
+		workspace:          ws,
 		editorSelect:       editorSelect,
 		editorSelectActive: false,
 		modeSelect:         modeSelect,
@@ -220,11 +226,14 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, nil
 				}
 
-				m.config.FileSystemMode = c
+				if err := m.config.ChangeMode(c); err != nil {
+					m.list.NewStatusMessage(statusMessageStyle(err.Error()))
+					return m, nil
+				}
 				m.modeSelectActive = false
+				m.workspace = m.config.MustWorkspace()
 
-				saveErr := m.config.Save()
-				if saveErr != nil {
+				if saveErr := m.config.Save(); saveErr != nil {
 					fmt.Println("Failed to save config file, exiting...")
 					os.Exit(1)
 				}
@@ -308,21 +317,22 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.list.NewStatusMessage(statusMessageStyle(err.Error()))
 						return m, nil
 					}
+					m.workspace = m.config.MustWorkspace()
 				default:
 					switch title {
 					case "VaultDir":
-						m.config.VaultDir = inputValue
+						m.workspace.VaultDir = inputValue
 					case "NvimArgs":
-						m.config.NvimArgs = inputValue
+						m.workspace.NvimArgs = inputValue
 					case "MoleculeMode":
-						m.config.FileSystemMode = inputValue
+						m.workspace.FileSystemMode = inputValue
 					}
 
-					err := m.config.Save()
-					if err != nil {
+					if err := m.config.Save(); err != nil {
 						fmt.Println("Failed to save config file, exiting...")
 						os.Exit(1)
 					}
+					m.workspace = m.config.MustWorkspace()
 				}
 
 				index := m.list.Index()

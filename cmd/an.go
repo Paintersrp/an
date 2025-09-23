@@ -17,6 +17,9 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
+	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -27,7 +30,10 @@ import (
 )
 
 func Execute() {
-	s, err := state.NewState()
+	workspaceOverride, err := parseWorkspaceFlag(os.Args[1:])
+	cobra.CheckErr(err)
+
+	s, err := state.NewState(workspaceOverride)
 
 	if err != nil {
 		var initErr *config.ConfigInitError
@@ -35,7 +41,7 @@ func Execute() {
 			err := initialize.Run()
 			cobra.CheckErr(err)
 
-			s, err := state.NewState()
+			s, err := state.NewState(workspaceOverride)
 			cobra.CheckErr(err) // TODO: or loop again if failed?
 
 			executeRoot(s)
@@ -53,4 +59,22 @@ func executeRoot(s *state.State) {
 
 	execErr := cmd.Execute()
 	cobra.CheckErr(execErr)
+}
+
+func parseWorkspaceFlag(args []string) (string, error) {
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		switch {
+		case arg == "--workspace" || arg == "-w":
+			if i+1 >= len(args) {
+				return "", fmt.Errorf("flag needs an argument: %s", arg)
+			}
+			return args[i+1], nil
+		case strings.HasPrefix(arg, "--workspace="):
+			return strings.TrimPrefix(arg, "--workspace="), nil
+		case strings.HasPrefix(arg, "-w="):
+			return strings.TrimPrefix(arg, "-w="), nil
+		}
+	}
+	return "", nil
 }

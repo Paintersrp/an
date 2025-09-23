@@ -13,7 +13,7 @@ func ResolveVaultPath(cmd *cobra.Command, s *state.State, arg string) (string, e
 	if s == nil || s.Config == nil {
 		return "", fmt.Errorf("state configuration is not initialized")
 	}
-	vaultDir := filepath.Clean(s.Config.VaultDir)
+	vaultDir := filepath.Clean(s.Config.MustWorkspace().VaultDir)
 	if vaultDir == "" {
 		return "", fmt.Errorf("vault directory is not configured")
 	}

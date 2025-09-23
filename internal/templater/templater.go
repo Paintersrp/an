@@ -12,6 +12,8 @@ import (
 	"strings"
 	"text/template"
 	"time"
+
+	"github.com/Paintersrp/an/internal/config"
 )
 
 //go:embed templates
@@ -58,8 +60,15 @@ type TemplateData struct {
 	Fulfilled bool
 }
 
-func NewTemplater() (*Templater, error) {
+func NewTemplater(workspace *config.Workspace) (*Templater, error) {
 	tmplMap := make(TemplateMap)
+
+	if workspace != nil {
+		workspaceTemplateDir := filepath.Join(workspace.VaultDir, ".an", "templates")
+		if err := tmplMap.loadTemplates(workspaceTemplateDir); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return nil, err
+		}
+	}
 
 	// Load user templates first to give them precedence.
 	userHomeDir, err := os.UserHomeDir()
@@ -68,12 +77,8 @@ func NewTemplater() (*Templater, error) {
 	}
 	userTemplateDir := filepath.Join(userHomeDir, ".an", "templates")
 
-	_, userDirErr := os.Stat(userTemplateDir)
-	if !os.IsNotExist(userDirErr) {
-		err := tmplMap.loadTemplates(userTemplateDir)
-		if err != nil {
-			return nil, err
-		}
+	if err := tmplMap.loadTemplates(userTemplateDir); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return nil, err
 	}
 
 	for templateName := range tmplMap {

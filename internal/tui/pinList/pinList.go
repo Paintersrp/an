@@ -369,24 +369,25 @@ func (m *PinListModel) refreshDelegate(pinType string) {
 
 func getItemsByType(cfg *config.Config, pinType string) []list.Item {
 	var items []list.Item
+	ws := cfg.MustWorkspace()
 
 	switch pinType {
 	case "text":
-		names := make([]string, 0, len(cfg.NamedPins))
-		for name := range cfg.NamedPins {
+		names := make([]string, 0, len(ws.NamedPins))
+		for name := range ws.NamedPins {
 			names = append(names, name)
 		}
 		sort.Strings(names)
 
 		for _, name := range names {
-			path := cfg.NamedPins[name]
+			path := ws.NamedPins[name]
 			items = append(items, PinListItem{title: name, description: path})
 		}
 
-		if cfg.PinnedFile != "" {
+		if ws.PinnedFile != "" {
 			items = append(
 				items,
-				PinListItem{title: "default", description: cfg.PinnedFile},
+				PinListItem{title: "default", description: ws.PinnedFile},
 			)
 		} else {
 			items = append(
@@ -395,21 +396,21 @@ func getItemsByType(cfg *config.Config, pinType string) []list.Item {
 			)
 		}
 	case "task":
-		names := make([]string, 0, len(cfg.NamedTaskPins))
-		for name := range cfg.NamedTaskPins {
+		names := make([]string, 0, len(ws.NamedTaskPins))
+		for name := range ws.NamedTaskPins {
 			names = append(names, name)
 		}
 		sort.Strings(names)
 
 		for _, name := range names {
-			path := cfg.NamedTaskPins[name]
+			path := ws.NamedTaskPins[name]
 			items = append(items, PinListItem{title: name, description: path})
 		}
 
-		if cfg.PinnedTaskFile != "" {
+		if ws.PinnedTaskFile != "" {
 			items = append(
 				items,
-				PinListItem{title: "default", description: cfg.PinnedTaskFile},
+				PinListItem{title: "default", description: ws.PinnedTaskFile},
 			)
 		} else {
 			items = append(

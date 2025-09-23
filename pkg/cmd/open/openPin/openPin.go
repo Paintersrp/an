@@ -42,17 +42,18 @@ func run(cmd *cobra.Command, c *config.Config) error {
 		return err
 	}
 
+	ws := c.MustWorkspace()
 	var targetPin string
 	if name != "" {
-		if c.NamedPins[name] == "" {
+		if ws.NamedPins[name] == "" {
 			return fmt.Errorf("no pinned file found")
 		}
-		targetPin = c.NamedPins[name]
+		targetPin = ws.NamedPins[name]
 	} else {
-		if c.PinnedFile == "" {
+		if ws.PinnedFile == "" {
 			return errors.New("no pinned file found")
 		}
-		targetPin = c.PinnedFile
+		targetPin = ws.PinnedFile
 	}
 
 	if _, err := os.Stat(targetPin); os.IsNotExist(err) {

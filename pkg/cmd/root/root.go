@@ -23,6 +23,7 @@ import (
 	"github.com/Paintersrp/an/pkg/cmd/unarchive"
 	"github.com/Paintersrp/an/pkg/cmd/untrash"
 	"github.com/Paintersrp/an/pkg/cmd/views"
+	"github.com/Paintersrp/an/pkg/cmd/workspace"
 )
 
 var subdirName string
@@ -51,6 +52,18 @@ func NewCmdRoot(s *state.State) (*cobra.Command, error) {
 		)
 	viper.BindPFlag("subdir", cmd.PersistentFlags().Lookup("subdir"))
 
+	workspaceDefault := ""
+	if s != nil {
+		workspaceDefault = s.WorkspaceName
+	}
+	cmd.PersistentFlags().StringP(
+		"workspace",
+		"w",
+		workspaceDefault,
+		"Workspace to use for this invocation.",
+	)
+	viper.BindPFlag("workspace", cmd.PersistentFlags().Lookup("workspace"))
+
 	cmd.AddCommand(
 		initialize.NewCmdInit(s),
 		addSubdir.NewCmdAddSubdir(s),
@@ -70,6 +83,7 @@ func NewCmdRoot(s *state.State) (*cobra.Command, error) {
 		untrash.NewCmdUntrash(s),
 		journal.NewCmdJournal(s),
 		views.NewCmdViews(s),
+		workspace.NewCmdWorkspace(s),
 	)
 
 	return cmd, nil

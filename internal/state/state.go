@@ -14,17 +14,19 @@ import (
 )
 
 type State struct {
-	Config      *config.Config
-	Templater   *templater.Templater
-	Handler     *handler.FileHandler
-	ViewManager *views.ViewManager
-	Views       map[string]views.View
-	Home        string
-	Vault       string
-	Watcher     *VaultWatcher
+	Config        *config.Config
+	Workspace     *config.Workspace
+	WorkspaceName string
+	Templater     *templater.Templater
+	Handler       *handler.FileHandler
+	ViewManager   *views.ViewManager
+	Views         map[string]views.View
+	Home          string
+	Vault         string
+	Watcher       *VaultWatcher
 }
 
-func NewState() (*State, error) {
+func NewState(workspaceOverride string) (*State, error) {
 	home, err := GetHomeDir()
 	if err != nil {
 		return nil, err
@@ -35,31 +37,44 @@ func NewState() (*State, error) {
 		return nil, err
 	}
 
-	t, err := templater.NewTemplater()
+	if workspaceOverride != "" {
+		if err := cfg.ActivateWorkspace(workspaceOverride); err != nil {
+			return nil, err
+		}
+	}
+
+	ws, err := cfg.ActiveWorkspace()
+	if err != nil {
+		return nil, err
+	}
+
+	t, err := templater.NewTemplater(ws)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create templater: %v", err)
 	}
 
-	h := handler.NewFileHandler(cfg.VaultDir)
+	h := handler.NewFileHandler(ws.VaultDir)
 	vm, err := views.NewViewManager(h, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to configure views: %w", err)
 	}
 
-	watcher, err := NewVaultWatcher(cfg.VaultDir)
+	watcher, err := NewVaultWatcher(ws.VaultDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create vault watcher: %w", err)
 	}
 
 	return &State{
-		Config:      cfg,
-		Templater:   t,
-		Handler:     h,
-		ViewManager: vm,
-		Views:       vm.Views,
-		Home:        home,
-		Vault:       cfg.VaultDir,
-		Watcher:     watcher,
+		Config:        cfg,
+		Workspace:     ws,
+		WorkspaceName: cfg.CurrentWorkspace,
+		Templater:     t,
+		Handler:       h,
+		ViewManager:   vm,
+		Views:         vm.Views,
+		Home:          home,
+		Vault:         ws.VaultDir,
+		Watcher:       watcher,
 	}, nil
 }
 

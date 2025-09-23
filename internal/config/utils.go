@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"reflect"
+	"strings"
 
 	"github.com/Paintersrp/an/internal/constants"
-	"github.com/spf13/viper"
 )
 
 func GetConfigPath(homeDir string) string {
@@ -42,48 +41,28 @@ func EnsureConfigExists(homeDir string) error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	requiredVars := []string{"VaultDir", "Editor", "FileSystemMode"}
-	for _, varName := range requiredVars {
-		value, err := getVarValue(cfg, varName)
-		if err != nil {
-			return err
-		}
-		if value == "" {
+	if cfg.CurrentWorkspace == "" {
+		return &ConfigInitError{msg: "no current workspace is configured"}
+	}
+
+	ws, err := cfg.ActiveWorkspace()
+	if err != nil {
+		return err
+	}
+
+	required := map[string]string{
+		"VaultDir":       ws.VaultDir,
+		"Editor":         ws.Editor,
+		"FileSystemMode": ws.FileSystemMode,
+	}
+
+	for name, value := range required {
+		if strings.TrimSpace(value) == "" {
 			return &ConfigInitError{
-				msg: fmt.Sprintf("required config variable %q is not set", varName),
+				msg: fmt.Sprintf("required config variable %q is not set", name),
 			}
 		}
 	}
 
 	return nil
-}
-
-func getVarValue(cfg *Config, varName string) (string, error) {
-	v := reflect.ValueOf(cfg).Elem()
-	fieldVal := v.FieldByName(varName)
-
-	if !fieldVal.IsValid() {
-		return "", fmt.Errorf("config variable %q does not exist", varName)
-	}
-
-	if fieldVal.Kind() != reflect.String {
-		return "", fmt.Errorf("config variable %q is not a string", varName)
-	}
-
-	return fieldVal.String(), nil
-}
-
-func verifySubdirExists(subdirName string) (bool, error) {
-	var subdirs []string
-	if err := viper.UnmarshalKey("subdirs", &subdirs); err != nil {
-		return false, err
-	}
-
-	for _, subdir := range subdirs {
-		if subdir == subdirName {
-			return true, nil
-		}
-	}
-
-	return false, nil
 }

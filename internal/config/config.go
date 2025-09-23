@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -21,7 +22,7 @@ type SearchConfig struct {
 	DefaultMetadataFilters map[string][]string `yaml:"metadata_filters"        json:"metadata_filters"`
 }
 
-type Config struct {
+type Workspace struct {
 	PinManager     *pin.PinManager           `yaml:"-"`
 	NamedPins      PinMap                    `yaml:"named_pins"       json:"named_pins"`
 	NamedTaskPins  PinMap                    `yaml:"named_task_pins"  json:"named_task_pins"`
@@ -37,6 +38,13 @@ type Config struct {
 	ViewOrder      []string                  `yaml:"view_order"      json:"view_order"`
 }
 
+type Config struct {
+	Workspaces       map[string]*Workspace `yaml:"workspaces"         json:"workspaces"`
+	CurrentWorkspace string                `yaml:"current_workspace" json:"current_workspace"`
+
+	active *Workspace `yaml:"-"`
+}
+
 type ViewSort struct {
 	Field string `yaml:"field" json:"field"`
 	Order string `yaml:"order" json:"order"`
@@ -48,6 +56,8 @@ type ViewDefinition struct {
 	Sort       ViewSort `yaml:"sort"       json:"sort"`
 	Predicates []string `yaml:"predicates" json:"predicates"`
 }
+
+const defaultWorkspaceName = "default"
 
 var ValidModes = map[string]bool{
 	"strict":  true,
@@ -95,6 +105,62 @@ func validEditorList() string {
 	return strings.Join(quoted[:len(quoted)-1], ", ") + ", or " + quoted[len(quoted)-1]
 }
 
+type legacyConfig struct {
+	NamedPins      PinMap                    `yaml:"named_pins"`
+	NamedTaskPins  PinMap                    `yaml:"named_task_pins"`
+	VaultDir       string                    `yaml:"vaultdir"`
+	Editor         string                    `yaml:"editor"`
+	NvimArgs       string                    `yaml:"nvimargs"`
+	FileSystemMode string                    `yaml:"fsmode"`
+	PinnedFile     string                    `yaml:"pinned_file"`
+	PinnedTaskFile string                    `yaml:"pinned_task_file"`
+	SubDirs        []string                  `yaml:"subdirs"`
+	Search         SearchConfig              `yaml:"search"`
+	Views          map[string]ViewDefinition `yaml:"views"`
+	ViewOrder      []string                  `yaml:"view_order"`
+}
+
+func newWorkspace() *Workspace {
+	ws := &Workspace{
+		NamedPins:      make(PinMap),
+		NamedTaskPins:  make(PinMap),
+		Search:         SearchConfig{EnableBody: true, DefaultMetadataFilters: make(map[string][]string)},
+		Views:          make(map[string]ViewDefinition),
+		ViewOrder:      nil,
+		FileSystemMode: "strict",
+	}
+	ws.PinManager = pin.NewPinManager(
+		pin.PinMap(ws.NamedPins),
+		pin.PinMap(ws.NamedTaskPins),
+		ws.PinnedFile,
+		ws.PinnedTaskFile,
+	)
+	return ws
+}
+
+func (ws *Workspace) ensureDefaults() {
+	if ws.NamedPins == nil {
+		ws.NamedPins = make(PinMap)
+	}
+	if ws.NamedTaskPins == nil {
+		ws.NamedTaskPins = make(PinMap)
+	}
+	if ws.Search.DefaultMetadataFilters == nil {
+		ws.Search.DefaultMetadataFilters = make(map[string][]string)
+	}
+	if ws.Views == nil {
+		ws.Views = make(map[string]ViewDefinition)
+	}
+	if ws.PinManager == nil {
+		ws.PinManager = pin.NewPinManager(
+			pin.PinMap(ws.NamedPins),
+			pin.PinMap(ws.NamedTaskPins),
+			ws.PinnedFile,
+			ws.PinnedTaskFile,
+		)
+	}
+}
+
 func Load(home string) (*Config, error) {
 	path := GetConfigPath(home)
 	data, err := os.ReadFile(path)
@@ -102,38 +168,217 @@ func Load(home string) (*Config, error) {
 		return nil, err
 	}
 
-	cfg := &Config{Search: SearchConfig{EnableBody: true}}
-	if err := yaml.Unmarshal(data, cfg); err != nil {
+	cfg := &Config{}
+	if len(strings.TrimSpace(string(data))) == 0 {
+		cfg.Workspaces = map[string]*Workspace{
+			defaultWorkspaceName: newWorkspace(),
+		}
+		cfg.CurrentWorkspace = defaultWorkspaceName
+	} else {
+		raw := make(map[string]interface{})
+		if err := yaml.Unmarshal(data, &raw); err != nil {
+			return nil, err
+		}
+
+		if _, ok := raw["workspaces"]; ok {
+			if err := yaml.Unmarshal(data, cfg); err != nil {
+				return nil, err
+			}
+		} else {
+			var legacy legacyConfig
+			if err := yaml.Unmarshal(data, &legacy); err != nil {
+				return nil, err
+			}
+			cfg = migrateLegacyConfig(&legacy)
+		}
+	}
+
+	if err := cfg.ensureInitialized(); err != nil {
 		return nil, err
 	}
 
-	if cfg.Editor != "" {
-		if err := ValidateEditor(cfg.Editor); err != nil {
+	ws, err := cfg.ActiveWorkspace()
+	if err != nil {
+		return nil, err
+	}
+
+	if ws.Editor != "" {
+		if err := ValidateEditor(ws.Editor); err != nil {
 			return nil, err
 		}
 	}
 
-	if cfg.NamedPins == nil {
-		cfg.NamedPins = make(PinMap)
-	}
-	if cfg.NamedTaskPins == nil {
-		cfg.NamedTaskPins = make(PinMap)
-	}
-	if cfg.Search.DefaultMetadataFilters == nil {
-		cfg.Search.DefaultMetadataFilters = make(map[string][]string)
-	}
-	if cfg.Views == nil {
-		cfg.Views = make(map[string]ViewDefinition)
-	}
-
-	cfg.PinManager = pin.NewPinManager(
-		pin.PinMap(cfg.NamedPins),
-		pin.PinMap(cfg.NamedTaskPins),
-		cfg.PinnedFile,
-		cfg.PinnedTaskFile,
-	)
-
 	return cfg, nil
+}
+
+func migrateLegacyConfig(legacy *legacyConfig) *Config {
+	ws := newWorkspace()
+	ws.NamedPins = legacy.NamedPins
+	ws.NamedTaskPins = legacy.NamedTaskPins
+	ws.VaultDir = legacy.VaultDir
+	ws.Editor = legacy.Editor
+	ws.NvimArgs = legacy.NvimArgs
+	ws.FileSystemMode = legacy.FileSystemMode
+	if ws.FileSystemMode == "" {
+		ws.FileSystemMode = "strict"
+	}
+	ws.PinnedFile = legacy.PinnedFile
+	ws.PinnedTaskFile = legacy.PinnedTaskFile
+	ws.SubDirs = legacy.SubDirs
+	if legacy.Search.EnableBody || legacy.Search.IgnoredFolders != nil || legacy.Search.DefaultTagFilters != nil || legacy.Search.DefaultMetadataFilters != nil {
+		ws.Search = legacy.Search
+		if ws.Search.DefaultMetadataFilters == nil {
+			ws.Search.DefaultMetadataFilters = make(map[string][]string)
+		}
+	}
+	if legacy.Views != nil {
+		ws.Views = legacy.Views
+	}
+	ws.ViewOrder = legacy.ViewOrder
+	ws.ensureDefaults()
+
+	return &Config{
+		Workspaces: map[string]*Workspace{
+			defaultWorkspaceName: ws,
+		},
+		CurrentWorkspace: defaultWorkspaceName,
+		active:           ws,
+	}
+}
+
+func (cfg *Config) ensureInitialized() error {
+	if cfg.Workspaces == nil {
+		cfg.Workspaces = make(map[string]*Workspace)
+	}
+
+	if cfg.CurrentWorkspace == "" {
+		if len(cfg.Workspaces) == 0 {
+			cfg.Workspaces[defaultWorkspaceName] = newWorkspace()
+			cfg.CurrentWorkspace = defaultWorkspaceName
+		} else {
+			for name := range cfg.Workspaces {
+				cfg.CurrentWorkspace = name
+				break
+			}
+		}
+	}
+
+	return cfg.setActiveWorkspace(cfg.CurrentWorkspace)
+}
+
+func (cfg *Config) setActiveWorkspace(name string) error {
+	if name == "" {
+		return fmt.Errorf("workspace name cannot be empty")
+	}
+	ws, ok := cfg.Workspaces[name]
+	if !ok {
+		return fmt.Errorf("workspace %q does not exist", name)
+	}
+	if ws == nil {
+		ws = newWorkspace()
+		cfg.Workspaces[name] = ws
+	}
+
+	ws.ensureDefaults()
+	cfg.CurrentWorkspace = name
+	cfg.active = ws
+
+	return nil
+}
+
+func (cfg *Config) ActiveWorkspace() (*Workspace, error) {
+	if cfg.active != nil {
+		return cfg.active, nil
+	}
+
+	if cfg.CurrentWorkspace == "" {
+		return nil, fmt.Errorf("no workspace is currently selected")
+	}
+
+	if err := cfg.setActiveWorkspace(cfg.CurrentWorkspace); err != nil {
+		return nil, err
+	}
+
+	return cfg.active, nil
+}
+
+func (cfg *Config) MustWorkspace() *Workspace {
+	ws, err := cfg.ActiveWorkspace()
+	if err != nil {
+		panic(err)
+	}
+	return ws
+}
+
+func (cfg *Config) WorkspaceNames() []string {
+	names := make([]string, 0, len(cfg.Workspaces))
+	for name := range cfg.Workspaces {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+func (cfg *Config) SwitchWorkspace(name string) error {
+	if err := cfg.setActiveWorkspace(name); err != nil {
+		return err
+	}
+	return cfg.Save()
+}
+
+func (cfg *Config) ActivateWorkspace(name string) error {
+	return cfg.setActiveWorkspace(name)
+}
+
+func (cfg *Config) AddWorkspace(name string, ws *Workspace, makeCurrent bool) error {
+	trimmed := strings.TrimSpace(name)
+	if trimmed == "" {
+		return fmt.Errorf("workspace name cannot be empty")
+	}
+
+	if cfg.Workspaces == nil {
+		cfg.Workspaces = make(map[string]*Workspace)
+	}
+
+	if _, exists := cfg.Workspaces[trimmed]; exists {
+		return fmt.Errorf("workspace %q already exists", trimmed)
+	}
+
+	if ws == nil {
+		ws = newWorkspace()
+	}
+	ws.ensureDefaults()
+	cfg.Workspaces[trimmed] = ws
+
+	if cfg.CurrentWorkspace == "" || makeCurrent {
+		if err := cfg.setActiveWorkspace(trimmed); err != nil {
+			return err
+		}
+	}
+
+	return cfg.Save()
+}
+
+func (cfg *Config) RemoveWorkspace(name string) error {
+	if len(cfg.Workspaces) <= 1 {
+		return fmt.Errorf("cannot remove the last workspace")
+	}
+
+	if _, exists := cfg.Workspaces[name]; !exists {
+		return fmt.Errorf("workspace %q does not exist", name)
+	}
+
+	delete(cfg.Workspaces, name)
+
+	if cfg.CurrentWorkspace == name {
+		cfg.active = nil
+		cfg.CurrentWorkspace = ""
+		if err := cfg.ensureInitialized(); err != nil {
+			return err
+		}
+	}
+
+	return cfg.Save()
 }
 
 func (cfg *Config) GetConfigPath() string {
@@ -145,13 +390,18 @@ func (cfg *Config) GetConfigPath() string {
 }
 
 func (cfg *Config) AddSubdir(name string) error {
-	for _, subDir := range cfg.SubDirs {
+	ws, err := cfg.ActiveWorkspace()
+	if err != nil {
+		return err
+	}
+
+	for _, subDir := range ws.SubDirs {
 		if subDir == name {
 			return fmt.Errorf("subdirectory %q already exists", name)
 		}
 	}
 
-	cfg.SubDirs = append(cfg.SubDirs, name)
+	ws.SubDirs = append(ws.SubDirs, name)
 	return cfg.Save()
 }
 
@@ -161,27 +411,37 @@ func (cfg *Config) AddView(name string, view ViewDefinition) error {
 		return fmt.Errorf("view name cannot be empty")
 	}
 
-	if cfg.Views == nil {
-		cfg.Views = make(map[string]ViewDefinition)
+	ws, err := cfg.ActiveWorkspace()
+	if err != nil {
+		return err
 	}
 
-	cfg.Views[name] = view
-	cfg.ViewOrder = appendViewOrder(cfg.ViewOrder, name)
+	if ws.Views == nil {
+		ws.Views = make(map[string]ViewDefinition)
+	}
+
+	ws.Views[name] = view
+	ws.ViewOrder = appendViewOrder(ws.ViewOrder, name)
 
 	return cfg.Save()
 }
 
 func (cfg *Config) RemoveView(name string) error {
-	if cfg.Views == nil {
+	ws, err := cfg.ActiveWorkspace()
+	if err != nil {
+		return err
+	}
+
+	if ws.Views == nil {
 		return fmt.Errorf("no views are configured")
 	}
 
-	if _, ok := cfg.Views[name]; !ok {
+	if _, ok := ws.Views[name]; !ok {
 		return fmt.Errorf("view %q does not exist", name)
 	}
 
-	delete(cfg.Views, name)
-	cfg.ViewOrder = removeFromOrder(cfg.ViewOrder, name)
+	delete(ws.Views, name)
+	ws.ViewOrder = removeFromOrder(ws.ViewOrder, name)
 
 	return cfg.Save()
 }
@@ -204,7 +464,12 @@ func (cfg *Config) SetViewOrder(order []string) error {
 		deduped = append(deduped, trimmed)
 	}
 
-	cfg.ViewOrder = deduped
+	ws, err := cfg.ActiveWorkspace()
+	if err != nil {
+		return err
+	}
+
+	ws.ViewOrder = deduped
 	return cfg.Save()
 }
 
@@ -237,7 +502,12 @@ func (cfg *Config) ChangeMode(mode string) error {
 		)
 	}
 
-	cfg.FileSystemMode = mode
+	ws, err := cfg.ActiveWorkspace()
+	if err != nil {
+		return err
+	}
+
+	ws.FileSystemMode = mode
 	return cfg.Save()
 }
 
@@ -246,12 +516,22 @@ func (cfg *Config) ChangeEditor(editor string) error {
 		return err
 	}
 
-	cfg.Editor = editor
+	ws, err := cfg.ActiveWorkspace()
+	if err != nil {
+		return err
+	}
+
+	ws.Editor = editor
 	return cfg.Save()
 }
 
 func (cfg *Config) AddPin(pinName, file, pinType string) error {
-	err := cfg.PinManager.AddPin(pinName, file, pinType)
+	ws, err := cfg.ActiveWorkspace()
+	if err != nil {
+		return err
+	}
+
+	err = ws.PinManager.AddPin(pinName, file, pinType)
 	if err != nil {
 		return err
 	}
@@ -260,7 +540,12 @@ func (cfg *Config) AddPin(pinName, file, pinType string) error {
 }
 
 func (cfg *Config) ChangePin(file, pinType, pinName string) error {
-	err := cfg.PinManager.ChangePin(file, pinType, pinName)
+	ws, err := cfg.ActiveWorkspace()
+	if err != nil {
+		return err
+	}
+
+	err = ws.PinManager.ChangePin(file, pinType, pinName)
 	if err != nil {
 		return err
 	}
@@ -269,7 +554,12 @@ func (cfg *Config) ChangePin(file, pinType, pinName string) error {
 }
 
 func (cfg *Config) DeleteNamedPin(pinName, pinType string) error {
-	err := cfg.PinManager.DeleteNamedPin(pinName, pinType)
+	ws, err := cfg.ActiveWorkspace()
+	if err != nil {
+		return err
+	}
+
+	err = ws.PinManager.DeleteNamedPin(pinName, pinType)
 	if err != nil {
 		return err
 	}
@@ -278,7 +568,12 @@ func (cfg *Config) DeleteNamedPin(pinName, pinType string) error {
 }
 
 func (cfg *Config) ClearPinnedFile(pinType string) error {
-	err := cfg.PinManager.ClearPinnedFile(pinType)
+	ws, err := cfg.ActiveWorkspace()
+	if err != nil {
+		return err
+	}
+
+	err = ws.PinManager.ClearPinnedFile(pinType)
 	if err != nil {
 		return err
 	}
@@ -287,7 +582,12 @@ func (cfg *Config) ClearPinnedFile(pinType string) error {
 }
 
 func (cfg *Config) RenamePin(oldName, newName, pinType string) error {
-	err := cfg.PinManager.RenamePin(oldName, newName, pinType)
+	ws, err := cfg.ActiveWorkspace()
+	if err != nil {
+		return err
+	}
+
+	err = ws.PinManager.RenamePin(oldName, newName, pinType)
 	if err != nil {
 		return err
 	}
@@ -296,7 +596,12 @@ func (cfg *Config) RenamePin(oldName, newName, pinType string) error {
 }
 
 func (cfg *Config) ListPins(pinType string) error {
-	err := cfg.PinManager.ListPins(pinType)
+	ws, err := cfg.ActiveWorkspace()
+	if err != nil {
+		return err
+	}
+
+	err = ws.PinManager.ListPins(pinType)
 	if err != nil {
 		return err
 	}
@@ -305,8 +610,13 @@ func (cfg *Config) ListPins(pinType string) error {
 }
 
 func (cfg *Config) Save() error {
-	if cfg.Editor != "" {
-		if err := ValidateEditor(cfg.Editor); err != nil {
+	ws, err := cfg.ActiveWorkspace()
+	if err != nil {
+		return err
+	}
+
+	if ws.Editor != "" {
+		if err := ValidateEditor(ws.Editor); err != nil {
 			return err
 		}
 	}
@@ -324,23 +634,37 @@ func (cfg *Config) Save() error {
 	return os.WriteFile(configPath, data, 0o644)
 }
 
-func (cfg *Config) syncPins() {
-	cfg.NamedPins = PinMap(cfg.PinManager.NamedPins)
-	cfg.NamedTaskPins = PinMap(cfg.PinManager.NamedTaskPins)
-	cfg.PinnedFile = cfg.PinManager.PinnedFile
-	cfg.PinnedTaskFile = cfg.PinManager.PinnedTaskFile
+func (ws *Workspace) syncPins() {
+	if ws.PinManager == nil {
+		return
+	}
+	ws.NamedPins = PinMap(ws.PinManager.NamedPins)
+	ws.NamedTaskPins = PinMap(ws.PinManager.NamedTaskPins)
+	ws.PinnedFile = ws.PinManager.PinnedFile
+	ws.PinnedTaskFile = ws.PinManager.PinnedTaskFile
+}
+
+func (cfg *Config) syncPins() error {
+	ws, err := cfg.ActiveWorkspace()
+	if err != nil {
+		return err
+	}
+	ws.syncPins()
+	return nil
 }
 
 func (cfg *Config) syncPinsAndSave() error {
-	cfg.syncPins()
+	if err := cfg.syncPins(); err != nil {
+		return err
+	}
 	return cfg.Save()
 }
 
 func (cfg *Config) HandleSubdir(subdirName string) {
-	exists, err := verifySubdirExists(subdirName)
-	cobra.CheckErr(err)
+	ws := cfg.MustWorkspace()
+	exists := ws.HasSubdir(subdirName)
 
-	switch cfg.FileSystemMode {
+	switch ws.FileSystemMode {
 	case "strict":
 		if !exists {
 			fmt.Println("Error: Subdirectory", subdirName, "does not exist.")
@@ -351,7 +675,7 @@ func (cfg *Config) HandleSubdir(subdirName string) {
 		}
 	case "free":
 		if !exists {
-			cfg.AddSubdir(subdirName)
+			cobra.CheckErr(cfg.AddSubdir(subdirName))
 		}
 	case "confirm":
 		if !exists {
@@ -376,7 +700,7 @@ func (cfg *Config) getConfirmation(subdirName string) {
 
 		switch response {
 		case "yes", "y":
-			cfg.AddSubdir(subdirName)
+			cobra.CheckErr(cfg.AddSubdir(subdirName))
 			return
 		case "no", "n":
 			fmt.Println("Exiting due to non-existing subdirectory")
@@ -385,4 +709,13 @@ func (cfg *Config) getConfirmation(subdirName string) {
 			fmt.Println("Invalid response. Please enter 'y'/'yes' or 'n'/'no'.")
 		}
 	}
+}
+
+func (ws *Workspace) HasSubdir(name string) bool {
+	for _, subdir := range ws.SubDirs {
+		if subdir == name {
+			return true
+		}
+	}
+	return false
 }

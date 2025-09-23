@@ -33,7 +33,12 @@ func NewCmdPinAdd(s *state.State, pinType string) *cobra.Command {
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if check {
-				fmt.Println("Current pinned file:", s.Config.PinnedFile)
+				ws := s.Config.MustWorkspace()
+				if pinType == "task" {
+					fmt.Println("Current pinned file:", ws.PinnedTaskFile)
+				} else {
+					fmt.Println("Current pinned file:", ws.PinnedFile)
+				}
 				return nil
 			}
 			return run(cmd, args, s, pinType)

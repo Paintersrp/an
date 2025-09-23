@@ -10,7 +10,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/Paintersrp/an/internal/config"
-	"github.com/Paintersrp/an/internal/pin"
 	"github.com/Paintersrp/an/internal/state"
 	"github.com/Paintersrp/an/internal/tui/notes"
 	"github.com/Paintersrp/an/internal/tui/pinList/submodels/input"
@@ -18,16 +17,10 @@ import (
 )
 
 func TestUpdateAddPinErrorShowsStatusAndKeepsDialog(t *testing.T) {
-	cfg := &config.Config{
+	cfg := newTestConfig(t, &config.Workspace{
 		NamedPins:     config.PinMap{"existing": "path"},
 		NamedTaskPins: config.PinMap{},
-	}
-	cfg.PinManager = pin.NewPinManager(
-		pin.PinMap(cfg.NamedPins),
-		pin.PinMap(cfg.NamedTaskPins),
-		"",
-		"",
-	)
+	})
 
 	model := newTestPinListModel(cfg, "text")
 	model.adding = true
@@ -68,16 +61,10 @@ func TestUpdateAddPinErrorShowsStatusAndKeepsDialog(t *testing.T) {
 }
 
 func TestUpdateRenamePinErrorShowsStatusAndKeepsDialog(t *testing.T) {
-	cfg := &config.Config{
+	cfg := newTestConfig(t, &config.Workspace{
 		NamedPins:     config.PinMap{},
 		NamedTaskPins: config.PinMap{},
-	}
-	cfg.PinManager = pin.NewPinManager(
-		pin.PinMap(cfg.NamedPins),
-		pin.PinMap(cfg.NamedTaskPins),
-		"",
-		"",
-	)
+	})
 
 	model := newTestPinListModel(cfg, "text")
 	model.renaming = true
@@ -108,16 +95,10 @@ func TestUpdateRenamePinErrorShowsStatusAndKeepsDialog(t *testing.T) {
 }
 
 func TestUpdateChangePinErrorShowsStatusAndKeepsDialog(t *testing.T) {
-	cfg := &config.Config{
+	cfg := newTestConfig(t, &config.Workspace{
 		NamedPins:     config.PinMap{},
 		NamedTaskPins: config.PinMap{},
-	}
-	cfg.PinManager = pin.NewPinManager(
-		pin.PinMap(cfg.NamedPins),
-		pin.PinMap(cfg.NamedTaskPins),
-		"",
-		"",
-	)
+	})
 
 	model := newTestPinListModel(cfg, "invalid")
 	model.finding = true
@@ -154,7 +135,7 @@ func TestUpdateChangePinErrorShowsStatusAndKeepsDialog(t *testing.T) {
 
 func TestRefreshItemsSortsPins(t *testing.T) {
 	newConfig := func() *config.Config {
-		cfg := &config.Config{
+		return newTestConfig(t, &config.Workspace{
 			NamedPins: config.PinMap{
 				"gamma": "/notes/gamma.md",
 				"alpha": "/notes/alpha.md",
@@ -167,14 +148,7 @@ func TestRefreshItemsSortsPins(t *testing.T) {
 			},
 			PinnedFile:     "/notes/default.md",
 			PinnedTaskFile: "/tasks/default.md",
-		}
-		cfg.PinManager = pin.NewPinManager(
-			pin.PinMap(cfg.NamedPins),
-			pin.PinMap(cfg.NamedTaskPins),
-			cfg.PinnedFile,
-			cfg.PinnedTaskFile,
-		)
-		return cfg
+		})
 	}
 
 	t.Run("text pins are sorted", func(t *testing.T) {
@@ -184,7 +158,7 @@ func TestRefreshItemsSortsPins(t *testing.T) {
 		model.refreshItems("text")
 		assertItemTitles(t, model.list.Items(), []string{"alpha", "beta", "gamma", "default"})
 
-		cfg.NamedPins["aardvark"] = "/notes/aardvark.md"
+		cfg.MustWorkspace().NamedPins["aardvark"] = "/notes/aardvark.md"
 		model.refreshItems("text")
 		assertItemTitles(t, model.list.Items(), []string{"aardvark", "alpha", "beta", "gamma", "default"})
 	})
@@ -196,14 +170,15 @@ func TestRefreshItemsSortsPins(t *testing.T) {
 		model.refreshItems("task")
 		assertItemTitles(t, model.list.Items(), []string{"task-a", "task-b", "task-c", "default"})
 
-		cfg.NamedTaskPins["task-0"] = "/tasks/0.md"
+		cfg.MustWorkspace().NamedTaskPins["task-0"] = "/tasks/0.md"
 		model.refreshItems("task")
 		assertItemTitles(t, model.list.Items(), []string{"task-0", "task-a", "task-b", "task-c", "default"})
 	})
 }
 
 func newTestPinListModel(cfg *config.Config, pinType string) PinListModel {
-	state := &state.State{Config: cfg}
+	ws := cfg.MustWorkspace()
+	state := &state.State{Config: cfg, Workspace: ws, WorkspaceName: cfg.CurrentWorkspace}
 	return PinListModel{
 		list:         list.New(nil, list.NewDefaultDelegate(), 0, 0),
 		keys:         newListKeyMap(),
@@ -213,6 +188,18 @@ func newTestPinListModel(cfg *config.Config, pinType string) PinListModel {
 		sublist:      sublist.SubListModel{List: list.New(nil, list.NewDefaultDelegate(), 0, 0)},
 		input:        input.NewNameInput(),
 	}
+}
+
+func newTestConfig(t *testing.T, ws *config.Workspace) *config.Config {
+	t.Helper()
+	cfg := &config.Config{
+		Workspaces:       map[string]*config.Workspace{"default": ws},
+		CurrentWorkspace: "default",
+	}
+	if err := cfg.ActivateWorkspace("default"); err != nil {
+		t.Fatalf("failed to activate workspace: %v", err)
+	}
+	return cfg
 }
 
 func newNotesListItem(path string) notes.ListItem {
