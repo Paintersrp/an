@@ -21,6 +21,7 @@ type State struct {
 	Views       map[string]views.View
 	Home        string
 	Vault       string
+	Watcher     *VaultWatcher
 }
 
 func NewState() (*State, error) {
@@ -42,6 +43,11 @@ func NewState() (*State, error) {
 	h := handler.NewFileHandler(cfg.VaultDir)
 	vm := views.NewViewManager(h, cfg.VaultDir)
 
+	watcher, err := NewVaultWatcher(cfg.VaultDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create vault watcher: %w", err)
+	}
+
 	return &State{
 		Config:      cfg,
 		Templater:   t,
@@ -50,6 +56,7 @@ func NewState() (*State, error) {
 		Views:       vm.Views,
 		Home:        home,
 		Vault:       cfg.VaultDir,
+		Watcher:     watcher,
 	}, nil
 }
 

@@ -130,6 +130,20 @@ func (c *Cache) removeElement(e *list.Element) {
 	c.currentSize -= int64(sizeof(kv))
 }
 
+// Delete removes the provided key from the cache if it exists.
+func (c *Cache) Delete(key interface{}) {
+	if key == nil {
+		return
+	}
+
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	if ele, hit := c.items[key]; hit {
+		c.removeElement(ele)
+	}
+}
+
 // SizeOf returns the approximate memory usage in bytes of the cache.
 func (c *Cache) SizeOf() int64 {
 	return c.currentSize
