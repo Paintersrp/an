@@ -63,7 +63,7 @@ func NewFormModel(s *state.State) FormModel {
 	inputs[title] = textinput.New()
 	inputs[title].Placeholder = "Title"
 	inputs[title].Focus()
-	inputs[title].CharLimit = 20
+	inputs[title].CharLimit = 256
 	inputs[title].Width = 50
 	inputs[title].Prompt = ""
 

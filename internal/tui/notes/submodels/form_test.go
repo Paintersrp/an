@@ -136,6 +136,76 @@ func TestHandleSubmitAllowsEmptySubdirectory(t *testing.T) {
 	}
 }
 
+func TestHandleSubmitAllowsLongTitle(t *testing.T) {
+	tempDir := t.TempDir()
+
+	if err := os.MkdirAll(filepath.Join(tempDir, "notes"), 0o755); err != nil {
+		t.Fatalf("failed to create notes directory: %v", err)
+	}
+
+	model := NewFormModel(&state.State{
+		Vault:     tempDir,
+		Templater: &templater.Templater{},
+	})
+
+	longTitle := strings.Repeat("Long title ", 3) + "with more"
+	if len(longTitle) <= 20 {
+		t.Fatalf("expected longTitle to be longer than 20 characters, got %d", len(longTitle))
+	}
+
+	model.Inputs[title].SetValue(longTitle)
+	model.Inputs[tags].SetValue("")
+	model.Inputs[links].SetValue("")
+	model.Inputs[template].SetValue(defaultTemplate)
+	model.Inputs[subdirectory].SetValue("notes")
+
+	var capturedNote *note.ZettelkastenNote
+	var capturedTemplate string
+	originalLauncher := noteLauncher
+	noteLauncher = func(n *note.ZettelkastenNote, _ *templater.Templater, tmpl string, _ string) {
+		capturedNote = n
+		capturedTemplate = tmpl
+	}
+	defer func() {
+		noteLauncher = originalLauncher
+	}()
+
+	originalStdout := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create pipe: %v", err)
+	}
+	os.Stdout = w
+
+	model.handleSubmit()
+
+	_ = w.Close()
+	os.Stdout = originalStdout
+
+	var buf bytes.Buffer
+	if _, err := io.Copy(&buf, r); err != nil {
+		t.Fatalf("failed to read stdout: %v", err)
+	}
+	_ = r.Close()
+	output := buf.String()
+
+	if output != "" {
+		t.Fatalf("expected no output, got %q", output)
+	}
+
+	if capturedNote == nil {
+		t.Fatalf("expected note to be created, but noteLauncher was not called")
+	}
+
+	if capturedNote.Filename != longTitle {
+		t.Fatalf("expected title %q, got %q", longTitle, capturedNote.Filename)
+	}
+
+	if capturedTemplate != defaultTemplate {
+		t.Fatalf("expected template %q, got %q", defaultTemplate, capturedTemplate)
+	}
+}
+
 func TestHandleSubmitAllowsNestedSubdirectory(t *testing.T) {
 	tempDir := t.TempDir()
 
