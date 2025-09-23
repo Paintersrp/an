@@ -119,7 +119,7 @@ func (vm *ViewManager) GetFilesByView(
 	viewFlag string,
 	vaultDir string,
 ) ([]string, error) {
-	defaultExcludeDirs := []string{"archive"}
+	defaultExcludeDirs := []string{"archive", "trash"}
 	defaultExcludeFiles := []string{}
 
 	var (
