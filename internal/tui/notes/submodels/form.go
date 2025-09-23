@@ -2,7 +2,10 @@ package submodels
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -96,14 +99,8 @@ func NewFormModel(s *state.State) FormModel {
 	// Join the template names into a single string separated by commas.
 	availableTemplateNames := strings.Join(templateNames, ", ")
 
-	availableSubdirs := s.Handler.GetSubdirectories(s.Vault, "")
-	var visibleSubdirs []string
-	for _, subdir := range availableSubdirs {
-		if !strings.HasPrefix(subdir, ".") {
-			visibleSubdirs = append(visibleSubdirs, subdir)
-		}
-	}
-	availableSubdirNames := strings.Join(visibleSubdirs, ", ")
+	availableSubdirs := discoverSubdirectories(s.Vault)
+	availableSubdirNames := strings.Join(availableSubdirs, ", ")
 
 	b := NewSubmitButton()
 
@@ -315,10 +312,67 @@ func (m FormModel) subdirectoryExists(subDir string) bool {
 		return true
 	}
 
+	if m.state != nil {
+		vault := strings.TrimSpace(m.state.Vault)
+		if vault != "" {
+			joined := filepath.Join(vault, subDir)
+			if info, err := os.Stat(joined); err == nil && info.IsDir() {
+				return true
+			}
+		}
+	}
+
 	for _, dir := range m.availableSubdirs {
 		if dir == subDir {
 			return true
 		}
 	}
+	return false
+}
+
+func discoverSubdirectories(root string) []string {
+	if strings.TrimSpace(root) == "" {
+		return nil
+	}
+
+	var subDirs []string
+	_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+
+		if !d.IsDir() {
+			return nil
+		}
+
+		rel, err := filepath.Rel(root, path)
+		if err != nil || rel == "." {
+			return nil
+		}
+
+		if hasHiddenSegment(rel) {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		subDirs = append(subDirs, rel)
+		return nil
+	})
+
+	sort.Strings(subDirs)
+
+	return subDirs
+}
+
+func hasHiddenSegment(rel string) bool {
+	segments := strings.Split(rel, string(os.PathSeparator))
+	for _, segment := range segments {
+		if strings.HasPrefix(segment, ".") {
+			return true
+		}
+	}
+
 	return false
 }
