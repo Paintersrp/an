@@ -95,7 +95,19 @@ func (note *ZettelkastenNote) Create(
 	if err != nil {
 		return false, err
 	}
-	defer file.Close()
+	defer func() {
+		if file != nil {
+			file.Close()
+		}
+	}()
+
+	cleanup := func() {
+		if file != nil {
+			file.Close()
+			file = nil
+		}
+		removeCreatedArtifacts(path, note.VaultDir)
+	}
 
 	zetTime, tags := t.GenerateTagsAndDate(tmplName)
 	data := templater.TemplateData{
@@ -110,16 +122,45 @@ func (note *ZettelkastenNote) Create(
 
 	output, err := t.Execute(tmplName, data)
 	if err != nil {
-		// TODO: Delete newly created note on failure
+		cleanup()
 		return false, fmt.Errorf("failed to execute template: %w", err)
 	}
 
 	_, err = file.WriteString(output)
 	if err != nil {
+		cleanup()
 		return false, fmt.Errorf("failed to write to file: %w", err)
 	}
 
 	return true, nil
+}
+
+func removeCreatedArtifacts(filePath, vaultDir string) {
+	if filePath == "" {
+		return
+	}
+
+	_ = os.Remove(filePath)
+
+	vault := filepath.Clean(vaultDir)
+	dir := filepath.Dir(filePath)
+
+	for {
+		if dir == vault {
+			break
+		}
+
+		rel, err := filepath.Rel(vault, dir)
+		if err != nil || strings.HasPrefix(rel, "..") || rel == "." {
+			break
+		}
+
+		if err := os.Remove(dir); err != nil {
+			break
+		}
+
+		dir = filepath.Dir(dir)
+	}
 }
 
 // Open opens the Zettelkasten note in the configured editor.
