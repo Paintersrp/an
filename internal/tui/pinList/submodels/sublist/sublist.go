@@ -36,7 +36,7 @@ func NewSubListModel(s *state.State) SubListModel {
 	// l.DisableQuitKeybindings()
 	l.AdditionalFullHelpKeys = func() []key.Binding { return fullHelp(listKeys) }
 
-	files, err := s.ViewManager.GetFilesByView("default", s.Vault)
+	files, err := s.ViewManager.GetFilesByView("default")
 	if err != nil {
 		l.NewStatusMessage(
 			statusMessageStyle(fmt.Sprintf("Failed to load default view: %v", err)),

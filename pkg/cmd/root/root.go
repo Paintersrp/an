@@ -22,6 +22,7 @@ import (
 	"github.com/Paintersrp/an/pkg/cmd/trash"
 	"github.com/Paintersrp/an/pkg/cmd/unarchive"
 	"github.com/Paintersrp/an/pkg/cmd/untrash"
+	"github.com/Paintersrp/an/pkg/cmd/views"
 )
 
 var subdirName string
@@ -59,7 +60,7 @@ func NewCmdRoot(s *state.State) (*cobra.Command, error) {
 		tasks.NewCmdTasks(s),
 		pin.NewCmdPin(s, "text"),
 		echo.NewCmdEcho(s),
-		settings.NewCmdSettings(s.Config),
+		settings.NewCmdSettings(s),
 		symlink.NewCmdSymlink(s),
 		notes.NewCmdNotes(s),
 		todo.NewCmdTodo(s.Config),
@@ -68,6 +69,7 @@ func NewCmdRoot(s *state.State) (*cobra.Command, error) {
 		trash.NewCmdTrash(s),
 		untrash.NewCmdUntrash(s),
 		journal.NewCmdJournal(s),
+		views.NewCmdViews(s),
 	)
 
 	return cmd, nil

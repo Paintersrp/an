@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/internal/handler"
 )
 
@@ -26,16 +27,22 @@ func TestGetFilesByView_DefaultAndArchive(t *testing.T) {
 	mustWriteFile(t, trashedPath)
 
 	h := handler.NewFileHandler(vaultDir)
-	vm := NewViewManager(h, vaultDir)
+	cfg := &config.Config{
+		VaultDir: vaultDir,
+		Views: map[string]config.ViewDefinition{
+			"custom": {
+				Exclude: []string{"archive", "trash", "notes/skip.md"},
+			},
+		},
+	}
 
-	vm.Views["custom"] = View{
-		ExcludeDirs:  []string{},
-		ExcludeFiles: []string{"skip.md"},
-		OrphanOnly:   false,
+	vm, err := NewViewManager(h, cfg)
+	if err != nil {
+		t.Fatalf("NewViewManager returned error: %v", err)
 	}
 
 	t.Run("default view excludes archive and trash", func(t *testing.T) {
-		files, err := vm.GetFilesByView("default", vaultDir)
+		files, err := vm.GetFilesByView("default")
 		if err != nil {
 			t.Fatalf("GetFilesByView returned error: %v", err)
 		}
@@ -54,7 +61,7 @@ func TestGetFilesByView_DefaultAndArchive(t *testing.T) {
 	})
 
 	t.Run("archive view returns archived notes", func(t *testing.T) {
-		files, err := vm.GetFilesByView("archive", vaultDir)
+		files, err := vm.GetFilesByView("archive")
 		if err != nil {
 			t.Fatalf("GetFilesByView returned error: %v", err)
 		}
@@ -69,7 +76,7 @@ func TestGetFilesByView_DefaultAndArchive(t *testing.T) {
 	})
 
 	t.Run("custom view excludes configured files", func(t *testing.T) {
-		files, err := vm.GetFilesByView("custom", vaultDir)
+		files, err := vm.GetFilesByView("custom")
 		if err != nil {
 			t.Fatalf("GetFilesByView returned error: %v", err)
 		}
@@ -92,10 +99,51 @@ func TestGetFilesByView_DefaultAndArchive(t *testing.T) {
 	})
 
 	t.Run("invalid view returns error", func(t *testing.T) {
-		if _, err := vm.GetFilesByView("unknown", vaultDir); err == nil {
+		if _, err := vm.GetFilesByView("unknown"); err == nil {
 			t.Fatal("expected error for unknown view, got nil")
 		}
 	})
+}
+
+func TestViewManagerOrderHonorsConfig(t *testing.T) {
+	t.Parallel()
+
+	vaultDir := t.TempDir()
+	h := handler.NewFileHandler(vaultDir)
+	cfg := &config.Config{
+		VaultDir: vaultDir,
+		Views: map[string]config.ViewDefinition{
+			"custom": {},
+			"beta":   {},
+		},
+		ViewOrder: []string{"custom", "beta"},
+	}
+
+	vm, err := NewViewManager(h, cfg)
+	if err != nil {
+		t.Fatalf("NewViewManager returned error: %v", err)
+	}
+
+	order := vm.Order()
+	if len(order) == 0 {
+		t.Fatalf("expected order to contain views, got %v", order)
+	}
+
+	if order[0] != "custom" {
+		t.Fatalf("expected first view to be 'custom', got %q", order[0])
+	}
+
+	if order[1] != "beta" {
+		t.Fatalf("expected second view to be 'beta', got %q", order[1])
+	}
+
+	seen := make(map[string]struct{}, len(order))
+	for _, name := range order {
+		if _, ok := seen[name]; ok {
+			t.Fatalf("found duplicate view %q in order %v", name, order)
+		}
+		seen[name] = struct{}{}
+	}
 }
 
 func TestGetTitleForView(t *testing.T) {
@@ -104,20 +152,20 @@ func TestGetTitleForView(t *testing.T) {
 	tests := []struct {
 		name      string
 		viewFlag  string
-		sortField int
-		sortOrder int
+		sortField SortField
+		sortOrder SortOrder
 		want      string
 	}{{
 		name:      "known view and sort field ascending",
 		viewFlag:  "default",
-		sortField: 0,
-		sortOrder: 0,
+		sortField: SortFieldTitle,
+		sortOrder: SortOrderAscending,
 		want:      "✅ - All View \nSort: Title (Ascending)",
 	}, {
 		name:      "unknown view falls back to default prefix",
 		viewFlag:  "mystery",
-		sortField: 5,
-		sortOrder: 1,
+		sortField: SortField("mystery"),
+		sortOrder: SortOrderDescending,
 		want:      "✅ - All View \nSort: Unknown (Descending)",
 	}}
 
@@ -127,7 +175,7 @@ func TestGetTitleForView(t *testing.T) {
 			t.Parallel()
 			got := GetTitleForView(tc.viewFlag, tc.sortField, tc.sortOrder)
 			if got != tc.want {
-				t.Fatalf("GetTitleForView(%q, %d, %d) = %q, want %q",
+				t.Fatalf("GetTitleForView(%q, %q, %q) = %q, want %q",
 					tc.viewFlag, tc.sortField, tc.sortOrder, got, tc.want)
 			}
 		})

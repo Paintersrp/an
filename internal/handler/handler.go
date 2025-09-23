@@ -128,20 +128,23 @@ func (h *FileHandler) WalkFiles(
 			}
 
 			if !info.IsDir() && filepath.Ext(file) == ".md" {
-				content, err := os.ReadFile(path)
-				if err != nil {
-					log.Printf("Error reading file: %s, error: %v", path, err)
-					return nil
-				}
-
 				switch modeFlag {
-				case "orphan":
-					if !parser.HasNoteLinks(content) {
-						files = append(files, path)
+				case "orphan", "unfulfilled":
+					content, err := os.ReadFile(path)
+					if err != nil {
+						log.Printf("Error reading file: %s, error: %v", path, err)
+						return nil
 					}
-				case "unfulfilled":
-					if parser.CheckFulfillment(content, "false") {
-						files = append(files, path)
+
+					switch modeFlag {
+					case "orphan":
+						if !parser.HasNoteLinks(content) {
+							files = append(files, path)
+						}
+					case "unfulfilled":
+						if parser.CheckFulfillment(content, "false") {
+							files = append(files, path)
+						}
 					}
 				default:
 					files = append(files, path)
