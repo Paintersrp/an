@@ -127,7 +127,13 @@ func (m PinListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 						path := i.Path()
 						name := m.input.Input.Value()
-						m.state.Config.AddPin(name, path, m.pinType)
+						if err := m.state.Config.AddPin(name, path, m.pinType); err != nil {
+							return m, m.list.NewStatusMessage(
+								statusMessageStyle(
+									fmt.Sprintf("Failed to add pin: %v", err),
+								),
+							)
+						}
 						m.finding = false
 						m.adding = false
 						return m, m.refreshItems(m.pinType)
@@ -166,7 +172,13 @@ func (m PinListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, m.list.NewStatusMessage("new name and old name matched.")
 				}
 
-				m.state.Config.RenamePin(m.renamingFor, nv, m.pinType)
+				if err := m.state.Config.RenamePin(m.renamingFor, nv, m.pinType); err != nil {
+					return m, m.list.NewStatusMessage(
+						statusMessageStyle(
+							fmt.Sprintf("Failed to rename pin: %v", err),
+						),
+					)
+				}
 				m.input.Input.Blur()
 				m.renaming = false
 
@@ -184,7 +196,13 @@ func (m PinListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			if key.Matches(msg, m.keys.findSelect) {
 				if i, ok := m.sublist.List.SelectedItem().(notes.ListItem); ok {
-					m.state.Config.ChangePin(i.Path(), m.pinType, m.findingFor)
+					if err := m.state.Config.ChangePin(i.Path(), m.pinType, m.findingFor); err != nil {
+						return m, m.list.NewStatusMessage(
+							statusMessageStyle(
+								fmt.Sprintf("Failed to change pin: %v", err),
+							),
+						)
+					}
 					m.finding = false
 					return m, m.refreshItems(m.pinType)
 				} else {
