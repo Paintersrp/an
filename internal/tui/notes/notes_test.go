@@ -21,11 +21,12 @@ func TestCycleViewOrder(t *testing.T) {
 	l := list.New([]list.Item{}, delegate, 0, 0)
 
 	model := &NoteListModel{
-		list:      l,
-		state:     &state.State{Handler: fileHandler, ViewManager: viewManager, Vault: tempDir},
-		viewName:  "default",
-		sortField: sortByTitle,
-		sortOrder: ascending,
+		list:       l,
+		state:      &state.State{Handler: fileHandler, ViewManager: viewManager, Vault: tempDir},
+		viewName:   "default",
+		sortField:  sortByTitle,
+		sortOrder:  ascending,
+		highlights: newHighlightStore(),
 	}
 
 	expectedOrder := []string{"unfulfilled", "archive", "orphan", "trash", "default"}

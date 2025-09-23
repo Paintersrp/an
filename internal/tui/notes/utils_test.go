@@ -16,6 +16,8 @@ func newTestNoteListModel(t *testing.T, item ListItem, inputValue string) NoteLi
 	t.Helper()
 
 	delegate := list.NewDefaultDelegate()
+	store := newHighlightStore()
+	item.highlights = store
 	l := list.New([]list.Item{item}, delegate, 0, 0)
 	l.Select(0)
 
@@ -24,6 +26,7 @@ func newTestNoteListModel(t *testing.T, item ListItem, inputValue string) NoteLi
 
 	return NoteListModel{
 		list:       l,
+		highlights: store,
 		inputModel: inputModel,
 	}
 }
