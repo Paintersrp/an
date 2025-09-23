@@ -69,20 +69,26 @@ func run(
 				fmt.Printf("error fuzzyfinding note: %s", err)
 			}
 
-			s.Config.ChangePin(choice, pinType, name)
+			if err := s.Config.ChangePin(choice, pinType, name); err != nil {
+				return err
+			}
 		} else {
 			choice, err := finder.RunWithQuery(args[0], false)
 			if err != nil {
 				fmt.Printf("error fuzzyfinding note: %s", err)
 			}
 
-			s.Config.ChangePin(choice, pinType, name)
+			if err := s.Config.ChangePin(choice, pinType, name); err != nil {
+				return err
+			}
 		}
 	} else {
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			return errors.New("the specified file does not exist")
 		}
-		s.Config.ChangePin(path, pinType, name)
+		if err := s.Config.ChangePin(path, pinType, name); err != nil {
+			return err
+		}
 	}
 
 	return nil
