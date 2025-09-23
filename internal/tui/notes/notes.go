@@ -59,20 +59,27 @@ func NewNoteListModel(
 	s *state.State,
 	viewName string,
 ) (*NoteListModel, error) {
-	files, err := s.ViewManager.GetFilesByView(viewName, s.Vault)
+	view, err := s.ViewManager.GetView(viewName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve view %q: %w", viewName, err)
+	}
+
+	files, err := s.ViewManager.GetFilesByView(viewName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load files for view %q: %w", viewName, err)
 	}
 
 	items := ParseNoteFiles(files, s.Vault, false)
-	sortedItems := sortItems(castToListItems(items), sortByModifiedAt, descending)
+	sortField := sortFieldFromView(view.Sort.Field)
+	sortOrder := sortOrderFromView(view.Sort.Order)
+	sortedItems := sortItems(castToListItems(items), sortField, sortOrder)
 
 	highlightMatches := newHighlightStore()
 	attachHighlightStore(sortedItems, highlightMatches)
 
 	dkeys := newDelegateKeyMap()
 	lkeys := newListKeyMap()
-	title := v.GetTitleForView(viewName, int(sortByModifiedAt), int(descending))
+	title := v.GetTitleForView(viewName, view.Sort.Field, view.Sort.Order)
 	delegate := newItemDelegate(dkeys, s.Handler, viewName)
 
 	l := list.New(sortedItems, delegate, 0, 0)
@@ -107,8 +114,8 @@ func NewNoteListModel(
 		renaming:     false,
 		creating:     false,
 		copying:      false,
-		sortField:    sortByModifiedAt,
-		sortOrder:    descending,
+		sortField:    sortField,
+		sortOrder:    sortOrder,
 		highlights:   highlightMatches,
 	}
 
@@ -673,7 +680,7 @@ func renderPreviewCmd(path string, width, height int, cache *cache.Cache) tea.Cm
 }
 
 func (m *NoteListModel) refresh() tea.Cmd {
-	m.list.Title = v.GetTitleForView(m.viewName, int(m.sortField), int(m.sortOrder))
+	m.list.Title = v.GetTitleForView(m.viewName, viewSortField(m.sortField), viewSortOrder(m.sortOrder))
 	m.refreshDelegate()
 	cmd := m.refreshItems()
 	m.list.ResetSelected()
@@ -681,7 +688,7 @@ func (m *NoteListModel) refresh() tea.Cmd {
 }
 
 func (m *NoteListModel) refreshItems() tea.Cmd {
-	files, err := m.state.ViewManager.GetFilesByView(m.viewName, m.state.Vault)
+	files, err := m.state.ViewManager.GetFilesByView(m.viewName)
 	if err != nil {
 		m.list.NewStatusMessage(
 			statusStyle(fmt.Sprintf("Failed to load %s view: %v", m.viewName, err)),
@@ -702,7 +709,7 @@ func (m *NoteListModel) refreshDelegate() {
 }
 
 func (m *NoteListModel) refreshSort() tea.Cmd {
-	m.list.Title = v.GetTitleForView(m.viewName, int(m.sortField), int(m.sortOrder))
+	m.list.Title = v.GetTitleForView(m.viewName, viewSortField(m.sortField), viewSortOrder(m.sortOrder))
 	items := castToListItems(m.list.Items())
 	sortedItems := sortItems(items, m.sortField, m.sortOrder)
 	m.list.ResetSelected()
@@ -746,27 +753,74 @@ func (m *NoteListModel) toggleDetails() tea.Cmd {
 }
 
 func (m *NoteListModel) cycleView() tea.Cmd {
-	switch m.viewName {
-	case "default":
-		m.viewName = "unfulfilled"
-	case "unfulfilled":
-		m.viewName = "archive"
-	case "archive":
-		m.viewName = "orphan"
-	case "orphan":
-		m.viewName = "trash"
-	case "trash":
-		m.viewName = "default"
-	default:
-		m.viewName = "default"
+	next := m.state.ViewManager.NextView(m.viewName)
+	return m.applyView(next)
+}
+
+func (m *NoteListModel) swapView(newView string) tea.Cmd {
+	return m.applyView(newView)
+}
+
+func (m *NoteListModel) applyView(viewName string) tea.Cmd {
+	view, err := m.state.ViewManager.GetView(viewName)
+	if err != nil {
+		m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Invalid view %s", viewName)))
+		return nil
 	}
+
+	m.viewName = viewName
+	m.sortField = sortFieldFromView(view.Sort.Field)
+	m.sortOrder = sortOrderFromView(view.Sort.Order)
 
 	return m.refresh()
 }
 
-func (m *NoteListModel) swapView(newView string) tea.Cmd {
-	m.viewName = newView
-	return m.refresh()
+func sortFieldFromView(field v.SortField) sortField {
+	switch field {
+	case v.SortFieldTitle:
+		return sortByTitle
+	case v.SortFieldSubdirectory:
+		return sortBySubdir
+	case v.SortFieldModified:
+		fallthrough
+	default:
+		return sortByModifiedAt
+	}
+}
+
+func sortOrderFromView(order v.SortOrder) sortOrder {
+	switch order {
+	case v.SortOrderAscending:
+		return ascending
+	case v.SortOrderDescending:
+		fallthrough
+	default:
+		return descending
+	}
+}
+
+func viewSortField(field sortField) v.SortField {
+	switch field {
+	case sortByTitle:
+		return v.SortFieldTitle
+	case sortBySubdir:
+		return v.SortFieldSubdirectory
+	case sortByModifiedAt:
+		fallthrough
+	default:
+		return v.SortFieldModified
+	}
+}
+
+func viewSortOrder(order sortOrder) v.SortOrder {
+	switch order {
+	case ascending:
+		return v.SortOrderAscending
+	case descending:
+		fallthrough
+	default:
+		return v.SortOrderDescending
+	}
 }
 
 func (m *NoteListModel) toggleCopy() {

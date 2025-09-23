@@ -41,7 +41,10 @@ func NewState() (*State, error) {
 	}
 
 	h := handler.NewFileHandler(cfg.VaultDir)
-	vm := views.NewViewManager(h, cfg.VaultDir)
+	vm, err := views.NewViewManager(h, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to configure views: %w", err)
+	}
 
 	watcher, err := NewVaultWatcher(cfg.VaultDir)
 	if err != nil {

@@ -3,6 +3,7 @@ package settings
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
@@ -10,6 +11,8 @@ import (
 	"github.com/erikgeiser/promptkit/selection"
 
 	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/internal/state"
+	"github.com/Paintersrp/an/internal/views"
 )
 
 // TODO: Clean and Organize
@@ -68,24 +71,35 @@ type ListModel struct {
 	keys               *listKeyMap
 	delegateKeys       *delegateKeyMap
 	config             *config.Config
+	state              *state.State
 	configInput        ListInputModel
 	inputActive        bool
 	editorSelect       *selection.Model[string]
 	editorSelectActive bool
 	modeSelect         *selection.Model[string]
 	modeSelectActive   bool
+	pendingAction      string
 }
 
-func NewListModel(cfg *config.Config) ListModel {
+const (
+	viewActionAdd    = "add_view"
+	viewActionRemove = "remove_view"
+)
+
+func NewListModel(s *state.State) ListModel {
 	delegateKeys := newDelegateKeyMap()
 	listKeys := newListKeyMap()
 	configInput := initialInputModel()
+
+	cfg := s.Config
 
 	items := []list.Item{
 		ListItem{title: "VaultDir", description: cfg.VaultDir},
 		ListItem{title: "Editor", description: cfg.Editor},
 		ListItem{title: "NvimArgs", description: cfg.NvimArgs},
 		ListItem{title: "FileSystemMode", description: cfg.FileSystemMode},
+		ListItem{title: "Add Custom View", description: "name|include|exclude|sortField|sortOrder|predicates"},
+		ListItem{title: "Remove Custom View", description: "name"},
 	}
 
 	delegate := newItemDelegate(delegateKeys)
@@ -123,10 +137,12 @@ func NewListModel(cfg *config.Config) ListModel {
 		configInput:        configInput,
 		inputActive:        false,
 		config:             cfg,
+		state:              s,
 		editorSelect:       editorSelect,
 		editorSelectActive: false,
 		modeSelect:         modeSelect,
 		modeSelectActive:   false,
+		pendingAction:      "",
 	}
 }
 
@@ -235,6 +251,7 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if key.Matches(msg, m.keys.exitInputMode) {
 				m.configInput.Input.Blur()
 				m.inputActive = false
+				m.pendingAction = ""
 				return m, nil
 			}
 
@@ -252,12 +269,46 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 				inputValue := m.configInput.Input.Value()
-				if title == "Editor" {
+				handledCustomAction := false
+				updateDescription := true
+
+				switch {
+				case m.pendingAction == viewActionAdd:
+					name, def, err := parseViewDefinition(inputValue)
+					if err != nil {
+						m.list.NewStatusMessage(statusMessageStyle(err.Error()))
+						return m, nil
+					}
+
+					if err := m.state.ViewManager.AddCustomView(name, def); err != nil {
+						m.list.NewStatusMessage(statusMessageStyle(err.Error()))
+						return m, nil
+					}
+
+					handledCustomAction = true
+					updateDescription = false
+					m.list.NewStatusMessage(statusMessageStyle(fmt.Sprintf("Added view: %s", name)))
+				case m.pendingAction == viewActionRemove:
+					name := strings.TrimSpace(inputValue)
+					if name == "" {
+						m.list.NewStatusMessage(statusMessageStyle("View name is required"))
+						return m, nil
+					}
+
+					if err := m.state.ViewManager.RemoveCustomView(name); err != nil {
+						m.list.NewStatusMessage(statusMessageStyle(err.Error()))
+						return m, nil
+					}
+
+					handledCustomAction = true
+					updateDescription = false
+					m.list.NewStatusMessage(statusMessageStyle(fmt.Sprintf("Removed view: %s", name)))
+				case title == "Editor":
 					if err := m.config.ChangeEditor(inputValue); err != nil {
 						m.list.NewStatusMessage(statusMessageStyle(err.Error()))
 						return m, nil
 					}
-				} else {
+				default:
 					switch title {
 					case "VaultDir":
 						m.config.VaultDir = inputValue
@@ -275,14 +326,19 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 				index := m.list.Index()
-				items := m.list.Items()
-				items[index] = ListItem{title: title, description: inputValue}
-				m.list.SetItems(items)
+				if updateDescription {
+					items := m.list.Items()
+					items[index] = ListItem{title: title, description: inputValue}
+					m.list.SetItems(items)
+				}
 
 				m.configInput.Input.Reset()
 				m.configInput.Input.Blur()
 				m.inputActive = false
-				m.list.NewStatusMessage(statusMessageStyle("Updated and Saved: " + title))
+				m.pendingAction = ""
+				if !handledCustomAction {
+					m.list.NewStatusMessage(statusMessageStyle("Updated and Saved: " + title))
+				}
 			}
 
 			return m, tea.Batch(cmds...)
@@ -304,6 +360,20 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.editorSelectActive = true
 			case "FileSystemMode":
 				m.modeSelectActive = true
+			case "Add Custom View":
+				m.pendingAction = viewActionAdd
+				m.inputActive = true
+				m.configInput.Title = "Add Custom View"
+				m.configInput.Input.Focus()
+				m.configInput.Input.SetValue("")
+				return m, nil
+			case "Remove Custom View":
+				m.pendingAction = viewActionRemove
+				m.inputActive = true
+				m.configInput.Title = "Remove Custom View"
+				m.configInput.Input.Focus()
+				m.configInput.Input.SetValue("")
+				return m, nil
 			default:
 				m.inputActive = true
 			}
@@ -355,11 +425,87 @@ func (m ListModel) View() string {
 	return appStyle.Render(m.list.View())
 }
 
-func Run(c *config.Config) error {
-	if _, err := tea.NewProgram(NewListModel(c), tea.WithAltScreen()).Run(); err != nil {
+func Run(s *state.State) error {
+	if _, err := tea.NewProgram(NewListModel(s), tea.WithAltScreen()).Run(); err != nil {
 		fmt.Println("Error running program:", err)
 		os.Exit(1)
 	}
 
 	return nil
+}
+
+func parseViewDefinition(input string) (string, config.ViewDefinition, error) {
+	parts := strings.Split(input, "|")
+	if len(parts) == 0 {
+		return "", config.ViewDefinition{}, fmt.Errorf("input cannot be empty")
+	}
+
+	name := strings.TrimSpace(parts[0])
+	if name == "" {
+		return "", config.ViewDefinition{}, fmt.Errorf("view name is required")
+	}
+
+	def := config.ViewDefinition{}
+
+	if len(parts) > 1 {
+		def.Include = splitAndTrimCSV(parts[1])
+	}
+	if len(parts) > 2 {
+		def.Exclude = splitAndTrimCSV(parts[2])
+	}
+	if len(parts) > 3 {
+		field := strings.ToLower(strings.TrimSpace(parts[3]))
+		if field != "" {
+			sortField := views.SortField(field)
+			if !views.IsValidSortField(sortField) {
+				return "", config.ViewDefinition{}, fmt.Errorf("invalid sort field: %s", field)
+			}
+			def.Sort.Field = field
+		}
+	}
+	if len(parts) > 4 {
+		order := strings.ToLower(strings.TrimSpace(parts[4]))
+		if order != "" {
+			sortOrder := views.SortOrder(order)
+			if !views.IsValidSortOrder(sortOrder) {
+				return "", config.ViewDefinition{}, fmt.Errorf("invalid sort order: %s", order)
+			}
+			def.Sort.Order = order
+		}
+	}
+	if len(parts) > 5 {
+		predicates := splitAndTrimCSV(parts[5])
+		for i, predicate := range predicates {
+			normalized := strings.ToLower(predicate)
+			if !views.IsValidPredicate(views.Predicate(normalized)) {
+				return "", config.ViewDefinition{}, fmt.Errorf("invalid predicate: %s", predicate)
+			}
+			predicates[i] = normalized
+		}
+		def.Predicates = predicates
+	}
+
+	return name, def, nil
+}
+
+func splitAndTrimCSV(value string) []string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+
+	if len(result) == 0 {
+		return nil
+	}
+
+	return result
 }

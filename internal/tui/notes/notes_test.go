@@ -5,6 +5,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/list"
 
+	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/internal/handler"
 	"github.com/Paintersrp/an/internal/state"
 	"github.com/Paintersrp/an/internal/views"
@@ -15,14 +16,18 @@ func TestCycleViewOrder(t *testing.T) {
 
 	tempDir := t.TempDir()
 	fileHandler := handler.NewFileHandler(tempDir)
-	viewManager := views.NewViewManager(fileHandler, tempDir)
+	cfg := &config.Config{VaultDir: tempDir}
+	viewManager, err := views.NewViewManager(fileHandler, cfg)
+	if err != nil {
+		t.Fatalf("NewViewManager returned error: %v", err)
+	}
 
 	delegate := list.NewDefaultDelegate()
 	l := list.New([]list.Item{}, delegate, 0, 0)
 
 	model := &NoteListModel{
 		list:       l,
-		state:      &state.State{Handler: fileHandler, ViewManager: viewManager, Vault: tempDir},
+		state:      &state.State{Config: cfg, Handler: fileHandler, ViewManager: viewManager, Vault: tempDir},
 		viewName:   "default",
 		sortField:  sortByTitle,
 		sortOrder:  ascending,

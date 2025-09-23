@@ -174,3 +174,48 @@ func TestConfigAddSubdirPersistsChanges(t *testing.T) {
 		t.Fatal("expected error when adding duplicate subdir, got nil")
 	}
 }
+
+func TestConfigAddAndRemoveView(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	cfg := &config.Config{VaultDir: filepath.Join(home, "vault")}
+
+	if err := cfg.AddView("custom", config.ViewDefinition{Include: []string{"notes"}}); err != nil {
+		t.Fatalf("AddView returned error: %v", err)
+	}
+
+	if _, ok := cfg.Views["custom"]; !ok {
+		t.Fatalf("expected in-memory Views to include 'custom': %#v", cfg.Views)
+	}
+
+	if !slices.Contains(cfg.ViewOrder, "custom") {
+		t.Fatalf("expected ViewOrder to include 'custom': %#v", cfg.ViewOrder)
+	}
+
+	data, err := os.ReadFile(cfg.GetConfigPath())
+	if err != nil {
+		t.Fatalf("reading persisted config: %v", err)
+	}
+
+	var persisted config.Config
+	if err := yaml.Unmarshal(data, &persisted); err != nil {
+		t.Fatalf("unmarshal persisted config: %v", err)
+	}
+
+	if _, ok := persisted.Views["custom"]; !ok {
+		t.Fatalf("expected persisted Views to include 'custom': %#v", persisted.Views)
+	}
+
+	if err := cfg.RemoveView("custom"); err != nil {
+		t.Fatalf("RemoveView returned error: %v", err)
+	}
+
+	if _, ok := cfg.Views["custom"]; ok {
+		t.Fatalf("expected view 'custom' to be removed: %#v", cfg.Views)
+	}
+
+	if slices.Contains(cfg.ViewOrder, "custom") {
+		t.Fatalf("expected ViewOrder to exclude 'custom': %#v", cfg.ViewOrder)
+	}
+}
