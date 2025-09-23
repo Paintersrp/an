@@ -91,9 +91,11 @@ func run(cmd *cobra.Command, args []string, s *state.State, priority string) err
 		}
 	}
 
-	section := prioritySections[priority]
-	if section == "" {
-		section = prioritySections["low"]
+	normalizedPriority := strings.ToLower(priority)
+	section, ok := prioritySections[normalizedPriority]
+	if !ok {
+		normalizedPriority = "low"
+		section = prioritySections[normalizedPriority]
 	}
 
 	sectionIndex := strings.Index(contentStr, section) + len(section)
@@ -123,12 +125,12 @@ func run(cmd *cobra.Command, args []string, s *state.State, priority string) err
 		fmt.Printf(
 			"Task appended to the pinned named task file '%s' under the \"%s\" section.\n",
 			name,
-			priority,
+			normalizedPriority,
 		)
 	} else {
 		fmt.Printf(
 			"Task appended to the pinned task file under the \"%s\" section.\n",
-			priority,
+			normalizedPriority,
 		)
 	}
 	return nil
