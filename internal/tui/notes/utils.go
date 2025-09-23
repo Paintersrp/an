@@ -284,3 +284,15 @@ func castToListItems(items []list.Item) []ListItem {
 	}
 	return listItems
 }
+
+func attachHighlightStore(items []list.Item, store *highlightStore) {
+	if store == nil {
+		return
+	}
+	for i, item := range items {
+		if listItem, ok := item.(ListItem); ok {
+			listItem.highlights = store
+			items[i] = listItem
+		}
+	}
+}

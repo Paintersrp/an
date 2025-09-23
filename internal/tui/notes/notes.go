@@ -17,6 +17,7 @@ import (
 	"github.com/Paintersrp/an/internal/cache"
 	"github.com/Paintersrp/an/internal/note"
 	"github.com/Paintersrp/an/internal/pathutil"
+	"github.com/Paintersrp/an/internal/search"
 	"github.com/Paintersrp/an/internal/state"
 	"github.com/Paintersrp/an/internal/tui/notes/submodels"
 	v "github.com/Paintersrp/an/internal/views"
@@ -43,6 +44,9 @@ type NoteListModel struct {
 	copying      bool
 	sortField    sortField
 	sortOrder    sortOrder
+	searchIndex  *search.Index
+	searchQuery  search.Query
+	highlights   *highlightStore
 }
 
 type previewLoadedMsg struct {
@@ -62,6 +66,9 @@ func NewNoteListModel(
 
 	items := ParseNoteFiles(files, s.Vault, false)
 	sortedItems := sortItems(castToListItems(items), sortByModifiedAt, descending)
+
+	highlightMatches := newHighlightStore()
+	attachHighlightStore(sortedItems, highlightMatches)
 
 	dkeys := newDelegateKeyMap()
 	lkeys := newListKeyMap()
@@ -88,7 +95,7 @@ func NewNoteListModel(
 	i := submodels.NewInputModel()
 	f := submodels.NewFormModel(s)
 
-	return &NoteListModel{
+	m := &NoteListModel{
 		state:        s,
 		cache:        c,
 		list:         l,
@@ -102,7 +109,126 @@ func NewNoteListModel(
 		copying:      false,
 		sortField:    sortByModifiedAt,
 		sortOrder:    descending,
-	}, nil
+		highlights:   highlightMatches,
+	}
+
+	m.rebuildSearch(files)
+	m.list.Filter = m.makeFilterFunc()
+
+	return m, nil
+}
+
+func (m *NoteListModel) rebuildSearch(paths []string) {
+	if m.highlights != nil {
+		m.highlights.clear()
+	}
+
+	if m.state == nil || m.state.Config == nil {
+		m.searchIndex = nil
+		m.searchQuery = search.Query{}
+		return
+	}
+
+	cfg := m.state.Config.Search
+	searchCfg := search.Config{
+		EnableBody:     cfg.EnableBody,
+		IgnoredFolders: append([]string(nil), cfg.IgnoredFolders...),
+	}
+
+	metadata := make(map[string][]string, len(cfg.DefaultMetadataFilters))
+	for key, values := range cfg.DefaultMetadataFilters {
+		metadata[key] = append([]string(nil), values...)
+	}
+
+	m.searchQuery = search.Query{
+		Tags:     append([]string(nil), cfg.DefaultTagFilters...),
+		Metadata: metadata,
+	}
+
+	index := search.NewIndex(m.state.Vault, searchCfg)
+	if err := index.Build(paths); err != nil {
+		log.Printf("failed to rebuild search index: %v", err)
+		m.list.NewStatusMessage(
+			statusStyle(fmt.Sprintf("Search index error: %v", err)),
+		)
+		m.searchIndex = nil
+		return
+	}
+
+	m.searchIndex = index
+}
+
+func (m *NoteListModel) makeFilterFunc() list.FilterFunc {
+	base := list.DefaultFilter
+
+	return func(term string, targets []string) []list.Rank {
+		trimmed := strings.TrimSpace(term)
+		if m.highlights != nil {
+			m.highlights.clear()
+		}
+
+		baseRanks := base(term, targets)
+
+		if m.searchIndex == nil {
+			return baseRanks
+		}
+
+		needsSearch := trimmed != "" || len(m.searchQuery.Tags) > 0 || len(m.searchQuery.Metadata) > 0
+		if !needsSearch {
+			return baseRanks
+		}
+
+		query := m.searchQuery
+		query.Term = trimmed
+		results := m.searchIndex.Search(query)
+		if len(results) == 0 {
+			return baseRanks
+		}
+
+		highlightMap := make(map[string]search.Result, len(results))
+		orderedPaths := make([]string, 0, len(results))
+		for _, res := range results {
+			normalized := pathutil.NormalizePath(res.Path)
+			highlightMap[normalized] = res
+			orderedPaths = append(orderedPaths, normalized)
+		}
+
+		if m.highlights != nil {
+			m.highlights.setAll(highlightMap)
+		}
+
+		items := m.list.Items()
+		indexByPath := make(map[string]int, len(items))
+		for idx, item := range items {
+			if li, ok := item.(ListItem); ok {
+				indexByPath[pathutil.NormalizePath(li.path)] = idx
+			}
+		}
+
+		highlightRanks := make([]list.Rank, 0, len(orderedPaths))
+		for _, path := range orderedPaths {
+			if idx, ok := indexByPath[path]; ok {
+				highlightRanks = append(highlightRanks, list.Rank{Index: idx})
+			}
+		}
+
+		if trimmed == "" && (len(m.searchQuery.Tags) > 0 || len(m.searchQuery.Metadata) > 0) {
+			return highlightRanks
+		}
+
+		existing := make(map[int]struct{}, len(baseRanks))
+		for _, rank := range baseRanks {
+			existing[rank.Index] = struct{}{}
+		}
+
+		for _, rank := range highlightRanks {
+			if _, ok := existing[rank.Index]; !ok {
+				baseRanks = append(baseRanks, rank)
+			}
+		}
+
+		return baseRanks
+	}
 }
 
 func (m NoteListModel) Init() tea.Cmd {
@@ -564,6 +690,8 @@ func (m *NoteListModel) refreshItems() tea.Cmd {
 	}
 	items := ParseNoteFiles(files, m.state.Vault, m.showDetails)
 	sortedItems := sortItems(castToListItems(items), m.sortField, m.sortOrder)
+	attachHighlightStore(sortedItems, m.highlights)
+	m.rebuildSearch(files)
 	return m.list.SetItems(sortedItems)
 }
 

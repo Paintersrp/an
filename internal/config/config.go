@@ -14,6 +14,13 @@ import (
 
 type PinMap map[string]string
 
+type SearchConfig struct {
+	EnableBody             bool                `yaml:"enable_body"             json:"enable_body"`
+	IgnoredFolders         []string            `yaml:"ignored_folders"         json:"ignored_folders"`
+	DefaultTagFilters      []string            `yaml:"tag_filters"             json:"tag_filters"`
+	DefaultMetadataFilters map[string][]string `yaml:"metadata_filters"        json:"metadata_filters"`
+}
+
 type Config struct {
 	PinManager     *pin.PinManager `yaml:"-"`
 	NamedPins      PinMap          `yaml:"named_pins"       json:"named_pins"`
@@ -25,6 +32,7 @@ type Config struct {
 	PinnedFile     string          `yaml:"pinned_file"      json:"pinned_file"`
 	PinnedTaskFile string          `yaml:"pinned_task_file" json:"pinned_task_file"`
 	SubDirs        []string        `yaml:"subdirs"          json:"sub_dirs"`
+	Search         SearchConfig    `yaml:"search"           json:"search"`
 }
 
 var ValidModes = map[string]bool{
@@ -80,7 +88,7 @@ func Load(home string) (*Config, error) {
 		return nil, err
 	}
 
-	cfg := &Config{}
+	cfg := &Config{Search: SearchConfig{EnableBody: true}}
 	if err := yaml.Unmarshal(data, cfg); err != nil {
 		return nil, err
 	}
@@ -96,6 +104,9 @@ func Load(home string) (*Config, error) {
 	}
 	if cfg.NamedTaskPins == nil {
 		cfg.NamedTaskPins = make(PinMap)
+	}
+	if cfg.Search.DefaultMetadataFilters == nil {
+		cfg.Search.DefaultMetadataFilters = make(map[string][]string)
 	}
 
 	cfg.PinManager = pin.NewPinManager(

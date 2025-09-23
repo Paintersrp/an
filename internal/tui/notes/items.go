@@ -16,6 +16,7 @@ type ListItem struct {
 	tags         []string
 	size         int64
 	showFullPath bool
+	highlights   *highlightStore
 }
 
 func (i ListItem) Title() string {
@@ -48,19 +49,38 @@ func (i ListItem) Description() string {
 			description += strings.Join(i.tags, ", ")
 		}
 	}
+	if snippet := i.highlightSnippet(); snippet != "" {
+		if description != "" {
+			description += "\n"
+		}
+		description += snippet
+	}
+
 	return description
 }
 
 func (i ListItem) FilterValue() string {
-        str := strings.Join(i.tags, " ")
-        return fmt.Sprintf(
-                "%s [%s] [%s]",
-                i.Title(),
-                str,
-                i.subdirectory,
-        )
+	str := strings.Join(i.tags, " ")
+	parts := []string{i.Title(), "[" + str + "]", "[" + i.subdirectory + "]"}
+	if snippet := i.highlightSnippet(); snippet != "" {
+		parts = append(parts, snippet)
+	}
+	return strings.Join(parts, " ")
 }
 
 func (i ListItem) Path() string {
 	return i.path
+}
+
+func (i ListItem) highlightSnippet() string {
+	if i.highlights == nil {
+		return ""
+	}
+	if res, ok := i.highlights.lookup(i.path); ok {
+		if res.Snippet != "" {
+			return res.Snippet
+		}
+		return res.MatchFrom
+	}
+	return ""
 }
