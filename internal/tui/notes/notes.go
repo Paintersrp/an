@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/Paintersrp/an/internal/cache"
 	"github.com/Paintersrp/an/internal/note"
+	"github.com/Paintersrp/an/internal/pathutil"
 	"github.com/Paintersrp/an/internal/state"
 	"github.com/Paintersrp/an/internal/tui/notes/submodels"
 	v "github.com/Paintersrp/an/internal/views"
@@ -41,6 +43,12 @@ type NoteListModel struct {
 	copying      bool
 	sortField    sortField
 	sortOrder    sortOrder
+}
+
+type previewLoadedMsg struct {
+	path     string
+	content  string
+	cacheErr error
 }
 
 func NewNoteListModel(
@@ -98,18 +106,91 @@ func NewNoteListModel(
 }
 
 func (m NoteListModel) Init() tea.Cmd {
-	return nil
+	var cmds []tea.Cmd
+
+	if m.state != nil && m.state.Watcher != nil {
+		cmds = append(cmds, m.state.Watcher.Start())
+	}
+
+	if cmd := m.handlePreview(false); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+
+	return tea.Batch(cmds...)
 }
 
 func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
+	case previewLoadedMsg:
+		if msg.cacheErr != nil {
+			m.list.NewStatusMessage(
+				statusStyle(fmt.Sprintf("Error updating cache: %s", msg.cacheErr)),
+			)
+		}
+
+		if s, ok := m.list.SelectedItem().(ListItem); ok && s.path == msg.path {
+			m.preview = msg.content
+		}
+
+		return m, nil
+
+	case state.VaultNoteChangedMsg:
+		var force bool
+		if m.cache != nil && m.state != nil {
+			abs := filepath.Join(m.state.Vault, filepath.FromSlash(msg.Path))
+			normalized := pathutil.NormalizePath(abs)
+			m.cache.Delete(normalized)
+
+			if s, ok := m.list.SelectedItem().(ListItem); ok && pathutil.NormalizePath(s.path) == normalized {
+				force = true
+			}
+		}
+
+		cmds = append(cmds, m.refreshItems())
+
+		if cmd := m.handlePreview(force); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+
+		if m.state != nil && m.state.Watcher != nil {
+			cmds = append(cmds, m.state.Watcher.Start())
+		}
+
+		return m, tea.Batch(cmds...)
+
+	case state.VaultWatcherErrMsg:
+		if msg.Err != nil {
+			m.list.NewStatusMessage(
+				statusStyle(fmt.Sprintf("Watcher error: %v", msg.Err)),
+			)
+		}
+
+		if m.state != nil && m.state.Watcher != nil {
+			cmds = append(cmds, m.state.Watcher.Start())
+		}
+
+		return m, tea.Batch(cmds...)
+
+	case tea.QuitMsg:
+		if err := m.closeWatcher(); err != nil {
+			m.list.NewStatusMessage(
+				statusStyle(fmt.Sprintf("Watcher shutdown error: %v", err)),
+			)
+		}
+
+		return m, nil
+
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
 		h, v := appStyle.GetFrameSize()
 		m.list.SetSize(msg.Width-h, msg.Height-v)
+
+		if cmd := m.handlePreview(true); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 
 	case tea.KeyMsg:
 		if m.list.FilterState() == list.Filtering {
@@ -135,13 +216,31 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	previousSelection := m.currentSelectionPath()
+
 	nl, cmd := m.list.Update(msg)
 	m.list = nl
 	cmds = append(cmds, cmd)
 
-	// TODO: need to asyncronously stream in the markdown preview
-	m.handlePreview()
+	if nextSelection := m.currentSelectionPath(); nextSelection != previousSelection {
+		if nextSelection == "" {
+			m.preview = ""
+		}
+
+		if cmd := m.handlePreview(false); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	}
+
 	return m, tea.Batch(cmds...)
+}
+
+func (m NoteListModel) currentSelectionPath() string {
+	if s, ok := m.list.SelectedItem().(ListItem); ok {
+		return s.path
+	}
+
+	return ""
 }
 
 func (m NoteListModel) handleCopyUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -380,24 +479,69 @@ func Run(s *state.State, views map[string]v.View, viewFlag string) error {
 	return nil
 }
 
-func (m *NoteListModel) handlePreview() {
+func (m *NoteListModel) closeWatcher() error {
+	if m.state == nil || m.state.Watcher == nil {
+		return nil
+	}
+
+	err := m.state.Watcher.Close()
+	m.state.Watcher = nil
+
+	return err
+}
+
+func (m *NoteListModel) handlePreview(force bool) tea.Cmd {
+	selectedPath := ""
 	if s, ok := m.list.SelectedItem().(ListItem); ok {
-		if p, exists, err := m.cache.Get(s.path); err == nil && exists {
-			m.preview = p.(string)
-		} else {
-			if err != nil {
-				m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Error accessing cache: %s", err)))
+		selectedPath = s.path
+	} else {
+		m.preview = ""
+		return nil
+	}
+
+	cache := m.cache
+	if cache == nil {
+		width := m.width / 2
+		height := m.list.Height()
+		return renderPreviewCmd(selectedPath, width, height, nil)
+	}
+
+	if !force {
+		if cached, exists, err := cache.Get(selectedPath); err == nil && exists {
+			if preview, ok := cached.(string); ok {
+				m.preview = preview
+				return nil
 			}
 
-			w := m.width / 2
-			h := m.list.Height()
-			r := utils.RenderMarkdownPreview(s.path, w, h)
+			m.list.NewStatusMessage(
+				statusStyle(fmt.Sprintf("Unexpected cache type: %T", cached)),
+			)
+		} else if err != nil {
+			m.list.NewStatusMessage(
+				statusStyle(fmt.Sprintf("Error accessing cache: %s", err)),
+			)
+		}
+	}
 
-			if err := m.cache.Put(s.path, r); err != nil {
-				m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Error updating cache: %s", err)))
-			} else {
-				m.preview = r
-			}
+	width := m.width / 2
+	height := m.list.Height()
+
+	return renderPreviewCmd(selectedPath, width, height, cache)
+}
+
+func renderPreviewCmd(path string, width, height int, cache *cache.Cache) tea.Cmd {
+	return func() tea.Msg {
+		rendered := utils.RenderMarkdownPreview(path, width, height)
+
+		var cacheErr error
+		if cache != nil {
+			cacheErr = cache.Put(path, rendered)
+		}
+
+		return previewLoadedMsg{
+			path:     path,
+			content:  rendered,
+			cacheErr: cacheErr,
 		}
 	}
 }
@@ -407,8 +551,7 @@ func (m *NoteListModel) refresh() tea.Cmd {
 	m.refreshDelegate()
 	cmd := m.refreshItems()
 	m.list.ResetSelected()
-	m.handlePreview()
-	return cmd
+	return tea.Batch(cmd, m.handlePreview(true))
 }
 
 func (m *NoteListModel) refreshItems() tea.Cmd {
@@ -436,8 +579,7 @@ func (m *NoteListModel) refreshSort() tea.Cmd {
 	sortedItems := sortItems(items, m.sortField, m.sortOrder)
 	m.list.ResetSelected()
 	cmd := m.list.SetItems(sortedItems)
-	m.handlePreview()
-	return cmd
+	return tea.Batch(cmd, m.handlePreview(true))
 }
 
 // TODO: should prob use an error over a bool but a "success" flag sort of feels more natural for the context.
@@ -472,7 +614,7 @@ func (m *NoteListModel) toggleDetails() tea.Cmd {
 	m.showDetails = !m.showDetails
 	cmd := m.refreshItems()
 	m.list.ResetSelected()
-	return cmd
+	return tea.Batch(cmd, m.handlePreview(true))
 }
 
 func (m *NoteListModel) cycleView() tea.Cmd {
