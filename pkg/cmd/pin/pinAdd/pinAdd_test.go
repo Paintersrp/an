@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/Paintersrp/an/internal/config"
-	"github.com/Paintersrp/an/internal/pin"
 	"github.com/Paintersrp/an/internal/state"
 	"github.com/Paintersrp/an/pkg/shared/flags"
 )
@@ -22,16 +21,16 @@ func TestRunReturnsChangePinError(t *testing.T) {
 		t.Fatalf("failed to create temp file: %v", err)
 	}
 
+	ws := &config.Workspace{NamedPins: config.PinMap{}, NamedTaskPins: config.PinMap{}}
 	cfg := &config.Config{
-		PinManager: pin.NewPinManager(
-			make(pin.PinMap),
-			make(pin.PinMap),
-			"",
-			"",
-		),
+		Workspaces:       map[string]*config.Workspace{"default": ws},
+		CurrentWorkspace: "default",
+	}
+	if err := cfg.ActivateWorkspace("default"); err != nil {
+		t.Fatalf("failed to activate workspace: %v", err)
 	}
 
-	st := &state.State{Config: cfg}
+	st := &state.State{Config: cfg, Workspace: ws, WorkspaceName: "default"}
 
 	cmd := &cobra.Command{}
 	flags.AddPath(cmd)

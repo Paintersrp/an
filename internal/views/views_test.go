@@ -27,13 +27,20 @@ func TestGetFilesByView_DefaultAndArchive(t *testing.T) {
 	mustWriteFile(t, trashedPath)
 
 	h := handler.NewFileHandler(vaultDir)
-	cfg := &config.Config{
+	ws := &config.Workspace{
 		VaultDir: vaultDir,
 		Views: map[string]config.ViewDefinition{
 			"custom": {
 				Exclude: []string{"archive", "trash", "notes/skip.md"},
 			},
 		},
+	}
+	cfg := &config.Config{
+		Workspaces:       map[string]*config.Workspace{"default": ws},
+		CurrentWorkspace: "default",
+	}
+	if err := cfg.ActivateWorkspace("default"); err != nil {
+		t.Fatalf("failed to activate workspace: %v", err)
 	}
 
 	vm, err := NewViewManager(h, cfg)
@@ -110,13 +117,20 @@ func TestViewManagerOrderHonorsConfig(t *testing.T) {
 
 	vaultDir := t.TempDir()
 	h := handler.NewFileHandler(vaultDir)
-	cfg := &config.Config{
+	ws := &config.Workspace{
 		VaultDir: vaultDir,
 		Views: map[string]config.ViewDefinition{
 			"custom": {},
 			"beta":   {},
 		},
 		ViewOrder: []string{"custom", "beta"},
+	}
+	cfg := &config.Config{
+		Workspaces:       map[string]*config.Workspace{"default": ws},
+		CurrentWorkspace: "default",
+	}
+	if err := cfg.ActivateWorkspace("default"); err != nil {
+		t.Fatalf("failed to activate workspace: %v", err)
 	}
 
 	vm, err := NewViewManager(h, cfg)

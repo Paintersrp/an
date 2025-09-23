@@ -44,10 +44,11 @@ func newItemDelegate(
 						pinType = "text"
 					}
 
+					ws := cfg.MustWorkspace()
 					if pinType == "task" {
-						cfg.PinnedTaskFile = description
+						ws.PinnedTaskFile = description
 					} else {
-						cfg.PinnedFile = description
+						ws.PinnedFile = description
 					}
 					if err := cfg.Save(); err != nil {
 						return m.NewStatusMessage(statusMessageStyle("Error saving the configuration: " + err.Error()))

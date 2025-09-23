@@ -117,27 +117,28 @@ func determineTargetPin(
 	auto bool,
 	c *config.Config,
 ) (string, string, error) {
+	ws := c.MustWorkspace()
 	if auto {
 		title, targetPin := generateFileName(c)
 		return title, targetPin, nil
 	}
 
 	if name != "" {
-		pin := c.NamedPins[name]
+		pin := ws.NamedPins[name]
 		if pin == "" {
 			return "", "", fmt.Errorf("no file pinned for the name '%s'", name)
 		}
 		return "", pin, nil
 	}
 
-	if c.PinnedFile == "" {
+	if ws.PinnedFile == "" {
 		return "", "", errors.New("no file pinned")
 	}
-	return "", c.PinnedFile, nil
+	return "", ws.PinnedFile, nil
 }
 
 func generateFileName(cfg *config.Config) (string, string) {
-	baseDir := filepath.Join(cfg.VaultDir, "echoes")
+	baseDir := filepath.Join(cfg.MustWorkspace().VaultDir, "echoes")
 
 	err := os.MkdirAll(baseDir, 0o755)
 	if err != nil {

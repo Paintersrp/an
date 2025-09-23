@@ -16,7 +16,14 @@ func TestCycleViewOrder(t *testing.T) {
 
 	tempDir := t.TempDir()
 	fileHandler := handler.NewFileHandler(tempDir)
-	cfg := &config.Config{VaultDir: tempDir}
+	ws := &config.Workspace{VaultDir: tempDir}
+	cfg := &config.Config{
+		Workspaces:       map[string]*config.Workspace{"default": ws},
+		CurrentWorkspace: "default",
+	}
+	if err := cfg.ActivateWorkspace("default"); err != nil {
+		t.Fatalf("failed to activate workspace: %v", err)
+	}
 	viewManager, err := views.NewViewManager(fileHandler, cfg)
 	if err != nil {
 		t.Fatalf("NewViewManager returned error: %v", err)
@@ -27,7 +34,7 @@ func TestCycleViewOrder(t *testing.T) {
 
 	model := &NoteListModel{
 		list:       l,
-		state:      &state.State{Config: cfg, Handler: fileHandler, ViewManager: viewManager, Vault: tempDir},
+		state:      &state.State{Config: cfg, Workspace: ws, WorkspaceName: cfg.CurrentWorkspace, Handler: fileHandler, ViewManager: viewManager, Vault: tempDir},
 		viewName:   "default",
 		sortField:  sortByTitle,
 		sortOrder:  ascending,

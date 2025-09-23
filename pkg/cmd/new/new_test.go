@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/Paintersrp/an/internal/config"
-	"github.com/Paintersrp/an/internal/pin"
 	"github.com/Paintersrp/an/internal/state"
 	"github.com/Paintersrp/an/internal/templater"
 )
@@ -32,28 +31,32 @@ func TestRunCreatesSingleSymlink(t *testing.T) {
 	}
 	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 
-	tmpl, err := templater.NewTemplater()
+	ws := &config.Workspace{
+		VaultDir:       vaultDir,
+		Editor:         "nvim",
+		FileSystemMode: "strict",
+		SubDirs:        []string{""},
+		NamedPins:      config.PinMap{},
+		NamedTaskPins:  config.PinMap{},
+	}
+	cfg := &config.Config{
+		Workspaces:       map[string]*config.Workspace{"default": ws},
+		CurrentWorkspace: "default",
+	}
+	if err := cfg.ActivateWorkspace("default"); err != nil {
+		t.Fatalf("failed to activate workspace: %v", err)
+	}
+
+	tmpl, err := templater.NewTemplater(ws)
 	if err != nil {
 		t.Fatalf("failed to create templater: %v", err)
 	}
 
-	cfg := &config.Config{
-		VaultDir:       vaultDir,
-		Editor:         "nvim",
-		FileSystemMode: "strict",
-		PinManager: pin.NewPinManager(
-			pin.PinMap{},
-			pin.PinMap{},
-			"",
-			"",
-		),
-		NamedPins:     config.PinMap{},
-		NamedTaskPins: config.PinMap{},
-	}
-
 	st := &state.State{
-		Config:    cfg,
-		Templater: tmpl,
+		Config:        cfg,
+		Workspace:     ws,
+		WorkspaceName: "default",
+		Templater:     tmpl,
 	}
 
 	workingDir := t.TempDir()

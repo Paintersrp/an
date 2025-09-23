@@ -41,17 +41,18 @@ func run(cmd *cobra.Command, s *state.State) error {
 		return err
 	}
 
+	ws := s.Config.MustWorkspace()
 	var targetPin string
 	if name != "" {
-		if s.Config.NamedTaskPins[name] == "" {
+		if ws.NamedTaskPins[name] == "" {
 			return fmt.Errorf("no pinned task file found")
 		}
-		targetPin = s.Config.NamedTaskPins[name]
+		targetPin = ws.NamedTaskPins[name]
 	} else {
-		if s.Config.PinnedTaskFile == "" {
+		if ws.PinnedTaskFile == "" {
 			return errors.New("no pinned task file found")
 		}
-		targetPin = s.Config.PinnedTaskFile
+		targetPin = ws.PinnedTaskFile
 	}
 
 	if _, err := os.Stat(targetPin); os.IsNotExist(err) {

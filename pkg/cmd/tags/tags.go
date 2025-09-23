@@ -28,7 +28,7 @@ allowing for quick access and organization of notes by their associated tags.`,
 }
 
 func run(c *config.Config) error {
-	p := parser.NewParser(c.VaultDir)
+	p := parser.NewParser(c.MustWorkspace().VaultDir)
 
 	if err := p.Walk(); err != nil {
 		fmt.Println("Error:", err)

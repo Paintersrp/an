@@ -23,7 +23,16 @@ func TestRun_InvalidPriorityFallsBackToLow(t *testing.T) {
 		t.Fatalf("failed to write initial task file: %v", err)
 	}
 
-	st := &state.State{Config: &config.Config{PinnedTaskFile: taskFile}}
+	cfg := &config.Config{
+		Workspaces: map[string]*config.Workspace{
+			"default": {PinnedTaskFile: taskFile},
+		},
+		CurrentWorkspace: "default",
+	}
+	if err := cfg.ActivateWorkspace("default"); err != nil {
+		t.Fatalf("failed to activate workspace: %v", err)
+	}
+	st := &state.State{Config: cfg, Workspace: cfg.MustWorkspace(), WorkspaceName: cfg.CurrentWorkspace}
 
 	cmd := &cobra.Command{}
 	cmd.Flags().StringP("name", "n", "", "")

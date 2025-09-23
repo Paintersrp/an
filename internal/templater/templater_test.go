@@ -31,7 +31,7 @@ func TestNewTemplaterRegistersUserTemplate(t *testing.T) {
 		}
 	}()
 
-	tmpl, err := NewTemplater()
+	tmpl, err := NewTemplater(nil)
 	if err != nil {
 		t.Fatalf("NewTemplater returned error: %v", err)
 	}
@@ -165,7 +165,7 @@ func TestTemplaterExecuteUsesUserTemplateContent(t *testing.T) {
 		}
 	}()
 
-	templater, err := NewTemplater()
+	templater, err := NewTemplater(nil)
 	if err != nil {
 		t.Fatalf("NewTemplater returned error: %v", err)
 	}

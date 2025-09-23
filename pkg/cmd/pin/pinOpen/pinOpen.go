@@ -42,33 +42,34 @@ func run(cmd *cobra.Command, s *state.State, pinType string) error {
 		return err
 	}
 
+	ws := s.Config.MustWorkspace()
 	var targetPin string
 	if name != "" {
 		switch pinType {
 		case "text":
-			if s.Config.NamedPins[name] == "" {
+			if ws.NamedPins[name] == "" {
 				return fmt.Errorf("no pinned file found")
 			}
-			targetPin = s.Config.NamedPins[name]
+			targetPin = ws.NamedPins[name]
 		case "task":
-			if s.Config.NamedTaskPins[name] == "" {
+			if ws.NamedTaskPins[name] == "" {
 				return fmt.Errorf("no pinned file found")
 			}
-			targetPin = s.Config.NamedTaskPins[name]
+			targetPin = ws.NamedTaskPins[name]
 		}
 	} else {
 		switch pinType {
 		case "text":
-			if s.Config.PinnedFile == "" {
+			if ws.PinnedFile == "" {
 				return errors.New("no pinned file found")
 			}
-			targetPin = s.Config.PinnedFile
+			targetPin = ws.PinnedFile
 
 		case "task":
-			if s.Config.PinnedTaskFile == "" {
+			if ws.PinnedTaskFile == "" {
 				return errors.New("no pinned file found")
 			}
-			targetPin = s.Config.PinnedTaskFile
+			targetPin = ws.PinnedTaskFile
 		}
 	}
 

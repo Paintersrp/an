@@ -15,7 +15,7 @@ func TestCreateCleansUpOnTemplateError(t *testing.T) {
 	subDir := filepath.Join("foo", "bar")
 	note := NewZettelkastenNote(vaultDir, subDir, "test-note", nil, nil, "")
 
-	tmpl, err := templater.NewTemplater()
+	tmpl, err := templater.NewTemplater(nil)
 	if err != nil {
 		t.Fatalf("failed to create templater: %v", err)
 	}

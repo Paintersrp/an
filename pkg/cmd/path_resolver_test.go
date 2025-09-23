@@ -12,7 +12,16 @@ import (
 func TestResolveVaultPath(t *testing.T) {
 	vaultDir := t.TempDir()
 
-	st := &state.State{Config: &config.Config{VaultDir: vaultDir}}
+	cfg := &config.Config{
+		Workspaces: map[string]*config.Workspace{
+			"default": {VaultDir: vaultDir},
+		},
+		CurrentWorkspace: "default",
+	}
+	if err := cfg.ActivateWorkspace("default"); err != nil {
+		t.Fatalf("failed to activate workspace: %v", err)
+	}
+	st := &state.State{Config: cfg, Workspace: cfg.MustWorkspace(), WorkspaceName: cfg.CurrentWorkspace}
 
 	tests := map[string]struct {
 		command *cobra.Command

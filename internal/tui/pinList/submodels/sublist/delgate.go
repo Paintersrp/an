@@ -22,7 +22,7 @@ func newItemDelegate(keys *delegateKeyMap, cfg *config.Config) list.DefaultDeleg
 
 			switch {
 			case key.Matches(msg, keys.choose):
-				fmt.Println(msg, cfg.VaultDir)
+				fmt.Println(msg, cfg.MustWorkspace().VaultDir)
 				return nil
 			}
 		}

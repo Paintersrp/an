@@ -48,22 +48,23 @@ func run(cmd *cobra.Command, args []string, s *state.State, priority string) err
 	task := strings.Join(args, " ")
 	taskEntry := fmt.Sprintf("- [ ] %s\n", task)
 
+	ws := s.Config.MustWorkspace()
 	var targetPin string
 	if name != "" {
-		if s.Config.NamedTaskPins[name] == "" {
+		if ws.NamedTaskPins[name] == "" {
 			return fmt.Errorf(
 				"no task file pinned for named task pin '%s'. Use the task-pin command to pin a task-file first",
 				name,
 			)
 		}
-		targetPin = s.Config.NamedTaskPins[name]
+		targetPin = ws.NamedTaskPins[name]
 	} else {
-		if s.Config.PinnedTaskFile == "" {
+		if ws.PinnedTaskFile == "" {
 			return errors.New(
 				"no task file pinned. Use the task-pin command to pin a task-file first",
 			)
 		}
-		targetPin = s.Config.PinnedTaskFile
+		targetPin = ws.PinnedTaskFile
 	}
 
 	content, err := os.ReadFile(targetPin)

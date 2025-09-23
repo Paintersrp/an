@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/viper"
 
+	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/internal/state"
 	"github.com/Paintersrp/an/internal/templater"
 	"github.com/Paintersrp/an/utils"
@@ -35,13 +36,26 @@ func setupEntryTest(t *testing.T) (*state.State, string) {
 
 	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 
-	tmpl, err := templater.NewTemplater()
+	ws := &config.Workspace{VaultDir: vaultDir, Editor: "nvim"}
+	cfg := &config.Config{
+		Workspaces:       map[string]*config.Workspace{"default": ws},
+		CurrentWorkspace: "default",
+	}
+	if err := cfg.ActivateWorkspace("default"); err != nil {
+		t.Fatalf("failed to activate workspace: %v", err)
+	}
+
+	tmpl, err := templater.NewTemplater(ws)
 	if err != nil {
 		t.Fatalf("failed to create templater: %v", err)
 	}
 
 	st := &state.State{
-		Templater: tmpl,
+		Config:        cfg,
+		Workspace:     ws,
+		WorkspaceName: "default",
+		Templater:     tmpl,
+		Vault:         vaultDir,
 	}
 
 	return st, vaultDir
