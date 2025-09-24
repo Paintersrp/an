@@ -570,7 +570,7 @@ func (m *NoteListModel) startInlineEdit() tea.Cmd {
 	session.setMetadata(selected.path, selected.Title(), editorModeExisting)
 	session.setValue(string(data))
 	session.setOriginal(string(data), info.ModTime())
-	session.status = "ctrl+s save • ctrl+r reload • esc discard"
+	session.status = ""
 
 	m.editor = session
 	return session.focus()
@@ -592,7 +592,7 @@ func (m *NoteListModel) startScratchCapture() tea.Cmd {
 	session.setMetadata(path, filepath.Base(path), editorModeScratch)
 	session.setValue("")
 	session.setOriginal("", time.Time{})
-	session.status = "ctrl+s save • esc discard"
+	session.status = ""
 
 	m.editor = session
 	return session.focus()
@@ -849,6 +849,13 @@ func (m NoteListModel) editorInstructions() string {
 	default:
 		return ""
 	}
+}
+
+func (m *NoteListModel) editorActive() bool {
+	if m == nil {
+		return false
+	}
+	return m.editor != nil
 }
 
 // TODO: returns are kinda unnecessary now

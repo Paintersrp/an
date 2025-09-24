@@ -93,14 +93,16 @@ func (m *RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case tea.KeyMsg:
+		editorActive := m.active == viewNotes && m.notes != nil && m.notes.editorActive()
+
 		switch {
-		case key.Matches(msg, m.keys.notes):
+		case !editorActive && key.Matches(msg, m.keys.notes):
 			m.active = viewNotes
 			return m, nil
-		case key.Matches(msg, m.keys.tasks):
+		case !editorActive && key.Matches(msg, m.keys.tasks):
 			m.active = viewTasks
 			return m, nil
-		case key.Matches(msg, m.keys.journal):
+		case !editorActive && key.Matches(msg, m.keys.journal):
 			m.active = viewJournal
 			return m, nil
 		case key.Matches(msg, m.keys.next):
