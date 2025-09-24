@@ -130,15 +130,15 @@ func newItemDelegate(
 }
 
 func batchStatusWithRemoval(m *list.Model, path, status string) tea.Cmd {
-	removeCmd := removeItemByPath(m, path)
+	removeItemByPath(m, path)
 	statusCmd := m.NewStatusMessage(status)
 
-	return batchCmds(removeCmd, statusCmd, requestListRefresh())
+	return batchCmds(statusCmd, requestListRefresh())
 }
 
-func removeItemByPath(m *list.Model, path string) tea.Cmd {
+func removeItemByPath(m *list.Model, path string) {
 	if path == "" {
-		return nil
+		return
 	}
 
 	items := m.Items()
@@ -148,14 +148,10 @@ func removeItemByPath(m *list.Model, path string) tea.Cmd {
 			continue
 		}
 		if li.path == path {
-			newItems := make([]list.Item, 0, len(items)-1)
-			newItems = append(newItems, items[:idx]...)
-			newItems = append(newItems, items[idx+1:]...)
-			return m.SetItems(newItems)
+			m.RemoveItem(idx)
+			return
 		}
 	}
-
-	return nil
 }
 
 func requestListRefresh() tea.Cmd {
