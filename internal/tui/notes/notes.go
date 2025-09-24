@@ -317,6 +317,10 @@ func (m *NoteListModel) makeFilterFunc() list.FilterFunc {
 		}
 
 		baseRanks := base(term, targets)
+		matchedIndexes := make(map[int][]int, len(baseRanks))
+		for _, rank := range baseRanks {
+			matchedIndexes[rank.Index] = rank.MatchedIndexes
+		}
 
 		if m.searchIndex == nil {
 			return baseRanks
@@ -355,16 +359,36 @@ func (m *NoteListModel) makeFilterFunc() list.FilterFunc {
 			}
 		}
 
-		highlightRanks := make([]list.Rank, 0, len(orderedPaths))
+		searchRanks := make([]list.Rank, 0, len(orderedPaths))
 		for _, path := range orderedPaths {
 			if idx, ok := indexByPath[path]; ok {
-				highlightRanks = append(highlightRanks, list.Rank{Index: idx})
+				rank := list.Rank{Index: idx}
+				if matches, ok := matchedIndexes[idx]; ok {
+					rank.MatchedIndexes = matches
+				}
+				searchRanks = append(searchRanks, rank)
 			}
 		}
 
 		if trimmed == "" &&
 			(len(m.searchQuery.Tags) > 0 || len(m.searchQuery.Metadata) > 0) {
-			return highlightRanks
+			return searchRanks
+		}
+
+		if trimmed != "" && len(searchRanks) > 0 {
+			ordered := make([]list.Rank, 0, len(searchRanks)+len(baseRanks))
+			seen := make(map[int]struct{}, len(searchRanks))
+			for _, rank := range searchRanks {
+				ordered = append(ordered, rank)
+				seen[rank.Index] = struct{}{}
+			}
+			for _, rank := range baseRanks {
+				if _, ok := seen[rank.Index]; ok {
+					continue
+				}
+				ordered = append(ordered, rank)
+			}
+			return ordered
 		}
 
 		existing := make(map[int]struct{}, len(baseRanks))
@@ -372,7 +396,7 @@ func (m *NoteListModel) makeFilterFunc() list.FilterFunc {
 			existing[rank.Index] = struct{}{}
 		}
 
-		for _, rank := range highlightRanks {
+		for _, rank := range searchRanks {
 			if _, ok := existing[rank.Index]; !ok {
 				baseRanks = append(baseRanks, rank)
 			}
@@ -543,6 +567,8 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.list = nl
 	cmds = append(cmds, cmd)
 
+	m.ensureSelectionInBounds()
+
 	if nextSelection := m.currentSelectionPath(); nextSelection != previousSelection {
 		if nextSelection == "" {
 			m.preview = ""
@@ -562,6 +588,18 @@ func (m NoteListModel) currentSelectionPath() string {
 	}
 
 	return ""
+}
+
+func (m *NoteListModel) ensureSelectionInBounds() {
+	visible := m.list.VisibleItems()
+	if len(visible) == 0 {
+		m.list.ResetSelected()
+		return
+	}
+
+	if idx := m.list.Index(); idx >= len(visible) {
+		m.list.ResetSelected()
+	}
 }
 
 func (m NoteListModel) handleCopyUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -1282,7 +1320,9 @@ func (m *NoteListModel) refreshItems() tea.Cmd {
 	sortedItems := sortItems(castToListItems(items), m.sortField, m.sortOrder)
 	attachHighlightStore(sortedItems, m.highlights)
 	m.rebuildSearch(files)
-	return m.list.SetItems(sortedItems)
+	cmd := m.list.SetItems(sortedItems)
+	m.ensureSelectionInBounds()
+	return cmd
 }
 
 func (m *NoteListModel) refreshDelegate() {
