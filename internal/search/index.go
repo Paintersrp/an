@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -22,6 +23,7 @@ type document struct {
 	Links       []string
 	Body        string
 	ModifiedAt  time.Time
+	Headings    []string
 }
 
 // Index stores searchable representations of notes on disk.
@@ -185,39 +187,107 @@ func (idx *Index) Search(q Query) []Result {
 	term := strings.TrimSpace(q.Term)
 	loweredTerm := strings.ToLower(term)
 
-	results := make([]Result, 0)
+	type scoredResult struct {
+		result Result
+		score  float64
+	}
+
+	now := time.Now().UTC()
+	matches := make([]scoredResult, 0)
+	matchedPaths := make(map[string]struct{})
+
 	for _, doc := range idx.docs {
 		if !doc.matchesFilters(q) {
 			continue
 		}
 
 		if loweredTerm == "" {
-			// Pure metadata filtering request.
-			results = append(results, Result{Path: doc.Path, MatchFrom: "metadata"})
+			score := computeScore(doc, idx.cfg, q, 0, 0, 0, now)
+			res := Result{Path: doc.Path, MatchFrom: "metadata", Score: score, Related: idx.Related(doc.Path)}
+			matches = append(matches, scoredResult{result: res, score: score})
+			matchedPaths[doc.Path] = struct{}{}
 			continue
 		}
 
-		if snippet, ok := doc.matchFrontMatter(loweredTerm); ok {
-			results = append(results, Result{Path: doc.Path, Snippet: snippet, MatchFrom: "frontmatter"})
-			continue
+		var snippet string
+		matchFrom := ""
+		totalFreq := 0
+		contentMatches := 0
+
+		if s, freq := doc.matchFrontMatter(loweredTerm); freq > 0 {
+			if snippet == "" {
+				snippet = s
+				matchFrom = "frontmatter"
+			}
+			totalFreq += freq
+			contentMatches++
 		}
 
-		if snippet, ok := doc.matchLinks(loweredTerm); ok {
-			results = append(results, Result{Path: doc.Path, Snippet: snippet, MatchFrom: "links"})
-			continue
+		if s, freq := doc.matchLinks(loweredTerm); freq > 0 {
+			if snippet == "" {
+				snippet = s
+				matchFrom = "links"
+			}
+			totalFreq += freq
+			contentMatches++
 		}
 
 		if idx.cfg.EnableBody {
-			if snippet, ok := doc.matchBody(loweredTerm); ok {
-				results = append(results, Result{Path: doc.Path, Snippet: snippet, MatchFrom: "body"})
-				continue
+			if s, freq := doc.matchBody(loweredTerm); freq > 0 {
+				if snippet == "" {
+					snippet = s
+					matchFrom = "body"
+				}
+				totalFreq += freq
+				contentMatches++
 			}
+		}
+
+		if totalFreq > 0 {
+			score := computeScore(doc, idx.cfg, q, totalFreq, contentMatches, 0, now)
+			res := Result{Path: doc.Path, Snippet: snippet, MatchFrom: matchFrom, Score: score, Related: idx.Related(doc.Path)}
+			matches = append(matches, scoredResult{result: res, score: score})
+			matchedPaths[doc.Path] = struct{}{}
 		}
 	}
 
-	sort.SliceStable(results, func(i, j int) bool {
-		return results[i].Path < results[j].Path
+	if loweredTerm != "" {
+		for _, doc := range idx.docs {
+			if !doc.matchesFilters(q) {
+				continue
+			}
+			if _, ok := matchedPaths[doc.Path]; ok {
+				continue
+			}
+
+			candidate, similarity := doc.bestFuzzyCandidate(idx.root, loweredTerm)
+			if similarity < 0.45 {
+				continue
+			}
+
+			score := computeScore(doc, idx.cfg, q, 0, 1, similarity, now)
+			res := Result{
+				Path:      doc.Path,
+				Snippet:   fmt.Sprintf("≈ %s", candidate),
+				MatchFrom: "fuzzy",
+				Score:     score,
+				Related:   idx.Related(doc.Path),
+			}
+			matches = append(matches, scoredResult{result: res, score: score})
+		}
+	}
+
+	sort.SliceStable(matches, func(i, j int) bool {
+		if matches[i].score == matches[j].score {
+			return matches[i].result.Path < matches[j].result.Path
+		}
+		return matches[i].score > matches[j].score
 	})
+
+	results := make([]Result, len(matches))
+	for i, m := range matches {
+		results[i] = m.result
+	}
 	return results
 }
 
@@ -258,13 +328,17 @@ func (idx *Index) loadDocument(path string) (document, error) {
 		return document{}, fmt.Errorf("parse front matter: %w", err)
 	}
 
+	links := extractLinks(body)
+	headings := extractHeadings(body)
+
 	return document{
 		Path:        filepath.Clean(path),
 		Tags:        tags,
 		FrontMatter: parsed,
-		Links:       extractLinks(body),
+		Links:       links,
 		Body:        string(body),
 		ModifiedAt:  info.ModTime().UTC(),
+		Headings:    headings,
 	}, nil
 }
 
@@ -519,34 +593,318 @@ func (d document) matchesFilters(q Query) bool {
 	return true
 }
 
-func (d document) matchFrontMatter(term string) (string, bool) {
+func (d document) matchFrontMatter(term string) (string, int) {
+	matches := 0
+	var snippet string
 	for key, values := range d.FrontMatter {
 		for _, value := range values {
-			if strings.Contains(strings.ToLower(value), term) {
-				return fmt.Sprintf("%s: %s", key, value), true
+			lowered := strings.ToLower(value)
+			if strings.Contains(lowered, term) {
+				if snippet == "" {
+					snippet = fmt.Sprintf("%s: %s", key, value)
+				}
+				matches += countOccurrences(lowered, term)
 			}
 		}
 	}
-	return "", false
+	return snippet, matches
 }
 
-func (d document) matchLinks(term string) (string, bool) {
+func (d document) matchLinks(term string) (string, int) {
+	matches := 0
+	var snippet string
 	for _, link := range d.Links {
-		if strings.Contains(strings.ToLower(link), term) {
-			return fmt.Sprintf("link: %s", link), true
+		lowered := strings.ToLower(link)
+		if strings.Contains(lowered, term) {
+			if snippet == "" {
+				snippet = fmt.Sprintf("link: %s", link)
+			}
+			matches += countOccurrences(lowered, term)
 		}
 	}
-	return "", false
+	return snippet, matches
 }
 
-func (d document) matchBody(term string) (string, bool) {
+func (d document) matchBody(term string) (string, int) {
 	lowered := strings.ToLower(d.Body)
 	idx := strings.Index(lowered, term)
 	if idx == -1 {
-		return "", false
+		return "", 0
 	}
 	runeStart := utf8.RuneCountInString(lowered[:idx])
-	return bodySnippet(d.Body, runeStart, utf8.RuneCountInString(term)), true
+	snippet := bodySnippet(d.Body, runeStart, utf8.RuneCountInString(term))
+	return snippet, countOccurrences(lowered, term)
+}
+
+func (d document) bestFuzzyCandidate(root, loweredTerm string) (string, float64) {
+	candidates := make([]string, 0, 4+len(d.Headings))
+
+	if rel, err := filepath.Rel(root, d.Path); err == nil {
+		rel = filepath.ToSlash(rel)
+		if rel != "" {
+			candidates = append(candidates, rel)
+		}
+	}
+
+	base := filepath.Base(d.Path)
+	if base != "" {
+		candidates = append(candidates, base)
+		if ext := filepath.Ext(base); ext != "" {
+			stem := strings.TrimSuffix(base, ext)
+			if stem != "" {
+				candidates = append(candidates, stem)
+			}
+		}
+	}
+
+	candidates = append(candidates, d.Headings...)
+
+	for _, values := range d.FrontMatter {
+		candidates = append(candidates, values...)
+	}
+
+	seen := make(map[string]struct{}, len(candidates))
+	bestCandidate := ""
+	bestScore := 0.0
+
+	for _, candidate := range candidates {
+		cleaned := strings.TrimSpace(candidate)
+		if cleaned == "" {
+			continue
+		}
+		lowered := strings.ToLower(cleaned)
+		if _, ok := seen[lowered]; ok {
+			continue
+		}
+		seen[lowered] = struct{}{}
+
+		score := similarityScore(loweredTerm, lowered)
+		if score > bestScore {
+			bestScore = score
+			bestCandidate = cleaned
+		}
+	}
+
+	return bestCandidate, bestScore
+}
+
+func computeScore(doc document, cfg Config, q Query, termFreq int, contentMatches int, similarity float64, now time.Time) float64 {
+	const (
+		recencyWeight   = 0.45
+		frequencyWeight = 0.35
+		tagWeight       = 0.15
+		contextWeight   = 0.05
+	)
+
+	recencyScore := recencyComponent(doc.ModifiedAt, now)
+	frequencyScore := frequencyComponent(termFreq, similarity)
+	tagScore, tagMatches := tagOverlapScore(doc.Tags, q.Tags)
+	metadataMatches := metadataMatchCount(doc, q)
+
+	contentTotal := 0
+	if termFreq > 0 || contentMatches > 0 {
+		contentTotal = 2
+		if cfg.EnableBody {
+			contentTotal++
+		}
+	} else if similarity > 0 {
+		contentTotal = 1
+	}
+
+	totalContexts := contentTotal + len(q.Tags) + len(q.Metadata)
+	if totalContexts == 0 {
+		totalContexts = 1
+	}
+	matchedContexts := contentMatches + tagMatches + metadataMatches
+	contextScore := float64(matchedContexts) / float64(totalContexts)
+
+	return recencyWeight*recencyScore + frequencyWeight*frequencyScore + tagWeight*tagScore + contextWeight*contextScore
+}
+
+func recencyComponent(modifiedAt, now time.Time) float64 {
+	if modifiedAt.IsZero() {
+		return 0
+	}
+	age := now.Sub(modifiedAt)
+	if age < 0 {
+		age = 0
+	}
+	const decay = 30 * 24 * time.Hour
+	if decay <= 0 {
+		return 0
+	}
+	return math.Exp(-age.Hours() / decay.Hours())
+}
+
+func frequencyComponent(freq int, similarity float64) float64 {
+	if freq < 0 {
+		freq = 0
+	}
+	tf := 0.0
+	if freq > 0 {
+		tf = 1 - math.Exp(-float64(freq))
+	}
+	if similarity > tf {
+		tf = similarity
+	}
+	if tf > 1 {
+		tf = 1
+	}
+	return tf
+}
+
+func tagOverlapScore(tags, required []string) (float64, int) {
+	if len(required) == 0 {
+		return 0, 0
+	}
+	matches := 0
+	for _, want := range required {
+		if containsFold(tags, want) {
+			matches++
+		}
+	}
+	return float64(matches) / float64(len(required)), matches
+}
+
+func metadataMatchCount(doc document, q Query) int {
+	if len(q.Metadata) == 0 {
+		return 0
+	}
+	matches := 0
+	for key, values := range q.Metadata {
+		available, ok := doc.FrontMatter[key]
+		if !ok {
+			continue
+		}
+		allMatch := true
+		for _, want := range values {
+			if !containsFold(available, want) {
+				allMatch = false
+				break
+			}
+		}
+		if allMatch {
+			matches++
+		}
+	}
+	return matches
+}
+
+func countOccurrences(haystack, needle string) int {
+	if haystack == "" || needle == "" {
+		return 0
+	}
+	return strings.Count(haystack, needle)
+}
+
+func extractHeadings(content []byte) []string {
+	lines := strings.Split(string(content), "\n")
+	headings := make([]string, 0)
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		trimmed = strings.TrimLeft(trimmed, "#")
+		trimmed = strings.TrimSpace(trimmed)
+		if trimmed != "" {
+			headings = append(headings, trimmed)
+		}
+	}
+	return headings
+}
+
+func similarityScore(a, b string) float64 {
+	if a == "" || b == "" {
+		return 0
+	}
+
+	ar := []rune(a)
+	br := []rune(b)
+	if len(ar) < 3 || len(br) < 3 {
+		distance := levenshteinDistance(ar, br)
+		maxLen := max(len(ar), len(br))
+		if maxLen == 0 {
+			return 1
+		}
+		return 1 - float64(distance)/float64(maxLen)
+	}
+
+	return trigramSimilarity(a, b)
+}
+
+func trigramSimilarity(a, b string) float64 {
+	aTrigrams := toTrigramSet(a)
+	bTrigrams := toTrigramSet(b)
+	if len(aTrigrams) == 0 || len(bTrigrams) == 0 {
+		return 0
+	}
+
+	intersection := 0
+	for tri := range aTrigrams {
+		if _, ok := bTrigrams[tri]; ok {
+			intersection++
+		}
+	}
+
+	return float64(2*intersection) / float64(len(aTrigrams)+len(bTrigrams))
+}
+
+func toTrigramSet(s string) map[string]struct{} {
+	trigrams := make(map[string]struct{})
+	for i := 0; i <= len(s)-3; i++ {
+		tri := s[i : i+3]
+		trigrams[tri] = struct{}{}
+	}
+	return trigrams
+}
+
+func levenshteinDistance(a, b []rune) int {
+	if len(a) == 0 {
+		return len(b)
+	}
+	if len(b) == 0 {
+		return len(a)
+	}
+
+	dp := make([]int, len(b)+1)
+	for j := range dp {
+		dp[j] = j
+	}
+
+	for i := 1; i <= len(a); i++ {
+		prev := dp[0]
+		dp[0] = i
+		for j := 1; j <= len(b); j++ {
+			temp := dp[j]
+			cost := 0
+			if a[i-1] != b[j-1] {
+				cost = 1
+			}
+
+			insertion := dp[j] + 1
+			deletion := dp[j-1] + 1
+			substitution := prev + cost
+
+			dp[j] = minInt(insertion, deletion, substitution)
+			prev = temp
+		}
+	}
+
+	return dp[len(b)]
+}
+
+func minInt(values ...int) int {
+	if len(values) == 0 {
+		return 0
+	}
+	m := values[0]
+	for _, v := range values[1:] {
+		if v < m {
+			m = v
+		}
+	}
+	return m
 }
 
 func containsFold(values []string, target string) bool {
