@@ -11,6 +11,7 @@ import (
 
 	"github.com/Paintersrp/an/internal/pin"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 type PinMap map[string]string
@@ -283,7 +284,32 @@ func (cfg *Config) setActiveWorkspace(name string) error {
 	cfg.CurrentWorkspace = name
 	cfg.active = ws
 
+	cfg.syncViperWithActiveWorkspace()
+
 	return nil
+}
+
+func (cfg *Config) syncViperWithActiveWorkspace() {
+	if cfg.active == nil {
+		return
+	}
+
+	syncWorkspaceWithViper(cfg.active)
+}
+
+func syncWorkspaceWithViper(ws *Workspace) {
+	viper.Set("vaultdir", ws.VaultDir)
+	viper.Set("vaultDir", ws.VaultDir)
+	viper.Set("editor", ws.Editor)
+	viper.Set("nvimargs", ws.NvimArgs)
+	viper.Set("fsmode", ws.FileSystemMode)
+	viper.Set("pinned_file", ws.PinnedFile)
+	viper.Set("pinned_task_file", ws.PinnedTaskFile)
+	if ws.SubDirs == nil {
+		viper.Set("subdirs", []string{})
+	} else {
+		viper.Set("subdirs", append([]string(nil), ws.SubDirs...))
+	}
 }
 
 func (cfg *Config) ActiveWorkspace() (*Workspace, error) {
@@ -620,6 +646,8 @@ func (cfg *Config) Save() error {
 			return err
 		}
 	}
+
+	cfg.syncViperWithActiveWorkspace()
 
 	data, err := yaml.Marshal(cfg)
 	if err != nil {

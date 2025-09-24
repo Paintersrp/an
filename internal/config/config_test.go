@@ -10,6 +10,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/Paintersrp/an/internal/config"
+	"github.com/spf13/viper"
 )
 
 func writeConfigFile(t *testing.T, home string, data map[string]any) {
@@ -158,6 +159,60 @@ func TestSaveWithNoEditorSkipsValidation(t *testing.T) {
 
 	if !slices.Contains(reloaded.MustWorkspace().SubDirs, "atoms") {
 		t.Fatalf("expected persisted SubDirs to include 'atoms': %#v", reloaded.MustWorkspace().SubDirs)
+	}
+}
+
+func TestActiveWorkspaceSetsViperValues(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	cfgData := map[string]any{
+		"current_workspace": "main",
+		"workspaces": map[string]any{
+			"main": map[string]any{
+				"vaultdir":         filepath.Join(home, "vault"),
+				"editor":           "nvim",
+				"nvimargs":         "--clean",
+				"fsmode":           "strict",
+				"pinned_file":      "pins.md",
+				"pinned_task_file": "tasks.md",
+				"subdirs":          []string{"atoms", "projects"},
+			},
+		},
+	}
+
+	writeConfigFile(t, home, cfgData)
+	viper.Reset()
+
+	if _, err := config.Load(home); err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+
+	wantVault := filepath.Join(home, "vault")
+	if got := viper.GetString("vaultdir"); got != wantVault {
+		t.Fatalf("expected vaultdir %q, got %q", wantVault, got)
+	}
+	if got := viper.GetString("vaultDir"); got != wantVault {
+		t.Fatalf("expected vaultDir %q, got %q", wantVault, got)
+	}
+	if got := viper.GetString("editor"); got != "nvim" {
+		t.Fatalf("expected editor 'nvim', got %q", got)
+	}
+	if got := viper.GetString("nvimargs"); got != "--clean" {
+		t.Fatalf("expected nvimargs '--clean', got %q", got)
+	}
+	if got := viper.GetString("fsmode"); got != "strict" {
+		t.Fatalf("expected fsmode 'strict', got %q", got)
+	}
+	wantSubdirs := []string{"atoms", "projects"}
+	if got := viper.GetStringSlice("subdirs"); !slices.Equal(got, wantSubdirs) {
+		t.Fatalf("expected subdirs %v, got %v", wantSubdirs, got)
+	}
+	if got := viper.GetString("pinned_file"); got != "pins.md" {
+		t.Fatalf("expected pinned_file 'pins.md', got %q", got)
+	}
+	if got := viper.GetString("pinned_task_file"); got != "tasks.md" {
+		t.Fatalf("expected pinned_task_file 'tasks.md', got %q", got)
 	}
 }
 
