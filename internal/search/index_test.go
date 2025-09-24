@@ -1,6 +1,7 @@
 package search
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -105,4 +106,69 @@ func TestIndexSearchSupportsMetadataAndTags(t *testing.T) {
 	if len(results) != 0 {
 		t.Fatalf("expected metadata filters to exclude non-matching notes, got %+v", results)
 	}
+}
+
+func TestIndexRelatedComputesBacklinksAndOutbound(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	alpha := writeNote(t, dir, "alpha.md", "[[beta]]\n[[gamma]]\n")
+	beta := writeNote(t, dir, "beta.md", "Content with [Alpha](alpha.md) and duplicate [[gamma]] reference\n")
+	gamma := writeNote(t, dir, "notes/gamma.md", "No outbound links\n")
+	orphan := writeNote(t, dir, "orphan.md", "External link [Example](https://example.com)\n")
+
+	idx := NewIndex(dir, Config{})
+	if err := idx.Build([]string{alpha, beta, gamma, orphan}); err != nil {
+		t.Fatalf("Build returned error: %v", err)
+	}
+
+	relatedAlpha := idx.Related(alpha)
+	wantAlphaOutbound := []string{filepath.Clean(beta), filepath.Clean(gamma)}
+	if diff := cmpSlices(relatedAlpha.Outbound, wantAlphaOutbound); diff != "" {
+		t.Fatalf("unexpected outbound for alpha: %s", diff)
+	}
+	wantAlphaBacklinks := []string{filepath.Clean(beta)}
+	if diff := cmpSlices(relatedAlpha.Backlinks, wantAlphaBacklinks); diff != "" {
+		t.Fatalf("unexpected backlinks for alpha: %s", diff)
+	}
+
+	relPath, err := filepath.Rel(dir, beta)
+	if err != nil {
+		t.Fatalf("filepath.Rel returned error: %v", err)
+	}
+	relatedBeta := idx.Related(relPath)
+	wantBetaOutbound := []string{filepath.Clean(alpha), filepath.Clean(filepath.Join(dir, "notes", "gamma.md"))}
+	if diff := cmpSlices(relatedBeta.Outbound, wantBetaOutbound); diff != "" {
+		t.Fatalf("unexpected outbound for beta: %s", diff)
+	}
+	wantBetaBacklinks := []string{filepath.Clean(alpha)}
+	if diff := cmpSlices(relatedBeta.Backlinks, wantBetaBacklinks); diff != "" {
+		t.Fatalf("unexpected backlinks for beta: %s", diff)
+	}
+
+	relatedGamma := idx.Related(gamma)
+	if len(relatedGamma.Outbound) != 0 {
+		t.Fatalf("expected no outbound links for gamma, got %+v", relatedGamma.Outbound)
+	}
+	wantGammaBacklinks := []string{filepath.Clean(alpha), filepath.Clean(beta)}
+	if diff := cmpSlices(relatedGamma.Backlinks, wantGammaBacklinks); diff != "" {
+		t.Fatalf("unexpected backlinks for gamma: %s", diff)
+	}
+
+	relatedOrphan := idx.Related(orphan)
+	if len(relatedOrphan.Outbound) != 0 || len(relatedOrphan.Backlinks) != 0 {
+		t.Fatalf("expected orphan note to have no relationships, got %+v", relatedOrphan)
+	}
+}
+
+func cmpSlices(got, want []string) string {
+	if len(got) != len(want) {
+		return fmt.Sprintf("length mismatch got %d want %d (got=%v, want=%v)", len(got), len(want), got, want)
+	}
+	for i := range got {
+		if filepath.Clean(got[i]) != filepath.Clean(want[i]) {
+			return fmt.Sprintf("value mismatch at %d: got %q want %q", i, got[i], want[i])
+		}
+	}
+	return ""
 }
