@@ -302,7 +302,7 @@ func (m FormModel) handleSubmit() FormModel {
 	}
 
 	// TODO: Content instead of "" ?
-	noteLauncher(n, m.state.Templater, tmpl, "", nil)
+	noteLauncher(n, m.state.Templater, tmpl, "", map[string]interface{}{})
 
 	return m
 }
