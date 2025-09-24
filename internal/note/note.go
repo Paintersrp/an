@@ -352,12 +352,9 @@ func launchWithObsidian(path string) (*EditorLaunch, error) {
 		return nil, fmt.Errorf("unable to determine relative path for obsidian: %w", err)
 	}
 
-	obsidianURI := fmt.Sprintf(
-		"obsidian://open?vault=%s&file=%s",
-		vaultName,
-		relativePath,
-	)
-
+	if !launch.Wait {
+		return nil
+	}
 	switch runtime.GOOS {
 	case "darwin":
 		return newEditorLaunch("open", []string{obsidianURI}, false, true)
@@ -372,7 +369,28 @@ func launchWithObsidian(path string) (*EditorLaunch, error) {
 
 func newEditorLaunch(command string, args []string, wait bool, silence bool) (*EditorLaunch, error) {
 	cmd := exec.Command(command, args...)
-	if silence {
+
+	if wait {
+		if cmd.Stdin == nil {
+			cmd.Stdin = os.Stdin
+		}
+
+		if cmd.Stdout == nil {
+			if silence {
+				cmd.Stdout = io.Discard
+			} else {
+				cmd.Stdout = os.Stdout
+			}
+		}
+
+		if cmd.Stderr == nil {
+			if silence {
+				cmd.Stderr = io.Discard
+			} else {
+				cmd.Stderr = os.Stderr
+			}
+		}
+	} else if silence {
 		cmd.Stdout = io.Discard
 		cmd.Stderr = io.Discard
 	}
