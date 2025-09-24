@@ -110,3 +110,27 @@ func TestRootModelNavigation(t *testing.T) {
 		t.Fatalf("expected journal view content in output")
 	}
 }
+
+func TestRootModelKeepsNotesViewWhenEditorActive(t *testing.T) {
+	noteModel := newEditorTestModel(t, map[string]string{})
+	if noteModel == nil {
+		t.Fatalf("expected note model")
+	}
+
+	root := NewRootModel(noteModel, nil, nil)
+
+	_ = noteModel.startScratchCapture()
+	if !noteModel.editorActive() {
+		t.Fatalf("expected scratch editor to be active")
+	}
+
+	_, _ = root.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+
+	if root.active != viewNotes {
+		t.Fatalf("expected to remain on notes view, got %v", root.active)
+	}
+
+	if got := noteModel.editor.value(); got != "2" {
+		t.Fatalf("expected editor to capture input, got %q", got)
+	}
+}
