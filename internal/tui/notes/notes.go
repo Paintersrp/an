@@ -1146,7 +1146,6 @@ func (m *NoteListModel) openNote(obsidian bool) tea.Cmd {
 		m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Open Error: %v", err)))
 		return nil
 	}
-
 	if !launch.Wait {
 		return func() tea.Msg {
 			startErr := launch.Cmd.Start()
@@ -1169,6 +1168,16 @@ func (m *NoteListModel) afterExternalEditor() tea.Cmd {
 	}
 
 	return nil
+}
+
+func (m *NoteListModel) afterExternalEditor() tea.Cmd {
+	cmds := []tea.Cmd{tea.EnterAltScreen, tea.ClearScreen}
+
+	if cmd := m.handlePreview(true); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+
+	return tea.Batch(cmds...)
 }
 
 func (m *NoteListModel) toggleTitleBar() {
