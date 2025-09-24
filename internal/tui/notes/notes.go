@@ -811,17 +811,15 @@ func (m *NoteListModel) handleDefaultUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 	switch {
 	case key.Matches(msg, m.keys.openNote):
 		if ok := m.openNote(false); ok {
-			return m, tea.Quit
-		} else {
-			return m, nil
+			return m, m.afterExternalEditor()
 		}
+		return m, nil
 
 	case key.Matches(msg, m.keys.openNoteInObsidian):
 		if ok := m.openNote(true); ok {
-			return m, tea.Quit
-		} else {
-			return m, nil
+			return m, m.afterExternalEditor()
 		}
+		return m, nil
 
 	case key.Matches(msg, m.keys.toggleTitleBar):
 		m.toggleTitleBar()
@@ -1116,7 +1114,7 @@ func (m *NoteListModel) refreshSort() tea.Cmd {
 
 // TODO: should prob use an error over a bool but a "success" flag sort of feels more natural for the context.
 // TODO: unsuccessful opens provide a status message and the program stays live
-// TODO: successful opens return true which trigger graceful stdin passing and closing of the program
+// openNote reports success so callers can trigger follow-up updates (like refreshing the preview)
 func (m *NoteListModel) openNote(obsidian bool) bool {
 	var p string
 
@@ -1126,13 +1124,24 @@ func (m *NoteListModel) openNote(obsidian bool) bool {
 		return false
 	}
 
+	tea.ExitAltScreen()
+
 	err := note.OpenFromPath(p, obsidian)
 	if err != nil {
 		m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Open Error: %s", err)))
-		return false
 	}
 
 	return true
+}
+
+func (m *NoteListModel) afterExternalEditor() tea.Cmd {
+	cmds := []tea.Cmd{tea.EnterAltScreen, tea.ClearScreen}
+
+	if cmd := m.handlePreview(true); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+
+	return tea.Batch(cmds...)
 }
 
 func (m *NoteListModel) toggleTitleBar() {
