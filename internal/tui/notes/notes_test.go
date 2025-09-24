@@ -109,9 +109,9 @@ func TestRefreshItemsClampsSelectionWhenListShrinks(t *testing.T) {
 		t.Fatalf("expected refreshItems command to be nil, got %T", cmd)
 	}
 
-	visible := model.list.VisibleItems()
-	if idx := model.list.Index(); idx < 0 || idx >= len(visible) {
-		t.Fatalf("expected selection to be within bounds, got index %d with %d visible items", idx, len(visible))
+	items := model.list.Items()
+	if idx := model.list.Index(); idx < 0 || idx >= len(items) {
+		t.Fatalf("expected selection to be within bounds, got index %d with %d items", idx, len(items))
 	}
 
 	if _, ok := model.list.SelectedItem().(ListItem); !ok {
