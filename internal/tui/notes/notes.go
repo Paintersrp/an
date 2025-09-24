@@ -811,13 +811,13 @@ func (m *NoteListModel) handleDefaultUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 	switch {
 	case key.Matches(msg, m.keys.openNote):
 		if ok := m.openNote(false); ok {
-			return m, m.handlePreview(true)
+			return m, m.afterExternalEditor()
 		}
 		return m, nil
 
 	case key.Matches(msg, m.keys.openNoteInObsidian):
 		if ok := m.openNote(true); ok {
-			return m, m.handlePreview(true)
+			return m, m.afterExternalEditor()
 		}
 		return m, nil
 
@@ -1131,6 +1131,16 @@ func (m *NoteListModel) openNote(obsidian bool) bool {
 	}
 
 	return true
+}
+
+func (m *NoteListModel) afterExternalEditor() tea.Cmd {
+	cmds := []tea.Cmd{tea.EnterAltScreen, tea.ClearScreen}
+
+	if cmd := m.handlePreview(true); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+
+	return tea.Batch(cmds...)
 }
 
 func (m *NoteListModel) toggleTitleBar() {
