@@ -352,12 +352,9 @@ func launchWithObsidian(path string) (*EditorLaunch, error) {
 		return nil, fmt.Errorf("unable to determine relative path for obsidian: %w", err)
 	}
 
-	obsidianURI := fmt.Sprintf(
-		"obsidian://open?vault=%s&file=%s",
-		vaultName,
-		relativePath,
-	)
-
+	if !launch.Wait {
+		return nil
+	}
 	switch runtime.GOOS {
 	case "darwin":
 		return newEditorLaunch("open", []string{obsidianURI}, false, true)
