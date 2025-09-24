@@ -27,20 +27,31 @@ type Index struct {
 	root string
 	cfg  Config
 	docs map[string]document
+	// aliases maps lowercase note identifiers (relative paths, basenames,
+	// and stemmed names) to their canonical on-disk path.
+	aliases   map[string]string
+	outbound  map[string][]string
+	backlinks map[string][]string
 }
 
 // NewIndex constructs an empty index rooted at the provided directory.
 func NewIndex(root string, cfg Config) *Index {
 	return &Index{
-		root: filepath.Clean(root),
-		cfg:  cfg,
-		docs: make(map[string]document),
+		root:      filepath.Clean(root),
+		cfg:       cfg,
+		docs:      make(map[string]document),
+		aliases:   make(map[string]string),
+		outbound:  make(map[string][]string),
+		backlinks: make(map[string][]string),
 	}
 }
 
 // Build replaces the index contents using the provided note paths.
 func (idx *Index) Build(paths []string) error {
 	idx.docs = make(map[string]document, len(paths))
+	idx.aliases = make(map[string]string)
+	idx.outbound = make(map[string][]string)
+	idx.backlinks = make(map[string][]string)
 	for _, p := range paths {
 		if idx.shouldIgnore(p) {
 			continue
@@ -55,7 +66,37 @@ func (idx *Index) Build(paths []string) error {
 		}
 		idx.docs[filepath.Clean(p)] = doc
 	}
+	idx.aliases = idx.buildAliases()
+	idx.computeRelationships()
 	return nil
+}
+
+// RelatedNotes captures outbound links and backlinks for a note.
+type RelatedNotes struct {
+	Outbound  []string
+	Backlinks []string
+}
+
+// Related returns the outbound and backlink relationships for the provided
+// note path. The method accepts absolute or relative paths and falls back to
+// alias matching using the index metadata when possible.
+func (idx *Index) Related(path string) RelatedNotes {
+	canonical := filepath.Clean(path)
+
+	// Attempt to resolve via alias lookup so relative paths or stem names
+	// still succeed when called by higher level features.
+	if resolved := idx.resolveAlias(canonical); resolved != "" {
+		canonical = resolved
+	}
+
+	related := RelatedNotes{}
+	if links, ok := idx.outbound[canonical]; ok {
+		related.Outbound = append([]string(nil), links...)
+	}
+	if refs, ok := idx.backlinks[canonical]; ok {
+		related.Backlinks = append([]string(nil), refs...)
+	}
+	return related
 }
 
 // Search evaluates the provided query against the index and returns matching
@@ -142,6 +183,135 @@ func (idx *Index) loadDocument(path string) (document, error) {
 		Links:       extractLinks(body),
 		Body:        string(body),
 	}, nil
+}
+
+func (idx *Index) computeRelationships() {
+	outbound := make(map[string]map[string]struct{}, len(idx.docs))
+	backlinks := make(map[string]map[string]struct{}, len(idx.docs))
+
+	for path, doc := range idx.docs {
+		for _, raw := range doc.Links {
+			target := idx.resolveLink(raw)
+			if target == "" || target == path {
+				continue
+			}
+
+			if _, ok := outbound[path]; !ok {
+				outbound[path] = make(map[string]struct{})
+			}
+			outbound[path][target] = struct{}{}
+
+			if _, ok := backlinks[target]; !ok {
+				backlinks[target] = make(map[string]struct{})
+			}
+			backlinks[target][path] = struct{}{}
+		}
+	}
+
+	idx.outbound = make(map[string][]string, len(outbound))
+	for path, targets := range outbound {
+		idx.outbound[path] = setToSortedSlice(targets)
+	}
+
+	idx.backlinks = make(map[string][]string, len(backlinks))
+	for path, sources := range backlinks {
+		idx.backlinks[path] = setToSortedSlice(sources)
+	}
+}
+
+func (idx *Index) buildAliases() map[string]string {
+	aliases := make(map[string]string, len(idx.docs)*4)
+	for path := range idx.docs {
+		canonical := filepath.Clean(path)
+
+		rel, err := filepath.Rel(idx.root, canonical)
+		if err == nil {
+			addAlias(aliases, rel, canonical)
+		}
+
+		addAlias(aliases, filepath.Base(canonical), canonical)
+	}
+	return aliases
+}
+
+func addAlias(aliases map[string]string, candidate, path string) {
+	candidate = strings.TrimSpace(candidate)
+	if candidate == "" {
+		return
+	}
+	normalized := strings.ToLower(filepath.ToSlash(candidate))
+	aliases[normalized] = path
+
+	if ext := filepath.Ext(normalized); ext != "" {
+		stem := strings.TrimSuffix(normalized, ext)
+		if stem != "" {
+			aliases[stem] = path
+		}
+	}
+}
+
+func (idx *Index) resolveAlias(path string) string {
+	if len(idx.aliases) == 0 {
+		return ""
+	}
+	normalized := strings.ToLower(filepath.ToSlash(path))
+	if normalized == "" {
+		return ""
+	}
+	if resolved, ok := idx.aliases[normalized]; ok {
+		return resolved
+	}
+	if ext := filepath.Ext(normalized); ext != "" {
+		stem := strings.TrimSuffix(normalized, ext)
+		if resolved, ok := idx.aliases[stem]; ok {
+			return resolved
+		}
+	}
+	return ""
+}
+
+func (idx *Index) resolveLink(link string) string {
+	if len(idx.aliases) == 0 {
+		return ""
+	}
+	cleaned := strings.TrimSpace(link)
+	if cleaned == "" {
+		return ""
+	}
+
+	cleaned = strings.ReplaceAll(cleaned, "\\", "/")
+	if hash := strings.Index(cleaned, "#"); hash >= 0 {
+		cleaned = cleaned[:hash]
+	}
+	cleaned = strings.Trim(cleaned, "/")
+	if cleaned == "" {
+		return ""
+	}
+
+	lowered := strings.ToLower(cleaned)
+	if strings.Contains(lowered, "://") || strings.HasPrefix(lowered, "mailto:") {
+		return ""
+	}
+
+	if resolved, ok := idx.aliases[lowered]; ok {
+		return resolved
+	}
+	if ext := filepath.Ext(lowered); ext != "" {
+		stem := strings.TrimSuffix(lowered, ext)
+		if resolved, ok := idx.aliases[stem]; ok {
+			return resolved
+		}
+	}
+	return ""
+}
+
+func setToSortedSlice(values map[string]struct{}) []string {
+	out := make([]string, 0, len(values))
+	for v := range values {
+		out = append(out, v)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func (d document) matchesFilters(q Query) bool {
