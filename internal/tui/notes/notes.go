@@ -481,6 +481,9 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		return m, tea.Batch(cmds...)
 
+	case noteListRefreshMsg:
+		return m, batchCmds(m.refreshItems(), m.handlePreview(true))
+
 	case state.VaultWatcherErrMsg:
 		if msg.Err != nil {
 			m.list.NewStatusMessage(
