@@ -44,8 +44,7 @@ func newItemDelegate(
 					if err := h.Archive(p); err != nil {
 						return m.NewStatusMessage(statusStyle("Failed to archive " + n))
 					}
-					i := m.Index()
-					m.RemoveItem(i)
+					removeItemByPath(m, p)
 					return m.NewStatusMessage(statusStyle("Archived " + n))
 				}
 
@@ -54,8 +53,7 @@ func newItemDelegate(
 					if err := os.Remove(p); err != nil {
 						return m.NewStatusMessage(statusStyle("Failed to delete " + n))
 					}
-					i := m.Index()
-					m.RemoveItem(i)
+					removeItemByPath(m, p)
 					return m.NewStatusMessage(statusStyle("Deleted " + n))
 				}
 
@@ -63,8 +61,7 @@ func newItemDelegate(
 				if err := h.Trash(p); err != nil {
 					return m.NewStatusMessage(statusStyle("Failed to move " + n + " to trash"))
 				}
-				i := m.Index()
-				m.RemoveItem(i)
+				removeItemByPath(m, p)
 				return m.NewStatusMessage(statusStyle("Moved " + n + " to trash"))
 
 			case key.Matches(msg, keys.undo):
@@ -73,16 +70,14 @@ func newItemDelegate(
 					if err := h.Unarchive(p); err != nil {
 						return m.NewStatusMessage(statusStyle("Failed to unarchive " + n))
 					}
-					i := m.Index()
-					m.RemoveItem(i)
+					removeItemByPath(m, p)
 					return m.NewStatusMessage(statusStyle("Restored " + n))
 
 				case "trash":
 					if err := h.Untrash(p); err != nil {
 						return m.NewStatusMessage(statusStyle("Failed to restore " + n))
 					}
-					i := m.Index()
-					m.RemoveItem(i)
+					removeItemByPath(m, p)
 					return m.NewStatusMessage(statusStyle("Restored " + n))
 				}
 
@@ -92,16 +87,14 @@ func newItemDelegate(
 					if err := h.Trash(p); err != nil {
 						return m.NewStatusMessage(statusStyle("Failed to move " + n + " to trash"))
 					}
-					i := m.Index()
-					m.RemoveItem(i)
+					removeItemByPath(m, p)
 					return m.NewStatusMessage(statusStyle("Moved " + n + " to trash"))
 
 				case "trash":
 					if err := os.Remove(p); err != nil {
 						return m.NewStatusMessage(statusStyle("Failed to delete " + n))
 					}
-					i := m.Index()
-					m.RemoveItem(i)
+					removeItemByPath(m, p)
 					return m.NewStatusMessage(statusStyle("Deleted " + n))
 				}
 
@@ -139,6 +132,24 @@ func newItemDelegate(
 		return longHelp
 	}
 	return d
+}
+
+func removeItemByPath(m *list.Model, path string) {
+	if path == "" {
+		return
+	}
+
+	items := m.Items()
+	for idx, item := range items {
+		li, ok := item.(ListItem)
+		if !ok {
+			continue
+		}
+		if li.path == path {
+			m.RemoveItem(idx)
+			return
+		}
+	}
 }
 
 type delegateKeyMap struct {
