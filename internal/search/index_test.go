@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 )
 
@@ -158,6 +159,47 @@ func TestIndexRelatedComputesBacklinksAndOutbound(t *testing.T) {
 	relatedOrphan := idx.Related(orphan)
 	if len(relatedOrphan.Outbound) != 0 || len(relatedOrphan.Backlinks) != 0 {
 		t.Fatalf("expected orphan note to have no relationships, got %+v", relatedOrphan)
+	}
+}
+
+func TestIndexRelatedResolvesRelativeLinks(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	parent := writeNote(t, dir, "notes/parent.md", "Parent note\n")
+	child := writeNote(t, dir, "notes/nested/child.md", "Links to [parent](../parent.md) and [sibling](./sibling.md)\n")
+	sibling := writeNote(t, dir, "notes/nested/sibling.md", "Back to [child](./child.md)\n")
+
+	idx := NewIndex(dir, Config{})
+	if err := idx.Build([]string{parent, child, sibling}); err != nil {
+		t.Fatalf("Build returned error: %v", err)
+	}
+
+	relatedChild := idx.Related(child)
+	wantChildOutbound := []string{filepath.Clean(parent), filepath.Clean(sibling)}
+	sort.Strings(wantChildOutbound)
+	if diff := cmpSlices(relatedChild.Outbound, wantChildOutbound); diff != "" {
+		t.Fatalf("unexpected outbound for child: %s", diff)
+	}
+	wantChildBacklinks := []string{filepath.Clean(sibling)}
+	if diff := cmpSlices(relatedChild.Backlinks, wantChildBacklinks); diff != "" {
+		t.Fatalf("unexpected backlinks for child: %s", diff)
+	}
+
+	relatedParent := idx.Related(parent)
+	wantParentBacklinks := []string{filepath.Clean(child)}
+	if diff := cmpSlices(relatedParent.Backlinks, wantParentBacklinks); diff != "" {
+		t.Fatalf("unexpected backlinks for parent: %s", diff)
+	}
+
+	relatedSibling := idx.Related(sibling)
+	wantSiblingOutbound := []string{filepath.Clean(child)}
+	if diff := cmpSlices(relatedSibling.Outbound, wantSiblingOutbound); diff != "" {
+		t.Fatalf("unexpected outbound for sibling: %s", diff)
+	}
+	wantSiblingBacklinks := []string{filepath.Clean(child)}
+	if diff := cmpSlices(relatedSibling.Backlinks, wantSiblingBacklinks); diff != "" {
+		t.Fatalf("unexpected backlinks for sibling: %s", diff)
 	}
 }
 

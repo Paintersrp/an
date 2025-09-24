@@ -191,7 +191,7 @@ func (idx *Index) computeRelationships() {
 
 	for path, doc := range idx.docs {
 		for _, raw := range doc.Links {
-			target := idx.resolveLink(raw)
+			target := idx.resolveLink(path, raw)
 			if target == "" || target == path {
 				continue
 			}
@@ -270,7 +270,7 @@ func (idx *Index) resolveAlias(path string) string {
 	return ""
 }
 
-func (idx *Index) resolveLink(link string) string {
+func (idx *Index) resolveLink(sourcePath, link string) string {
 	if len(idx.aliases) == 0 {
 		return ""
 	}
@@ -293,16 +293,40 @@ func (idx *Index) resolveLink(link string) string {
 		return ""
 	}
 
-	if resolved, ok := idx.aliases[lowered]; ok {
+	if resolved := idx.resolveAlias(cleaned); resolved != "" {
 		return resolved
 	}
-	if ext := filepath.Ext(lowered); ext != "" {
-		stem := strings.TrimSuffix(lowered, ext)
-		if resolved, ok := idx.aliases[stem]; ok {
-			return resolved
+
+	if sourcePath != "" {
+		if relative := idx.resolveRelativeLink(sourcePath, cleaned); relative != "" {
+			if resolved := idx.resolveAlias(relative); resolved != "" {
+				return resolved
+			}
 		}
 	}
 	return ""
+}
+
+func (idx *Index) resolveRelativeLink(sourcePath, link string) string {
+	if sourcePath == "" || link == "" {
+		return ""
+	}
+
+	sourceDir := filepath.Dir(sourcePath)
+
+	joined := filepath.Join(sourceDir, link)
+	if rel, err := filepath.Rel(idx.root, joined); err == nil {
+		cleaned := strings.Trim(filepath.ToSlash(rel), "/")
+		if cleaned != "" {
+			return cleaned
+		}
+	}
+
+	cleaned := strings.Trim(filepath.ToSlash(filepath.Clean(joined)), "/")
+	if cleaned == "" {
+		return ""
+	}
+	return cleaned
 }
 
 func setToSortedSlice(values map[string]struct{}) []string {
