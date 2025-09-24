@@ -2,11 +2,14 @@
 package notes
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
@@ -42,6 +45,7 @@ type NoteListModel struct {
 	showDetails  bool
 	creating     bool
 	copying      bool
+	editor       *editorSession
 	sortField    sortField
 	sortOrder    sortOrder
 	searchIndex  *search.Index
@@ -89,6 +93,8 @@ func NewNoteListModel(
 	l.AdditionalShortHelpKeys = func() []key.Binding {
 		return []key.Binding{
 			lkeys.openNote,
+			lkeys.editInline,
+			lkeys.quickCapture,
 			lkeys.changeView,
 		}
 	}
@@ -277,6 +283,11 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			normalized := pathutil.NormalizePath(abs)
 			m.cache.Delete(normalized)
 
+			if m.editor != nil && pathutil.NormalizePath(m.editor.path) == normalized {
+				m.editor.status = "Note changed on disk. Press ctrl+r to reload or ctrl+s to overwrite."
+				m.editor.allowOverwrite = true
+			}
+
 			if s, ok := m.list.SelectedItem().(ListItem); ok && pathutil.NormalizePath(s.path) == normalized {
 				force = true
 			}
@@ -322,11 +333,20 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		h, v := appStyle.GetFrameSize()
 		m.list.SetSize(msg.Width-h, msg.Height-v)
 
+		if m.editor != nil {
+			width, height := m.editorSize()
+			m.editor.setSize(width, height)
+		}
+
 		if cmd := m.handlePreview(true); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
 
 	case tea.KeyMsg:
+		if m.editor != nil {
+			return m.handleEditorUpdate(msg)
+		}
+
 		if m.list.FilterState() == list.Filtering {
 			break
 		}
@@ -446,6 +466,344 @@ func (m *NoteListModel) handleCreationUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd
 	return m, tea.Batch(cmds...)
 }
 
+func (m NoteListModel) handleEditorUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.editor == nil {
+		return m, nil
+	}
+
+	switch msg.Type {
+	case tea.KeyCtrlS:
+		cmd := m.saveEditor()
+		return m, cmd
+	case tea.KeyCtrlR:
+		if m.editor.mode == editorModeExisting {
+			return m, m.reloadEditor()
+		}
+		return m, nil
+	case tea.KeyEsc:
+		if !m.editor.hasChanges() || m.editor.pendingDiscard {
+			cmd := m.closeEditor()
+			if cmd2 := m.handlePreview(true); cmd2 != nil {
+				return m, tea.Batch(cmd, cmd2)
+			}
+			return m, cmd
+		}
+
+		m.editor.pendingDiscard = true
+		m.editor.status = "Discard changes? Press esc again to confirm."
+		return m, nil
+	}
+
+	m.editor.pendingDiscard = false
+	cmd := m.editor.area.Update(msg)
+	return m, cmd
+}
+
+func (m *NoteListModel) startInlineEdit() tea.Cmd {
+	if m.editor != nil {
+		return nil
+	}
+
+	if m.state == nil || m.state.Handler == nil {
+		m.list.NewStatusMessage(statusStyle("Editor unavailable: missing file handler"))
+		return nil
+	}
+
+	selected, ok := m.list.SelectedItem().(ListItem)
+	if !ok {
+		return nil
+	}
+
+	data, err := m.state.Handler.ReadFile(selected.path)
+	if err != nil {
+		m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Failed to open note: %v", err)))
+		return nil
+	}
+
+	info, err := os.Stat(selected.path)
+	if err != nil {
+		m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Failed to stat note: %v", err)))
+		return nil
+	}
+
+	width, height := m.editorSize()
+	session := newEditorSession(width, height)
+	session.setMetadata(selected.path, selected.Title(), editorModeExisting)
+	session.setValue(string(data))
+	session.setOriginal(string(data), info.ModTime())
+	session.status = "ctrl+s save • ctrl+r reload • esc discard"
+
+	m.editor = session
+	return session.focus()
+}
+
+func (m *NoteListModel) startScratchCapture() tea.Cmd {
+	if m.editor != nil {
+		return nil
+	}
+
+	width, height := m.editorSize()
+	path, err := m.nextScratchPath()
+	if err != nil {
+		m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Capture error: %v", err)))
+		return nil
+	}
+
+	session := newEditorSession(width, height)
+	session.setMetadata(path, filepath.Base(path), editorModeScratch)
+	session.setOriginal("", time.Time{})
+	session.status = "ctrl+s save • esc discard"
+
+	m.editor = session
+	return session.focus()
+}
+
+func (m *NoteListModel) saveEditor() tea.Cmd {
+	if m.editor == nil {
+		return nil
+	}
+
+	content := m.editor.value()
+	switch m.editor.mode {
+	case editorModeExisting:
+		return m.saveExistingEditor(content)
+	case editorModeScratch:
+		return m.saveScratchEditor(content)
+	default:
+		return nil
+	}
+}
+
+func (m *NoteListModel) saveExistingEditor(content string) tea.Cmd {
+	if m.editor == nil {
+		return nil
+	}
+
+	path := m.editor.path
+	if path == "" {
+		m.editor.status = "Unable to determine note path"
+		return nil
+	}
+
+	if m.state == nil || m.state.Handler == nil {
+		m.editor.status = "File handler unavailable"
+		return nil
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		m.editor.status = fmt.Sprintf("Save failed: %v", err)
+		return nil
+	}
+
+	if !m.editor.allowOverwrite && !info.ModTime().Equal(m.editor.originalModTime) {
+		disk, err := m.state.Handler.ReadFile(path)
+		if err != nil {
+			m.editor.status = fmt.Sprintf("Save blocked: %v", err)
+			return nil
+		}
+
+		if !m.editor.checksumMatches(disk) {
+			m.editor.status = "External changes detected. Press ctrl+r to reload or ctrl+s again to overwrite."
+			m.editor.allowOverwrite = true
+			return nil
+		}
+	}
+
+	if err := m.state.Handler.WriteFile(path, []byte(content)); err != nil {
+		m.editor.status = fmt.Sprintf("Save failed: %v", err)
+		return nil
+	}
+
+	if info, err := os.Stat(path); err == nil {
+		m.editor.setOriginal(content, info.ModTime())
+	} else {
+		m.editor.setOriginal(content, time.Now())
+	}
+
+	cmdBlur := m.closeEditor()
+
+	cmds := []tea.Cmd{}
+	if cmdBlur != nil {
+		cmds = append(cmds, cmdBlur)
+	}
+	if cmd := m.handlePreview(true); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+
+	m.list.NewStatusMessage(statusStyle("Note saved"))
+
+	return tea.Batch(cmds...)
+}
+
+func (m *NoteListModel) saveScratchEditor(content string) tea.Cmd {
+	if m.editor == nil {
+		return nil
+	}
+
+	if content == "" {
+		m.editor.status = "Nothing to save"
+		return nil
+	}
+
+	path := m.editor.path
+	if path == "" {
+		m.editor.status = "Unable to determine capture destination"
+		return nil
+	}
+
+	if m.state == nil || m.state.Handler == nil {
+		m.editor.status = "File handler unavailable"
+		return nil
+	}
+
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		m.editor.status = fmt.Sprintf("Save failed: %v", err)
+		return nil
+	}
+
+	if _, err := os.Stat(path); err == nil && !m.editor.allowOverwrite {
+		m.editor.status = "Capture already exists. Press ctrl+s again to overwrite."
+		m.editor.allowOverwrite = true
+		return nil
+	} else if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		m.editor.status = fmt.Sprintf("Save failed: %v", err)
+		return nil
+	}
+
+	if err := m.state.Handler.WriteFile(path, []byte(content)); err != nil {
+		m.editor.status = fmt.Sprintf("Save failed: %v", err)
+		return nil
+	}
+
+	m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Captured note %s", filepath.Base(path))))
+
+	cmdBlur := m.closeEditor()
+	cmds := []tea.Cmd{}
+	if cmdBlur != nil {
+		cmds = append(cmds, cmdBlur)
+	}
+	if cmd := m.refresh(); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+
+	return tea.Batch(cmds...)
+}
+
+func (m *NoteListModel) reloadEditor() tea.Cmd {
+	if m.editor == nil || m.editor.mode != editorModeExisting {
+		return nil
+	}
+
+	if m.state == nil || m.state.Handler == nil {
+		m.editor.status = "File handler unavailable"
+		return nil
+	}
+
+	data, err := m.state.Handler.ReadFile(m.editor.path)
+	if err != nil {
+		m.editor.status = fmt.Sprintf("Reload failed: %v", err)
+		return nil
+	}
+
+	info, err := os.Stat(m.editor.path)
+	if err != nil {
+		m.editor.status = fmt.Sprintf("Reload failed: %v", err)
+		return nil
+	}
+
+	m.editor.setValue(string(data))
+	m.editor.setOriginal(string(data), info.ModTime())
+	m.editor.status = "Reloaded from disk"
+	return nil
+}
+
+func (m *NoteListModel) closeEditor() tea.Cmd {
+	if m.editor == nil {
+		return nil
+	}
+
+	cmd := m.editor.blur()
+	m.editor = nil
+	return cmd
+}
+
+func (m NoteListModel) editorSize() (int, int) {
+	h, v := appStyle.GetFrameSize()
+	width := m.width - h
+	height := m.height - v
+	if width <= 0 {
+		width = m.width
+	}
+	if width <= 0 {
+		width = 80
+	}
+	if height <= 0 {
+		height = m.height
+	}
+	if height <= 0 {
+		if listHeight := m.list.Height(); listHeight > 0 {
+			height = listHeight
+		} else {
+			height = 24
+		}
+	}
+	return width, height
+}
+
+func (m *NoteListModel) nextScratchPath() (string, error) {
+	if m.state == nil || m.state.Config == nil {
+		return "", fmt.Errorf("workspace not configured")
+	}
+
+	ws := m.state.Config.MustWorkspace()
+	base := m.state.Vault
+	if base == "" {
+		return "", fmt.Errorf("vault path not configured")
+	}
+
+	var targetDir string
+	if len(ws.SubDirs) > 0 && ws.SubDirs[0] != "" {
+		targetDir = filepath.Join(base, ws.SubDirs[0])
+	} else {
+		targetDir = base
+	}
+
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
+		return "", err
+	}
+
+	for i := 0; i < 10; i++ {
+		timestamp := time.Now().Format("20060102-150405")
+		name := fmt.Sprintf("scratch-%s", timestamp)
+		if i > 0 {
+			name = fmt.Sprintf("%s-%d", name, i)
+		}
+		path := filepath.Join(targetDir, name+".md")
+		if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
+			return path, nil
+		}
+	}
+
+	return "", fmt.Errorf("unable to allocate capture filename")
+}
+
+func (m NoteListModel) editorInstructions() string {
+	if m.editor == nil {
+		return ""
+	}
+
+	switch m.editor.mode {
+	case editorModeExisting:
+		return "ctrl+s save • ctrl+r reload • esc discard"
+	case editorModeScratch:
+		return "ctrl+s save • esc discard"
+	default:
+		return ""
+	}
+}
+
 // TODO: returns are kinda unnecessary now
 func (m *NoteListModel) handleDefaultUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
@@ -509,6 +867,12 @@ func (m *NoteListModel) handleDefaultUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 	case key.Matches(msg, m.keys.copy):
 		m.toggleCopy()
 
+	case key.Matches(msg, m.keys.editInline):
+		return m, m.startInlineEdit()
+
+	case key.Matches(msg, m.keys.quickCapture):
+		return m, m.startScratchCapture()
+
 	case key.Matches(msg, m.keys.sortByTitle):
 		m.sortField = sortByTitle
 		return m, m.refreshSort()
@@ -537,6 +901,24 @@ func (m *NoteListModel) handleDefaultUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 }
 
 func (m NoteListModel) View() string {
+	if m.editor != nil {
+		width, height := m.editorSize()
+		m.editor.setSize(width, height)
+
+		sections := []string{
+			titleStyle.Render(m.editor.viewHeader()),
+			m.editor.area.View(),
+			helpStyle.Render(m.editorInstructions()),
+		}
+
+		if msg := m.editor.status; msg != "" {
+			sections = append(sections, statusStyle(msg))
+		}
+
+		layout := lipgloss.JoinVertical(lipgloss.Left, sections...)
+		return appStyle.Render(layout)
+	}
+
 	list := listStyle.MaxWidth(m.width / 2).Render(m.list.View())
 
 	if m.copying {

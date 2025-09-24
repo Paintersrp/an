@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -15,6 +16,47 @@ type FileHandler struct {
 
 func NewFileHandler(vaultDir string) *FileHandler {
 	return &FileHandler{vaultDir: vaultDir}
+}
+
+func (h *FileHandler) resolve(path string) (string, error) {
+	if h == nil {
+		return "", fmt.Errorf("file handler is not configured")
+	}
+
+	if path == "" {
+		return "", fmt.Errorf("path cannot be empty")
+	}
+
+	cleaned := filepath.Clean(path)
+	rel, err := filepath.Rel(h.vaultDir, cleaned)
+	if err != nil {
+		return "", err
+	}
+	if rel == ".." || strings.HasPrefix(rel, "..") {
+		return "", fmt.Errorf("path %q is outside the vault", path)
+	}
+	return cleaned, nil
+}
+
+func (h *FileHandler) ReadFile(path string) ([]byte, error) {
+	resolved, err := h.resolve(path)
+	if err != nil {
+		return nil, err
+	}
+	return os.ReadFile(resolved)
+}
+
+func (h *FileHandler) WriteFile(path string, data []byte) error {
+	resolved, err := h.resolve(path)
+	if err != nil {
+		return err
+	}
+
+	if err := os.MkdirAll(filepath.Dir(resolved), 0o755); err != nil {
+		return err
+	}
+
+	return os.WriteFile(resolved, data, 0o644)
 }
 
 // Archive moves a note file to the archive subdirectory.
