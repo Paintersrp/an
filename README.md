@@ -40,11 +40,26 @@ nvimargs: ''            # Optional flags passed to Neovim
 fsmode: confirm         # strict | confirm | free controls subdirectory enforcement
 pinned_file: ''         # Absolute path of the currently pinned note
 pinned_task_file: ''    # Absolute path of the currently pinned task note
+editor_template:
+  exec: ''              # Optional wrapper command (supports {cmd}, {args}, {file}, {vault}, {relative}, {filename})
+  args: []
+  wait: null            # Override whether the CLI should wait for the command to exit
+  silence: null         # Silence stdout/stderr when launching asynchronous editors
+hooks:
+  pre_open: []          # Commands run before opening a note (placeholders match the editor template)
+  post_open: []         # Commands run after the editor exits
+  post_create: []       # Commands run after a note is written to disk
 subdirs:
   - atoms               # Additional writing destinations inside the vault
 named_pins: {}
 named_task_pins: {}
 ```
+
+The `editor_template` block lets you wrap the built-in editor command with a custom launcher (for example, opening Neovim in a
+dedicated terminal tab or forwarding over SSH). Use `{cmd}` to reference the resolved editor binary and `{args}` to inject the
+default argument list, or substitute `{file}`, `{vault}`, `{relative}`, and `{filename}` directly. Automation hooks follow the
+same placeholder rules so you can trigger local sync jobs or backups before and after editing and immediately after creating a
+new note.
 
 During note creation you can target other subdirectories with `--subdir`, but ensure they exist (or add them with `an add-subdir`) when running in `strict` or `confirm` filesystem modes. Archival workflows expect `archive/` and `trash/` folders alongside your writing area so the TUI views and file handlers can move notes without prompting.
 
@@ -61,7 +76,7 @@ an new "first atomic note" "zettelkasten cli" --pin
 an notes --view default
 ```
 
-When the Bubble Tea interface opens you will see a scrollable list of notes, a preview pane, and an on-demand help panel. Use <kbd>↑</kbd>/<kbd>↓</kbd> or <kbd>j</kbd>/<kbd>k</kbd> to move, <kbd>enter</kbd> to open the highlighted note in your editor, <kbd>tab</kbd> to toggle focus between the list and detail panel, and <kbd>?</kbd>/<kbd>h</kbd> to expand the full key binding cheat sheet. Common actions include <kbd>c</kbd> to create a note, <kbd>r</kbd> to rename, <kbd>y</kbd> to copy, <kbd>v</kbd> to switch views, and number keys <kbd>1</kbd>–<kbd>5</kbd> to jump between default, orphan, unfulfilled, archive, and trash views respectively.
+When the Bubble Tea interface opens you will see a scrollable list of notes, a preview pane, and an on-demand help panel. Use <kbd>↑</kbd>/<kbd>↓</kbd> or <kbd>j</kbd>/<kbd>k</kbd> to move, <kbd>enter</kbd> to open the highlighted note in your editor, <kbd>tab</kbd> to toggle focus between the list and detail panel, and <kbd>?</kbd>/<kbd>h</kbd> to expand the full key binding cheat sheet. Common actions include <kbd>c</kbd> to create a note, <kbd>r</kbd> to rename, <kbd>y</kbd> to copy, <kbd>v</kbd> to switch views, and number keys <kbd>1</kbd>–<kbd>5</kbd> to jump between default, orphan, unfulfilled, archive, and trash views respectively. If you maintain multiple vaults, press <kbd>ctrl</kbd>+<kbd>w</kbd> to cycle through the configured workspaces; the active workspace is displayed alongside the view picker.
 
 ### Inline editing & captures
 

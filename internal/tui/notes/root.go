@@ -7,6 +7,8 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/internal/state"
 	journaltui "github.com/Paintersrp/an/internal/tui/journal"
 	taskstui "github.com/Paintersrp/an/internal/tui/tasks"
 )
@@ -31,6 +33,7 @@ type rootKeyMap struct {
 	notes   key.Binding
 	tasks   key.Binding
 	journal key.Binding
+	next    key.Binding
 }
 
 func newRootKeyMap() rootKeyMap {
@@ -46,6 +49,10 @@ func newRootKeyMap() rootKeyMap {
 		journal: key.NewBinding(
 			key.WithKeys("3"),
 			key.WithHelp("3", "journal"),
+		),
+		next: key.NewBinding(
+			key.WithKeys("ctrl+w"),
+			key.WithHelp("ctrl+w", "next workspace"),
 		),
 	}
 }
@@ -95,6 +102,11 @@ func (m *RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case key.Matches(msg, m.keys.journal):
 			m.active = viewJournal
+			return m, nil
+		case key.Matches(msg, m.keys.next):
+			if cmd := m.cycleWorkspace(); cmd != nil {
+				return m, cmd
+			}
 			return m, nil
 		}
 	}
@@ -150,11 +162,148 @@ func (m *RootModel) View() string {
 }
 
 func (m *RootModel) header() string {
-	sections := []string{"Views:"}
+	sections := []string{}
+	if name := m.workspaceName(); name != "" {
+		label := fmt.Sprintf("Workspace: [%s]", name)
+		if m.hasMultipleWorkspaces() {
+			label += " (ctrl+w to switch)"
+		}
+		sections = append(sections, label)
+	}
+	sections = append(sections, "Views:")
 	sections = append(sections, highlight(viewNotes, m.active, "1. Notes"))
 	sections = append(sections, highlight(viewTasks, m.active, "2. Tasks"))
 	sections = append(sections, highlight(viewJournal, m.active, "3. Journal"))
 	return strings.Join(sections, "  ")
+}
+
+func (m *RootModel) currentConfig() *config.Config {
+	if m.notes != nil && m.notes.state != nil {
+		return m.notes.state.Config
+	}
+	return nil
+}
+
+func (m *RootModel) workspaceName() string {
+	if cfg := m.currentConfig(); cfg != nil {
+		return cfg.CurrentWorkspace
+	}
+	return ""
+}
+
+func (m *RootModel) hasMultipleWorkspaces() bool {
+	if cfg := m.currentConfig(); cfg != nil {
+		return len(cfg.WorkspaceNames()) > 1
+	}
+	return false
+}
+
+func (m *RootModel) cycleWorkspace() tea.Cmd {
+	cfg := m.currentConfig()
+	if cfg == nil {
+		return nil
+	}
+
+	names := cfg.WorkspaceNames()
+	if len(names) == 0 {
+		return nil
+	}
+
+	current := cfg.CurrentWorkspace
+	idx := 0
+	for i, name := range names {
+		if name == current {
+			idx = i
+			break
+		}
+	}
+
+	next := names[(idx+1)%len(names)]
+	if next == "" || next == current {
+		if len(names) <= 1 {
+			m.notifyWorkspaceStatus("Only one workspace configured")
+		}
+		return nil
+	}
+
+	if err := cfg.SwitchWorkspace(next); err != nil {
+		m.notifyWorkspaceStatus(fmt.Sprintf("Workspace switch failed: %v", err))
+		return nil
+	}
+
+	if m.notes != nil {
+		_ = m.notes.closeWatcher()
+	}
+
+	newState, err := state.NewState(next)
+	if err != nil {
+		m.notifyWorkspaceStatus(fmt.Sprintf("Workspace switch failed: %v", err))
+		return nil
+	}
+
+	viewName := "default"
+	if m.notes != nil && m.notes.viewName != "" {
+		viewName = m.notes.viewName
+	}
+
+	newNotes, err := NewNoteListModel(newState, viewName)
+	if err != nil {
+		newNotes, err = NewNoteListModel(newState, "default")
+		if err != nil {
+			m.notifyWorkspaceStatus(fmt.Sprintf("Workspace switch failed: %v", err))
+			return nil
+		}
+	}
+
+	if m.notes != nil {
+		newNotes.width = m.notes.width
+		newNotes.height = m.notes.height
+		newNotes.showDetails = m.notes.showDetails
+	}
+
+	newTasks, err := taskstui.NewModel(newState)
+	if err != nil {
+		m.notifyWorkspaceStatus(fmt.Sprintf("Workspace switch failed: %v", err))
+		return nil
+	}
+
+	newJournal, err := journaltui.NewModel(newState)
+	if err != nil {
+		m.notifyWorkspaceStatus(fmt.Sprintf("Workspace switch failed: %v", err))
+		return nil
+	}
+
+	m.notes = newNotes
+	m.tasks = newTasks
+	m.journal = newJournal
+
+	cmds := []tea.Cmd{}
+	if cmd := m.notes.Init(); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+	if m.tasks != nil {
+		if cmd := m.tasks.Init(); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	}
+	if m.journal != nil {
+		if cmd := m.journal.Init(); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	}
+
+	m.notifyWorkspaceStatus(fmt.Sprintf("Switched to workspace %s", next))
+
+	if len(cmds) == 0 {
+		return nil
+	}
+	return tea.Batch(cmds...)
+}
+
+func (m *RootModel) notifyWorkspaceStatus(message string) {
+	if m.notes != nil {
+		m.notes.list.NewStatusMessage(statusStyle(message))
+	}
 }
 
 func highlight(view rootView, active rootView, label string) string {

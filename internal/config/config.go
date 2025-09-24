@@ -23,6 +23,19 @@ type SearchConfig struct {
 	DefaultMetadataFilters map[string][]string `yaml:"metadata_filters"        json:"metadata_filters"`
 }
 
+type CommandTemplate struct {
+	Exec    string   `yaml:"exec"    json:"exec"`
+	Args    []string `yaml:"args"    json:"args"`
+	Wait    *bool    `yaml:"wait"    json:"wait"`
+	Silence *bool    `yaml:"silence" json:"silence"`
+}
+
+type HookConfig struct {
+	PreOpen    []CommandTemplate `yaml:"pre_open"    json:"pre_open"`
+	PostOpen   []CommandTemplate `yaml:"post_open"   json:"post_open"`
+	PostCreate []CommandTemplate `yaml:"post_create" json:"post_create"`
+}
+
 type Workspace struct {
 	PinManager     *pin.PinManager           `yaml:"-"`
 	NamedPins      PinMap                    `yaml:"named_pins"       json:"named_pins"`
@@ -37,6 +50,8 @@ type Workspace struct {
 	Search         SearchConfig              `yaml:"search"           json:"search"`
 	Views          map[string]ViewDefinition `yaml:"views"           json:"views"`
 	ViewOrder      []string                  `yaml:"view_order"      json:"view_order"`
+	EditorTemplate CommandTemplate           `yaml:"editor_template" json:"editor_template"`
+	Hooks          HookConfig                `yaml:"hooks"           json:"hooks"`
 }
 
 type Config struct {
@@ -66,7 +81,7 @@ var ValidModes = map[string]bool{
 	"free":    true,
 }
 
-var validEditorNames = []string{"nvim", "obsidian", "vscode", "vim", "nano"}
+var validEditorNames = []string{"nvim", "obsidian", "vscode", "code", "vim", "nano", "custom"}
 
 var ValidEditors = func() map[string]bool {
 	editors := make(map[string]bool, len(validEditorNames))
@@ -305,6 +320,8 @@ func syncWorkspaceWithViper(ws *Workspace) {
 	viper.Set("fsmode", ws.FileSystemMode)
 	viper.Set("pinned_file", ws.PinnedFile)
 	viper.Set("pinned_task_file", ws.PinnedTaskFile)
+	viper.Set("editor_template", ws.EditorTemplate)
+	viper.Set("workspace_hooks", ws.Hooks)
 	if ws.SubDirs == nil {
 		viper.Set("subdirs", []string{})
 	} else {

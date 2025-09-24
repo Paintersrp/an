@@ -403,6 +403,12 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	if m.editor != nil {
+		if cmd := m.editor.area.Update(msg); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	}
+
 	previousSelection := m.currentSelectionPath()
 
 	nl, cmd := m.list.Update(msg)
@@ -584,6 +590,7 @@ func (m *NoteListModel) startScratchCapture() tea.Cmd {
 
 	session := newEditorSession(width, height)
 	session.setMetadata(path, filepath.Base(path), editorModeScratch)
+	session.setValue("")
 	session.setOriginal("", time.Time{})
 	session.status = "ctrl+s save • esc discard"
 
@@ -706,6 +713,11 @@ func (m *NoteListModel) saveScratchEditor(content string) tea.Cmd {
 	}
 
 	if err := m.state.Handler.WriteFile(path, []byte(content)); err != nil {
+		m.editor.status = fmt.Sprintf("Save failed: %v", err)
+		return nil
+	}
+
+	if err := note.RunPostCreateHooks(path); err != nil {
 		m.editor.status = fmt.Sprintf("Save failed: %v", err)
 		return nil
 	}
@@ -1171,18 +1183,29 @@ func (m *NoteListModel) openNote(obsidian bool) tea.Cmd {
 		m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Open Error: %v", err)))
 		return nil
 	}
+	if hookErr := note.RunPreOpenHooks(item.path); hookErr != nil {
+		m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Pre-open hook error: %v", hookErr)))
+		return nil
+	}
 	if !launch.Wait {
 		return func() tea.Msg {
 			startErr := launch.Cmd.Start()
 			if startErr != nil {
 				return editorFinishedMsg{path: item.path, err: startErr}
 			}
-
+			if err := note.RunPostOpenHooks(item.path); err != nil {
+				return editorFinishedMsg{path: item.path, err: err, waited: false}
+			}
 			return editorFinishedMsg{path: item.path, waited: false}
 		}
 	}
 
 	return tea.ExecProcess(launch.Cmd, func(execErr error) tea.Msg {
+		if execErr == nil {
+			if err := note.RunPostOpenHooks(item.path); err != nil {
+				return editorFinishedMsg{path: item.path, err: err, waited: true}
+			}
+		}
 		return editorFinishedMsg{path: item.path, err: execErr, waited: true}
 	})
 }

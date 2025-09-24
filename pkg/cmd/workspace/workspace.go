@@ -149,10 +149,43 @@ func cloneWorkspaceSettings(src *config.Workspace) *config.Workspace {
 		Search:         src.Search,
 		Views:          maps.Clone(src.Views),
 		ViewOrder:      append([]string(nil), src.ViewOrder...),
+		EditorTemplate: cloneCommandTemplate(src.EditorTemplate),
+		Hooks: config.HookConfig{
+			PreOpen:    cloneHookCommands(src.Hooks.PreOpen),
+			PostOpen:   cloneHookCommands(src.Hooks.PostOpen),
+			PostCreate: cloneHookCommands(src.Hooks.PostCreate),
+		},
 	}
 	clone.Search.DefaultMetadataFilters = map[string][]string{}
 	for key, values := range src.Search.DefaultMetadataFilters {
 		clone.Search.DefaultMetadataFilters[key] = append([]string(nil), values...)
 	}
 	return clone
+}
+
+func cloneCommandTemplate(src config.CommandTemplate) config.CommandTemplate {
+	clone := config.CommandTemplate{
+		Exec: src.Exec,
+		Args: append([]string(nil), src.Args...),
+	}
+	if src.Wait != nil {
+		wait := *src.Wait
+		clone.Wait = &wait
+	}
+	if src.Silence != nil {
+		silence := *src.Silence
+		clone.Silence = &silence
+	}
+	return clone
+}
+
+func cloneHookCommands(src []config.CommandTemplate) []config.CommandTemplate {
+	if len(src) == 0 {
+		return nil
+	}
+	out := make([]config.CommandTemplate, 0, len(src))
+	for _, template := range src {
+		out = append(out, cloneCommandTemplate(template))
+	}
+	return out
 }
