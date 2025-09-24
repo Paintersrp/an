@@ -44,6 +44,22 @@ This document captures medium-term feature expansions for the Atomic Notes CLI a
 - [ ] Create a Bubble Tea agenda view with filtering (today, upcoming, overdue) and quick actions (mark done, open note).
 - [ ] Add integration tests covering task parsing and agenda rendering to protect against regressions.
 
+## 4. Accelerate contextual review experiences
+
+**Vision.** Help users revisit the right knowledge at the right moment by pairing the existing search and templating engines with intelligent resurfacing queues and guided rituals. Review mode should feel purposeful, not like paging through static note lists.
+
+**Why now.** The TUI already supports inline editing, quick capture, and flexible view switching, but review sessions still demand manual navigation. We can unlock more value from the current search index (`internal/search`) and template engine (`pkg/templates`) by repurposing them for scheduled check-ins and contextual discovery.
+
+**Risks & dependencies.** Resurfacing logic depends on accurate timestamps and index freshness, so we need to avoid expensive rebuilds during reviews. Visualization panels add rendering complexity to the Bubble Tea layout, and guided flows must stay responsive even as they orchestrate templates, search filters, and task state.
+
+**Tasks.**
+- [ ] Ship a `ReviewQueue` builder that layers modification timestamps onto existing search filters so users can resurface notes last touched N days ago or during specific projects.
+- [ ] Persist queue snapshots in the search index to avoid redundant scans and add unit tests that confirm deterministic ordering and correct handling of missing metadata.
+- [ ] Add a Bubble Tea visualization panel that renders a backlinks graph using the indexed link data, including hoverable counts and quick navigation actions for linked notes.
+- [ ] Expose the graph panel as an optional split view within review mode and ensure layout performance stays responsive on large vaults.
+- [ ] Implement guided review flows that step through template-backed checklists (daily, weekly, project retro) and surface contextual quick actions powered by search results.
+- [ ] Document how to customize checklist templates and queue presets so review rituals remain repeatable for different teams.
+
 ## Operating cadence
 
 To make steady progress, tackle one feature area per iteration, moving a single checkboxed task into "in progress" at a time. After each task lands, revisit the vision statement to ensure the implementation still supports the overarching goal before proceeding to the next task.
