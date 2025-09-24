@@ -46,8 +46,6 @@ type NoteListModel struct {
 	inputModel          submodels.InputModel
 	width               int
 	height              int
-	listWidth           int
-	previewWidth        int
 	renaming            bool
 	showDetails         bool
 	creating            bool
@@ -509,22 +507,7 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		h, v := appStyle.GetFrameSize()
-		contentWidth := msg.Width - h
-		if contentWidth < 0 {
-			contentWidth = 0
-		}
-		contentHeight := msg.Height - v
-		if contentHeight < 0 {
-			contentHeight = 0
-		}
-		listWidth := contentWidth / 2
-		if listWidth <= 0 && contentWidth > 0 {
-			listWidth = contentWidth
-		}
-		previewWidth := contentWidth - listWidth
-		m.listWidth = listWidth
-		m.previewWidth = previewWidth
-		m.list.SetSize(listWidth, contentHeight)
+		m.list.SetSize(msg.Width-h, msg.Height-v)
 
 		if m.editor != nil {
 			width, height := m.editorSize()
@@ -608,13 +591,13 @@ func (m NoteListModel) currentSelectionPath() string {
 }
 
 func (m *NoteListModel) ensureSelectionInBounds() {
-	visible := m.list.VisibleItems()
-	if len(visible) == 0 {
+	items := m.list.Items()
+	if len(items) == 0 {
 		m.list.ResetSelected()
 		return
 	}
 
-	if idx := m.list.Index(); idx >= len(visible) {
+	if idx := m.list.Index(); idx >= len(items) {
 		m.list.ResetSelected()
 	}
 }
@@ -1158,15 +1141,7 @@ func (m NoteListModel) View() string {
 		return appStyle.Render(layout)
 	}
 
-	listWidth := m.listPaneWidth()
-	listHeight := m.contentHeight()
-	listBox := lipgloss.NewStyle().
-		Width(listWidth).
-		Height(listHeight).
-		Render(m.list.View())
-	list := listStyle.
-		Width(listWidth).
-		Render(listBox)
+	list := listStyle.MaxWidth(m.width / 2).Render(m.list.View())
 
 	if m.copying {
 		textPrompt := textPromptStyle.Render(
@@ -1201,14 +1176,12 @@ func (m NoteListModel) View() string {
 		return appStyle.Render(layout)
 	}
 
-	previewWidth := m.previewPaneWidth()
-	previewBox := lipgloss.NewStyle().
-		Width(previewWidth).
-		Height(m.contentHeight()).
-		Render(fmt.Sprintf("%s\n%s", titleStyle.Render("Preview"), m.preview))
-	preview := previewStyle.
-		Width(previewWidth).
-		Render(previewBox)
+	preview := previewStyle.Render(
+		lipgloss.NewStyle().
+			Height(m.list.Height()).
+			MaxHeight(m.list.Height()).
+			Render(fmt.Sprintf("%s\n%s", titleStyle.Render("Preview"), m.preview)),
+	)
 
 	layout := lipgloss.JoinHorizontal(lipgloss.Top, list, preview)
 	return appStyle.Render(layout)
@@ -1278,14 +1251,8 @@ func (m *NoteListModel) handlePreview(force bool) tea.Cmd {
 
 	cache := m.cache
 	if cache == nil {
-		width := m.previewPaneWidth()
-		height := m.contentHeight()
-		if width <= 0 {
-			width = m.width / 2
-		}
-		if height <= 0 {
-			height = m.list.Height()
-		}
+		width := m.width / 2
+		height := m.list.Height()
 		return renderPreviewCmd(selectedPath, width, height, nil)
 	}
 
@@ -1306,14 +1273,8 @@ func (m *NoteListModel) handlePreview(force bool) tea.Cmd {
 		}
 	}
 
-	width := m.previewPaneWidth()
-	if width <= 0 {
-		width = m.width / 2
-	}
-	height := m.contentHeight()
-	if height <= 0 {
-		height = m.list.Height()
-	}
+	width := m.width / 2
+	height := m.list.Height()
 
 	return renderPreviewCmd(selectedPath, width, height, cache)
 }
@@ -1430,60 +1391,6 @@ func (m *NoteListModel) afterExternalEditor() tea.Cmd {
 	}
 
 	return nil
-}
-
-func (m *NoteListModel) contentHeight() int {
-	if h := m.list.Height(); h > 0 {
-		return h
-	}
-	if m.height > 0 {
-		_, v := appStyle.GetFrameSize()
-		content := m.height - v
-		if content < 0 {
-			return 0
-		}
-		return content
-	}
-	return 0
-}
-
-func (m *NoteListModel) listPaneWidth() int {
-	if m.listWidth > 0 {
-		return m.listWidth
-	}
-	if m.width > 0 {
-		h, _ := appStyle.GetFrameSize()
-		content := m.width - h
-		if content < 0 {
-			content = 0
-		}
-		width := content / 2
-		if width <= 0 && content > 0 {
-			width = content
-		}
-		return width
-	}
-	return 0
-}
-
-func (m *NoteListModel) previewPaneWidth() int {
-	if m.previewWidth > 0 {
-		return m.previewWidth
-	}
-	content := 0
-	if m.width > 0 {
-		h, _ := appStyle.GetFrameSize()
-		content = m.width - h
-		if content < 0 {
-			content = 0
-		}
-	}
-	listWidth := m.listPaneWidth()
-	previewWidth := content - listWidth
-	if previewWidth <= 0 && content > 0 {
-		previewWidth = listWidth
-	}
-	return previewWidth
 }
 
 func (m *NoteListModel) toggleTitleBar() {
