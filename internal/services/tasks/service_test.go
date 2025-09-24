@@ -15,7 +15,7 @@ func TestServiceListIncludesPathAndStatus(t *testing.T) {
 		t.Fatalf("failed to create directory: %v", err)
 	}
 
-	content := "- [ ] first task\n- [x] done task\n"
+	content := "- [ ] first task @due(2024-01-10) @owner(Alice)\n- [x] done task @priority(low)\n"
 	if err := os.WriteFile(file, []byte(content), 0o644); err != nil {
 		t.Fatalf("failed to write file: %v", err)
 	}
@@ -36,6 +36,15 @@ func TestServiceListIncludesPathAndStatus(t *testing.T) {
 
 	if tasks[1].Completed != true {
 		t.Fatalf("expected completed task to be marked complete")
+	}
+	if tasks[0].Due == nil {
+		t.Fatalf("expected due date metadata to be carried to service item")
+	}
+	if tasks[0].Owner != "Alice" {
+		t.Fatalf("expected owner metadata to be carried to service item, got %q", tasks[0].Owner)
+	}
+	if tasks[1].Priority != "low" {
+		t.Fatalf("expected priority metadata to be carried to service item, got %q", tasks[1].Priority)
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
@@ -13,11 +14,22 @@ import (
 )
 
 type Task struct {
-	Status  string
-	Content string
-	ID      int
-	Path    string
-	Line    int
+	Status   string
+	Content  string
+	ID       int
+	Path     string
+	Line     int
+	Metadata TaskMetadata
+}
+
+type TaskMetadata struct {
+	DueDate       *time.Time
+	ScheduledDate *time.Time
+	Priority      string
+	Owner         string
+	Project       string
+	References    []string
+	RawTokens     map[string]string
 }
 
 type TaskHandler struct {
@@ -39,17 +51,30 @@ func (th *TaskHandler) ParseTask(content, path string, line int) {
 		if strings.HasPrefix(content, "[x]") {
 			status = "checked"
 		}
-		th.AddTask(status, strings.TrimSpace(content[3:]), path, line)
+
+		body := strings.TrimSpace(content[3:])
+		cleaned, metadata := ExtractTaskMetadata(body)
+		if cleaned == "" {
+			return
+		}
+
+		lowered := strings.ToLower(cleaned)
+		if strings.HasPrefix(lowered, "tags:") {
+			return
+		}
+
+		th.AddTask(status, cleaned, path, line, metadata)
 	}
 }
 
-func (th *TaskHandler) AddTask(status, content, path string, line int) {
+func (th *TaskHandler) AddTask(status, content, path string, line int, metadata TaskMetadata) {
 	th.Tasks[th.NextID] = Task{
-		ID:      th.NextID,
-		Status:  status,
-		Content: content,
-		Path:    path,
-		Line:    line,
+		ID:       th.NextID,
+		Status:   status,
+		Content:  content,
+		Path:     path,
+		Line:     line,
+		Metadata: metadata,
 	}
 	th.NextID++
 }
@@ -132,12 +157,33 @@ func (th *TaskHandler) PrintTasks(sortType, sortOrder string) {
 
 func (th *TaskHandler) printTasks(tasks []Task) {
 	for _, task := range tasks {
-		fmt.Printf(
-			"ID: %d, Status: %s, Content: %s\n",
-			task.ID,
-			task.Status,
-			task.Content,
-		)
+		meta := task.Metadata
+		var details []string
+		if meta.DueDate != nil {
+			details = append(details, fmt.Sprintf("due %s", meta.DueDate.Format("2006-01-02")))
+		}
+		if meta.ScheduledDate != nil {
+			details = append(details, fmt.Sprintf("scheduled %s", meta.ScheduledDate.Format("2006-01-02")))
+		}
+		if meta.Priority != "" {
+			details = append(details, fmt.Sprintf("priority %s", meta.Priority))
+		}
+		if meta.Owner != "" {
+			details = append(details, fmt.Sprintf("owner %s", meta.Owner))
+		}
+		if meta.Project != "" {
+			details = append(details, fmt.Sprintf("project %s", meta.Project))
+		}
+
+		line := fmt.Sprintf("ID: %d, Status: %s, Content: %s", task.ID, task.Status, task.Content)
+		if len(details) > 0 {
+			line = fmt.Sprintf("%s (%s)", line, strings.Join(details, ", "))
+		}
+		fmt.Println(line)
+
+		if len(meta.References) > 0 {
+			fmt.Printf("  refs: %s\n", strings.Join(meta.References, ", "))
+		}
 	}
 }
 
@@ -145,16 +191,28 @@ func (th *TaskHandler) setupTasksTable() table.Model {
 	columns := []table.Column{
 		{Title: "ID", Width: 4},
 		{Title: "Status", Width: 10},
-		{Title: "Content", Width: 100},
+		{Title: "Content", Width: 60},
+		{Title: "Due", Width: 12},
+		{Title: "Owner", Width: 18},
+		{Title: "Priority", Width: 10},
+		{Title: "Project", Width: 18},
 	}
 
 	var rows []table.Row
 	sorted := th.SortTasksByID("asc")
 	for _, task := range sorted {
+		due := ""
+		if task.Metadata.DueDate != nil {
+			due = task.Metadata.DueDate.Format("2006-01-02")
+		}
 		rows = append(rows, []string{
 			fmt.Sprintf("%d", task.ID),
 			task.Status,
 			task.Content,
+			due,
+			task.Metadata.Owner,
+			task.Metadata.Priority,
+			task.Metadata.Project,
 		})
 	}
 

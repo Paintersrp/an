@@ -10,9 +10,9 @@ func TestParserWalkExtractsTasksAndTags(t *testing.T) {
 	dir := t.TempDir()
 	notePath := filepath.Join(dir, "note.md")
 	content := `# Title
-- [ ] first task
-- [x] completed task
-- [ ]    
+- [ ] first task @due(2024-05-20) @owner(Alice) [[Project Hub]]
+- [x] completed task @priority(high)
+- [ ]
 tags:
 - project/foo
 - project/foo
@@ -40,11 +40,23 @@ tags:
 				t.Fatalf("expected first task to be unchecked, got %q", task.Status)
 			}
 			foundUnchecked = true
+			if task.Metadata.Owner != "Alice" {
+				t.Fatalf("expected owner metadata to be Alice, got %q", task.Metadata.Owner)
+			}
+			if task.Metadata.DueDate == nil {
+				t.Fatalf("expected due date metadata to be captured")
+			}
+			if len(task.Metadata.References) != 1 || task.Metadata.References[0] != "Project Hub" {
+				t.Fatalf("expected backlink metadata to be captured, got %#v", task.Metadata.References)
+			}
 		case "completed task":
 			if task.Status != "checked" {
 				t.Fatalf("expected completed task to be checked, got %q", task.Status)
 			}
 			foundChecked = true
+			if task.Metadata.Priority != "high" {
+				t.Fatalf("expected completed task priority metadata, got %#v", task.Metadata)
+			}
 		}
 	}
 
