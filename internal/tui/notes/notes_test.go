@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/list"
+	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/internal/handler"
@@ -109,13 +110,78 @@ func TestRefreshItemsClampsSelectionWhenListShrinks(t *testing.T) {
 		t.Fatalf("expected refreshItems command to be nil, got %T", cmd)
 	}
 
-	items := model.list.Items()
-	if idx := model.list.Index(); idx < 0 || idx >= len(items) {
-		t.Fatalf("expected selection to be within bounds, got index %d with %d items", idx, len(items))
+	visible := model.list.VisibleItems()
+	if idx := model.list.Index(); idx < 0 || idx >= len(visible) {
+		t.Fatalf("expected selection to be within bounds, got index %d with %d visible items", idx, len(visible))
 	}
 
 	if _, ok := model.list.SelectedItem().(ListItem); !ok {
 		t.Fatalf("expected a selected item after refreshing list")
+	}
+}
+
+func TestWindowSizeSplitsPaneDimensions(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	fileHandler := handler.NewFileHandler(tempDir)
+	ws := &config.Workspace{VaultDir: tempDir}
+	cfg := &config.Config{
+		Workspaces:       map[string]*config.Workspace{"default": ws},
+		CurrentWorkspace: "default",
+	}
+	if err := cfg.ActivateWorkspace("default"); err != nil {
+		t.Fatalf("failed to activate workspace: %v", err)
+	}
+
+	viewManager, err := views.NewViewManager(fileHandler, cfg)
+	if err != nil {
+		t.Fatalf("NewViewManager returned error: %v", err)
+	}
+
+	model, err := NewNoteListModel(&state.State{
+		Config:        cfg,
+		Workspace:     ws,
+		WorkspaceName: cfg.CurrentWorkspace,
+		Handler:       fileHandler,
+		ViewManager:   viewManager,
+		Vault:         tempDir,
+	}, "default")
+	if err != nil {
+		t.Fatalf("NewNoteListModel returned error: %v", err)
+	}
+
+	const (
+		windowWidth  = 120
+		windowHeight = 40
+	)
+
+	teaModel, _ := model.Update(tea.WindowSizeMsg{Width: windowWidth, Height: windowHeight})
+	model = adoptNoteModel(teaModel, model)
+
+	hFrame, vFrame := appStyle.GetFrameSize()
+	contentWidth := windowWidth - hFrame
+	if contentWidth < 0 {
+		contentWidth = 0
+	}
+	expectedListWidth := contentWidth / 2
+	if expectedListWidth <= 0 && contentWidth > 0 {
+		expectedListWidth = contentWidth
+	}
+	expectedPreviewWidth := contentWidth - expectedListWidth
+	contentHeight := windowHeight - vFrame
+	if contentHeight < 0 {
+		contentHeight = 0
+	}
+
+	if got := model.listWidth; got != expectedListWidth {
+		t.Fatalf("listWidth = %d, want %d", got, expectedListWidth)
+	}
+	if got := model.previewWidth; got != expectedPreviewWidth {
+		t.Fatalf("previewWidth = %d, want %d", got, expectedPreviewWidth)
+	}
+	if got := model.list.Height(); got != contentHeight {
+		t.Fatalf("list height = %d, want %d", got, contentHeight)
 	}
 }
 
