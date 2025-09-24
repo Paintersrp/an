@@ -3,7 +3,9 @@ package notes
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/charmbracelet/bubbles/list"
 
@@ -114,6 +116,162 @@ func TestRefreshItemsClampsSelectionWhenListShrinks(t *testing.T) {
 
 	if _, ok := model.list.SelectedItem().(ListItem); !ok {
 		t.Fatalf("expected a selected item after refreshing list")
+	}
+}
+
+func TestSearchFilterIncludesBodyMatches(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	matchingBody := []byte("---\ntitle: Body Note\n---\nthis searchterm appears in the body\n")
+	nonMatching := []byte("---\ntitle: Plain Note\n---\njust other content\n")
+
+	bodyPath := filepath.Join(tempDir, "body.md")
+	otherPath := filepath.Join(tempDir, "other.md")
+	if err := os.WriteFile(bodyPath, matchingBody, 0o644); err != nil {
+		t.Fatalf("failed to write body note: %v", err)
+	}
+	if err := os.WriteFile(otherPath, nonMatching, 0o644); err != nil {
+		t.Fatalf("failed to write other note: %v", err)
+	}
+
+	fileHandler := handler.NewFileHandler(tempDir)
+	ws := &config.Workspace{VaultDir: tempDir, Search: config.SearchConfig{EnableBody: true}}
+	cfg := &config.Config{
+		Workspaces:       map[string]*config.Workspace{"default": ws},
+		CurrentWorkspace: "default",
+	}
+	if err := cfg.ActivateWorkspace("default"); err != nil {
+		t.Fatalf("failed to activate workspace: %v", err)
+	}
+
+	viewManager, err := views.NewViewManager(fileHandler, cfg)
+	if err != nil {
+		t.Fatalf("NewViewManager returned error: %v", err)
+	}
+
+	model, err := NewNoteListModel(&state.State{
+		Config:        cfg,
+		Workspace:     ws,
+		WorkspaceName: cfg.CurrentWorkspace,
+		Handler:       fileHandler,
+		ViewManager:   viewManager,
+		Vault:         tempDir,
+	}, "default")
+	if err != nil {
+		t.Fatalf("NewNoteListModel returned error: %v", err)
+	}
+
+	items := model.list.Items()
+	targets := make([]string, len(items))
+	for i, item := range items {
+		targets[i] = item.FilterValue()
+	}
+
+	ranks := model.makeFilterFunc()("searchterm", targets)
+	if len(ranks) == 0 {
+		t.Fatalf("expected at least one rank for body search")
+	}
+
+	found := false
+	for _, rank := range ranks {
+		item, ok := items[rank.Index].(ListItem)
+		if !ok {
+			t.Fatalf("expected ListItem at index %d", rank.Index)
+		}
+		if item.path == bodyPath {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Fatalf("expected body note to be included in search results")
+	}
+
+	if res, ok := model.highlights.lookup(bodyPath); !ok {
+		t.Fatalf("expected highlight entry for body note")
+	} else if res.Snippet == "" {
+		t.Fatalf("expected highlight snippet for body match")
+	}
+
+	bodyItem := items[ranks[0].Index].(ListItem)
+	if desc := bodyItem.Description(); !strings.Contains(desc, "searchterm") {
+		t.Fatalf("expected description to include snippet, got %q", desc)
+	}
+}
+
+func TestSearchFilterPrefersSearchRankOrder(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	titleMatch := []byte("---\ntitle: Searchterm Heading\n---\ncontent without repeated term\n")
+	bodyMatch := []byte("---\ntitle: Fresh Body\n---\nsearchterm appears multiple times: searchterm searchterm\n")
+
+	titlePath := filepath.Join(tempDir, "title.md")
+	bodyPath := filepath.Join(tempDir, "body.md")
+	if err := os.WriteFile(titlePath, titleMatch, 0o644); err != nil {
+		t.Fatalf("failed to write title note: %v", err)
+	}
+	if err := os.WriteFile(bodyPath, bodyMatch, 0o644); err != nil {
+		t.Fatalf("failed to write body note: %v", err)
+	}
+
+	stale := time.Now().Add(-48 * time.Hour)
+	fresh := time.Now()
+	if err := os.Chtimes(titlePath, stale, stale); err != nil {
+		t.Fatalf("failed to age title note: %v", err)
+	}
+	if err := os.Chtimes(bodyPath, fresh, fresh); err != nil {
+		t.Fatalf("failed to refresh body note time: %v", err)
+	}
+
+	fileHandler := handler.NewFileHandler(tempDir)
+	ws := &config.Workspace{VaultDir: tempDir, Search: config.SearchConfig{EnableBody: true}}
+	cfg := &config.Config{
+		Workspaces:       map[string]*config.Workspace{"default": ws},
+		CurrentWorkspace: "default",
+	}
+	if err := cfg.ActivateWorkspace("default"); err != nil {
+		t.Fatalf("failed to activate workspace: %v", err)
+	}
+
+	viewManager, err := views.NewViewManager(fileHandler, cfg)
+	if err != nil {
+		t.Fatalf("NewViewManager returned error: %v", err)
+	}
+
+	model, err := NewNoteListModel(&state.State{
+		Config:        cfg,
+		Workspace:     ws,
+		WorkspaceName: cfg.CurrentWorkspace,
+		Handler:       fileHandler,
+		ViewManager:   viewManager,
+		Vault:         tempDir,
+	}, "default")
+	if err != nil {
+		t.Fatalf("NewNoteListModel returned error: %v", err)
+	}
+
+	items := model.list.Items()
+	targets := make([]string, len(items))
+	for i, item := range items {
+		targets[i] = item.FilterValue()
+	}
+
+	ranks := model.makeFilterFunc()("searchterm", targets)
+	if len(ranks) < 2 {
+		t.Fatalf("expected both notes to appear in results, got %d", len(ranks))
+	}
+
+	first := items[ranks[0].Index].(ListItem)
+	second := items[ranks[1].Index].(ListItem)
+
+	if first.path != bodyPath {
+		t.Fatalf("expected body match to rank first, got %s", first.path)
+	}
+	if second.path != titlePath {
+		t.Fatalf("expected title match second, got %s", second.path)
 	}
 }
 

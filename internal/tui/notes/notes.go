@@ -317,6 +317,10 @@ func (m *NoteListModel) makeFilterFunc() list.FilterFunc {
 		}
 
 		baseRanks := base(term, targets)
+		matchedIndexes := make(map[int][]int, len(baseRanks))
+		for _, rank := range baseRanks {
+			matchedIndexes[rank.Index] = rank.MatchedIndexes
+		}
 
 		if m.searchIndex == nil {
 			return baseRanks
@@ -355,16 +359,36 @@ func (m *NoteListModel) makeFilterFunc() list.FilterFunc {
 			}
 		}
 
-		highlightRanks := make([]list.Rank, 0, len(orderedPaths))
+		searchRanks := make([]list.Rank, 0, len(orderedPaths))
 		for _, path := range orderedPaths {
 			if idx, ok := indexByPath[path]; ok {
-				highlightRanks = append(highlightRanks, list.Rank{Index: idx})
+				rank := list.Rank{Index: idx}
+				if matches, ok := matchedIndexes[idx]; ok {
+					rank.MatchedIndexes = matches
+				}
+				searchRanks = append(searchRanks, rank)
 			}
 		}
 
 		if trimmed == "" &&
 			(len(m.searchQuery.Tags) > 0 || len(m.searchQuery.Metadata) > 0) {
-			return highlightRanks
+			return searchRanks
+		}
+
+		if trimmed != "" && len(searchRanks) > 0 {
+			ordered := make([]list.Rank, 0, len(searchRanks)+len(baseRanks))
+			seen := make(map[int]struct{}, len(searchRanks))
+			for _, rank := range searchRanks {
+				ordered = append(ordered, rank)
+				seen[rank.Index] = struct{}{}
+			}
+			for _, rank := range baseRanks {
+				if _, ok := seen[rank.Index]; ok {
+					continue
+				}
+				ordered = append(ordered, rank)
+			}
+			return ordered
 		}
 
 		existing := make(map[int]struct{}, len(baseRanks))
@@ -372,7 +396,7 @@ func (m *NoteListModel) makeFilterFunc() list.FilterFunc {
 			existing[rank.Index] = struct{}{}
 		}
 
-		for _, rank := range highlightRanks {
+		for _, rank := range searchRanks {
 			if _, ok := existing[rank.Index]; !ok {
 				baseRanks = append(baseRanks, rank)
 			}
