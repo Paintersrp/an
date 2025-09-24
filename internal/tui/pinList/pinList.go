@@ -344,10 +344,11 @@ func (m *PinListModel) openNote() bool {
 		return false
 	}
 
+	tea.ExitAltScreen()
+
 	err := note.OpenFromPath(p, false)
 	if err != nil {
 		m.list.NewStatusMessage(statusMessageStyle(fmt.Sprintf("Open Error: %s", err)))
-		return false
 	}
 
 	return true

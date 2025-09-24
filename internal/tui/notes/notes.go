@@ -1124,10 +1124,11 @@ func (m *NoteListModel) openNote(obsidian bool) bool {
 		return false
 	}
 
+	tea.ExitAltScreen()
+
 	err := note.OpenFromPath(p, obsidian)
 	if err != nil {
 		m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Open Error: %s", err)))
-		return false
 	}
 
 	return true
