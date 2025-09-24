@@ -195,7 +195,8 @@ func (m *NoteListModel) makeFilterFunc() list.FilterFunc {
 			return baseRanks
 		}
 
-		needsSearch := trimmed != "" || len(m.searchQuery.Tags) > 0 || len(m.searchQuery.Metadata) > 0
+		needsSearch := trimmed != "" || len(m.searchQuery.Tags) > 0 ||
+			len(m.searchQuery.Metadata) > 0
 		if !needsSearch {
 			return baseRanks
 		}
@@ -234,7 +235,8 @@ func (m *NoteListModel) makeFilterFunc() list.FilterFunc {
 			}
 		}
 
-		if trimmed == "" && (len(m.searchQuery.Tags) > 0 || len(m.searchQuery.Metadata) > 0) {
+		if trimmed == "" &&
+			(len(m.searchQuery.Tags) > 0 || len(m.searchQuery.Metadata) > 0) {
 			return highlightRanks
 		}
 
@@ -699,7 +701,9 @@ func (m *NoteListModel) saveScratchEditor(content string) tea.Cmd {
 		return nil
 	}
 
-	m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Captured note %s", filepath.Base(path))))
+	m.list.NewStatusMessage(
+		statusStyle(fmt.Sprintf("Captured note %s", filepath.Base(path))),
+	)
 
 	cmdBlur := m.closeEditor()
 	cmds := []tea.Cmd{}
@@ -1095,7 +1099,11 @@ func renderPreviewCmd(path string, width, height int, cache *cache.Cache) tea.Cm
 }
 
 func (m *NoteListModel) refresh() tea.Cmd {
-	m.list.Title = v.GetTitleForView(m.viewName, viewSortField(m.sortField), viewSortOrder(m.sortOrder))
+	m.list.Title = v.GetTitleForView(
+		m.viewName,
+		viewSortField(m.sortField),
+		viewSortOrder(m.sortOrder),
+	)
 	m.refreshDelegate()
 	cmd := m.refreshItems()
 	m.list.ResetSelected()
@@ -1124,7 +1132,11 @@ func (m *NoteListModel) refreshDelegate() {
 }
 
 func (m *NoteListModel) refreshSort() tea.Cmd {
-	m.list.Title = v.GetTitleForView(m.viewName, viewSortField(m.sortField), viewSortOrder(m.sortOrder))
+	m.list.Title = v.GetTitleForView(
+		m.viewName,
+		viewSortField(m.sortField),
+		viewSortOrder(m.sortOrder),
+	)
 	items := castToListItems(m.list.Items())
 	sortedItems := sortItems(items, m.sortField, m.sortOrder)
 	m.list.ResetSelected()
@@ -1168,16 +1180,6 @@ func (m *NoteListModel) afterExternalEditor() tea.Cmd {
 	}
 
 	return nil
-}
-
-func (m *NoteListModel) afterExternalEditor() tea.Cmd {
-	cmds := []tea.Cmd{tea.EnterAltScreen, tea.ClearScreen}
-
-	if cmd := m.handlePreview(true); cmd != nil {
-		cmds = append(cmds, cmd)
-	}
-
-	return tea.Batch(cmds...)
 }
 
 func (m *NoteListModel) toggleTitleBar() {
