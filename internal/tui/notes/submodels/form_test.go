@@ -39,7 +39,7 @@ func TestHandleSubmitUsesDefaultTemplateWhenEmpty(t *testing.T) {
 
 	var capturedTemplate string
 	originalLauncher := noteLauncher
-	noteLauncher = func(_ *note.ZettelkastenNote, _ *templater.Templater, tmpl string, _ string) {
+	noteLauncher = func(_ *note.ZettelkastenNote, _ *templater.Templater, tmpl string, _ string, _ map[string]interface{}) {
 		capturedTemplate = tmpl
 	}
 	defer func() {
@@ -97,7 +97,7 @@ func TestHandleSubmitAllowsEmptySubdirectory(t *testing.T) {
 
 	var capturedNote *note.ZettelkastenNote
 	originalLauncher := noteLauncher
-	noteLauncher = func(n *note.ZettelkastenNote, _ *templater.Templater, _ string, _ string) {
+	noteLauncher = func(n *note.ZettelkastenNote, _ *templater.Templater, _ string, _ string, _ map[string]interface{}) {
 		capturedNote = n
 	}
 	defer func() {
@@ -162,7 +162,7 @@ func TestHandleSubmitAllowsLongTitle(t *testing.T) {
 	var capturedNote *note.ZettelkastenNote
 	var capturedTemplate string
 	originalLauncher := noteLauncher
-	noteLauncher = func(n *note.ZettelkastenNote, _ *templater.Templater, tmpl string, _ string) {
+	noteLauncher = func(n *note.ZettelkastenNote, _ *templater.Templater, tmpl string, _ string, _ map[string]interface{}) {
 		capturedNote = n
 		capturedTemplate = tmpl
 	}
@@ -235,7 +235,7 @@ func TestHandleSubmitAllowsNestedSubdirectory(t *testing.T) {
 
 	var capturedNote *note.ZettelkastenNote
 	originalLauncher := noteLauncher
-	noteLauncher = func(n *note.ZettelkastenNote, _ *templater.Templater, _ string, _ string) {
+	noteLauncher = func(n *note.ZettelkastenNote, _ *templater.Templater, _ string, _ string, _ map[string]interface{}) {
 		capturedNote = n
 	}
 	defer func() {

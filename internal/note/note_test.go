@@ -20,7 +20,7 @@ func TestCreateCleansUpOnTemplateError(t *testing.T) {
 		t.Fatalf("failed to create templater: %v", err)
 	}
 
-	created, err := note.Create("nonexistent-template", tmpl, "")
+	created, err := note.Create("nonexistent-template", tmpl, "", nil)
 	if err == nil {
 		t.Fatalf("expected template execution error, got nil")
 	}

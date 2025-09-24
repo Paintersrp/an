@@ -2,6 +2,7 @@
 package note
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/spf13/viper"
+	"golang.org/x/term"
 
 	"github.com/Paintersrp/an/internal/pathutil"
 	"github.com/Paintersrp/an/internal/templater"
@@ -86,6 +88,7 @@ func (note *ZettelkastenNote) Create(
 	tmplName string,
 	t *templater.Templater,
 	content string,
+	metadata map[string]interface{},
 ) (bool, error) {
 	path, err := note.EnsurePath()
 	if err != nil {
@@ -119,6 +122,7 @@ func (note *ZettelkastenNote) Create(
 		Upstream:  note.Upstream,
 		Content:   content,
 		Fulfilled: false,
+		Metadata:  metadata,
 	}
 
 	output, err := t.Execute(tmplName, data)
@@ -232,8 +236,18 @@ func StaticHandleNoteLaunch(
 	note *ZettelkastenNote,
 	t *templater.Templater,
 	tmpl, content string,
+	metadata map[string]interface{},
 ) {
-	created, err := note.Create(tmpl, t, content)
+	if metadata == nil {
+		var err error
+		metadata, err = CollectTemplateMetadata(t, tmpl)
+		if err != nil {
+			fmt.Printf("error collecting template metadata: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	created, err := note.Create(tmpl, t, content, metadata)
 	if err != nil {
 		fmt.Printf("error creating note file: %v\n", err)
 		os.Exit(1)
@@ -245,6 +259,176 @@ func StaticHandleNoteLaunch(
 			os.Exit(1)
 		}
 	}
+}
+
+func CollectTemplateMetadata(t *templater.Templater, templateName string) (map[string]interface{}, error) {
+	manifest, err := t.Manifest(templateName)
+	if err != nil {
+		return nil, err
+	}
+	if len(manifest.Fields) == 0 {
+		return map[string]interface{}{}, nil
+	}
+
+	interactive := term.IsTerminal(int(os.Stdin.Fd()))
+	if interactive {
+		execName := filepath.Base(os.Args[0])
+		if strings.HasSuffix(execName, ".test") {
+			interactive = false
+		}
+	}
+	answers := make(map[string]interface{})
+
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Printf("Template %s requires additional details:\n", manifest.Name)
+
+	for _, field := range manifest.Fields {
+		if field.Key == "" {
+			continue
+		}
+
+		var value interface{}
+
+		if field.Multi || len(field.Defaults) > 0 {
+			defaults := field.Defaults
+			if len(defaults) == 0 && field.Default != "" {
+				defaults = []string{field.Default}
+			}
+			if !interactive {
+				if len(defaults) == 0 && field.Required {
+					return nil, fmt.Errorf(
+						"field %q is required but interactive input is not available", field.Key,
+					)
+				}
+				value = defaults
+			} else {
+				for {
+					prompt := fieldPrompt(field)
+					fmt.Print(prompt)
+					input, _ := reader.ReadString('\n')
+					input = strings.TrimSpace(input)
+					if input == "" && len(defaults) > 0 {
+						value = defaults
+						break
+					}
+					if input == "" && field.Required {
+						fmt.Println("This field is required. Please enter a value.")
+						continue
+					}
+					if input == "" {
+						value = []string{}
+						break
+					}
+					entries := splitListInput(input)
+					if len(field.Options) > 0 {
+						if err := validateOptions(entries, field.Options); err != nil {
+							fmt.Printf("%v\n", err)
+							continue
+						}
+					}
+					value = entries
+					break
+				}
+			}
+		} else {
+			if !interactive {
+				if field.Default != "" {
+					value = field.Default
+				} else if field.Required {
+					return nil, fmt.Errorf(
+						"field %q is required but interactive input is not available", field.Key,
+					)
+				} else {
+					value = ""
+				}
+			} else {
+				for {
+					prompt := fieldPrompt(field)
+					fmt.Print(prompt)
+					input, _ := reader.ReadString('\n')
+					input = strings.TrimSpace(input)
+					if input == "" && field.Default != "" {
+						value = field.Default
+						break
+					}
+					if input == "" && field.Required {
+						fmt.Println("This field is required. Please enter a value.")
+						continue
+					}
+					if input == "" {
+						value = ""
+						break
+					}
+					if len(field.Options) > 0 {
+						if err := validateOption(input, field.Options); err != nil {
+							fmt.Printf("%v\n", err)
+							continue
+						}
+					}
+					value = input
+					break
+				}
+			}
+		}
+
+		answers[field.Key] = value
+	}
+
+	return answers, nil
+}
+
+func fieldPrompt(field templater.TemplateField) string {
+	var parts []string
+	parts = append(parts, field.Prompt)
+	if len(field.Options) > 0 {
+		parts = append(parts, fmt.Sprintf("[%s]", strings.Join(field.Options, ", ")))
+	}
+	if field.Multi {
+		parts = append(parts, "(comma separated)")
+	}
+	if len(field.Defaults) > 0 {
+		parts = append(parts, fmt.Sprintf("default: %s", strings.Join(field.Defaults, ", ")))
+	} else if field.Default != "" {
+		parts = append(parts, fmt.Sprintf("default: %s", field.Default))
+	}
+	return strings.Join(parts, " ") + ": "
+}
+
+func validateOptions(values []string, options []string) error {
+	optSet := make(map[string]struct{}, len(options))
+	for _, opt := range options {
+		optSet[strings.TrimSpace(opt)] = struct{}{}
+	}
+	for _, value := range values {
+		if _, ok := optSet[value]; !ok {
+			return fmt.Errorf("value %q is not one of the allowed options", value)
+		}
+	}
+	return nil
+}
+
+func validateOption(value string, options []string) error {
+	for _, option := range options {
+		if value == option {
+			return nil
+		}
+	}
+	return fmt.Errorf("value %q is not one of the allowed options", value)
+}
+
+func splitListInput(input string) []string {
+	if input == "" {
+		return []string{}
+	}
+	parts := strings.Split(input, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
 }
 
 // OpenFromPath opens the note in the configured editor.

@@ -56,7 +56,7 @@ func run(
 
 	flags.HandlePin(cmd, s.Config, n, "task", nextTitle)
 
-	note.StaticHandleNoteLaunch(n, s.Templater, "task-echo", "")
+	note.StaticHandleNoteLaunch(n, s.Templater, "task-echo", "", nil)
 
 	return nil
 }
