@@ -15,7 +15,8 @@ import (
 	"github.com/Paintersrp/an/pkg/cmd/notes"
 	"github.com/Paintersrp/an/pkg/cmd/open"
 	"github.com/Paintersrp/an/pkg/cmd/pin"
-	"github.com/Paintersrp/an/pkg/cmd/settings"
+        "github.com/Paintersrp/an/pkg/cmd/review"
+        "github.com/Paintersrp/an/pkg/cmd/settings"
 	"github.com/Paintersrp/an/pkg/cmd/symlink"
 	"github.com/Paintersrp/an/pkg/cmd/tags"
 	"github.com/Paintersrp/an/pkg/cmd/tasks"
@@ -74,8 +75,9 @@ func NewCmdRoot(s *state.State) (*cobra.Command, error) {
 		tasks.NewCmdTasks(s),
 		pin.NewCmdPin(s, "text"),
 		echo.NewCmdEcho(s),
-		capture.NewCmdCapture(s),
-		settings.NewCmdSettings(s),
+                capture.NewCmdCapture(s),
+                review.NewCmdReview(s),
+                settings.NewCmdSettings(s),
 		symlink.NewCmdSymlink(s),
 		notes.NewCmdNotes(s),
 		todo.NewCmdTodo(s.Config),

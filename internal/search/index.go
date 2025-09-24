@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"gopkg.in/yaml.v3"
@@ -20,6 +21,7 @@ type document struct {
 	FrontMatter map[string][]string
 	Links       []string
 	Body        string
+	ModifiedAt  time.Time
 }
 
 // Index stores searchable representations of notes on disk.
@@ -170,6 +172,11 @@ func (idx *Index) loadDocument(path string) (document, error) {
 		return document{}, err
 	}
 
+	info, err := os.Stat(path)
+	if err != nil {
+		return document{}, err
+	}
+
 	fm, body := splitFrontMatter(data)
 	parsed, tags, err := parseFrontMatter(fm)
 	if err != nil {
@@ -182,7 +189,67 @@ func (idx *Index) loadDocument(path string) (document, error) {
 		FrontMatter: parsed,
 		Links:       extractLinks(body),
 		Body:        string(body),
+		ModifiedAt:  info.ModTime().UTC(),
 	}, nil
+}
+
+// Metadata represents the exposed metadata for an indexed document.
+type Metadata struct {
+	Path        string
+	Tags        []string
+	FrontMatter map[string][]string
+	Links       []string
+	ModifiedAt  time.Time
+}
+
+// Documents returns shallow copies of the metadata for indexed documents.
+func (idx *Index) Documents() []Metadata {
+	if len(idx.docs) == 0 {
+		return nil
+	}
+
+	out := make([]Metadata, 0, len(idx.docs))
+	for _, doc := range idx.docs {
+		out = append(out, Metadata{
+			Path:        doc.Path,
+			Tags:        append([]string(nil), doc.Tags...),
+			FrontMatter: cloneMetadata(doc.FrontMatter),
+			Links:       append([]string(nil), doc.Links...),
+			ModifiedAt:  doc.ModifiedAt,
+		})
+	}
+
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].Path < out[j].Path
+	})
+	return out
+}
+
+// FilteredDocuments returns the metadata for notes matching the provided query.
+func (idx *Index) FilteredDocuments(q Query) []Metadata {
+	if len(idx.docs) == 0 {
+		return nil
+	}
+
+	matches := make([]Metadata, 0)
+	for _, doc := range idx.docs {
+		if !doc.matchesFilters(q) {
+			continue
+		}
+
+		matches = append(matches, Metadata{
+			Path:        doc.Path,
+			Tags:        append([]string(nil), doc.Tags...),
+			FrontMatter: cloneMetadata(doc.FrontMatter),
+			Links:       append([]string(nil), doc.Links...),
+			ModifiedAt:  doc.ModifiedAt,
+		})
+	}
+
+	sort.Slice(matches, func(i, j int) bool {
+		return matches[i].Path < matches[j].Path
+	})
+	return matches
 }
 
 func (idx *Index) computeRelationships() {
@@ -336,6 +403,18 @@ func setToSortedSlice(values map[string]struct{}) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+func cloneMetadata(values map[string][]string) map[string][]string {
+	if len(values) == 0 {
+		return nil
+	}
+
+	cloned := make(map[string][]string, len(values))
+	for key, vals := range values {
+		cloned[key] = append([]string(nil), vals...)
+	}
+	return cloned
 }
 
 func (d document) matchesFilters(q Query) bool {
