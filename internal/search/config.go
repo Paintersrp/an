@@ -27,4 +27,6 @@ type Result struct {
 	Path      string
 	Snippet   string
 	MatchFrom string
+	Score     float64
+	Related   RelatedNotes
 }

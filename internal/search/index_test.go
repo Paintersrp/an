@@ -5,10 +5,12 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
+	"time"
 )
 
-func writeNote(t *testing.T, dir, name, content string) string {
+func writeNote(t testing.TB, dir, name, content string) string {
 	t.Helper()
 	path := filepath.Join(dir, name)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -250,6 +252,164 @@ func TestIndexRelatedResolvesRelativeLinks(t *testing.T) {
 	}
 }
 
+func TestIndexSearchRanksFrequencyAndTags(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	common := time.Now().Add(-time.Hour)
+	highFreq := writeNote(t, dir, "projects/high.md", "---\ntags:\n  - project\n---\nalpha alpha alpha focus\n")
+	lowFreq := writeNote(t, dir, "projects/low.md", "---\ntags:\n  - project\n---\nalpha details\n")
+
+	if err := os.Chtimes(highFreq, common, common); err != nil {
+		t.Fatalf("chtimes high freq: %v", err)
+	}
+	if err := os.Chtimes(lowFreq, common, common); err != nil {
+		t.Fatalf("chtimes low freq: %v", err)
+	}
+
+	idx := NewIndex(dir, Config{EnableBody: true})
+	if err := idx.Build([]string{highFreq, lowFreq}); err != nil {
+		t.Fatalf("Build returned error: %v", err)
+	}
+
+	query := Query{Term: "alpha", Tags: []string{"project"}}
+	results := idx.Search(query)
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+
+	if results[0].Path != filepath.Clean(highFreq) {
+		t.Fatalf("expected high frequency note first, got %s", results[0].Path)
+	}
+	if results[0].Score <= results[1].Score {
+		t.Fatalf("expected higher score for frequent note, got %+v", results)
+	}
+}
+
+func TestIndexSearchPrioritizesRecency(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	recent := writeNote(t, dir, "notes/recent.md", "---\ntitle: Recent\n---\nterm here\n")
+	older := writeNote(t, dir, "notes/older.md", "---\ntitle: Older\n---\nterm here\n")
+
+	oldTime := time.Now().Add(-48 * time.Hour)
+	if err := os.Chtimes(older, oldTime, oldTime); err != nil {
+		t.Fatalf("chtimes older: %v", err)
+	}
+
+	idx := NewIndex(dir, Config{EnableBody: true})
+	if err := idx.Build([]string{recent, older}); err != nil {
+		t.Fatalf("Build returned error: %v", err)
+	}
+
+	results := idx.Search(Query{Term: "term"})
+	if len(results) != 2 {
+		t.Fatalf("expected two results, got %d", len(results))
+	}
+
+	if results[0].Path != filepath.Clean(recent) {
+		t.Fatalf("expected recent note first, got %s", results[0].Path)
+	}
+	if results[0].Score <= results[1].Score {
+		t.Fatalf("expected recent note to score higher, got %+v", results)
+	}
+}
+
+func TestIndexSearchFuzzyMatchesTitlesAndHeadings(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	note := writeNote(t, dir, "plans/launch.md", "---\ntitle: Launch Plan\n---\n# Launch Checklist\nDetails here\n")
+
+	idx := NewIndex(dir, Config{EnableBody: false})
+	if err := idx.Build([]string{note}); err != nil {
+		t.Fatalf("Build returned error: %v", err)
+	}
+
+	results := idx.Search(Query{Term: "lanch plan"})
+	if len(results) != 1 {
+		t.Fatalf("expected fuzzy match result, got %d", len(results))
+	}
+	if results[0].MatchFrom != "fuzzy" {
+		t.Fatalf("expected fuzzy match, got %q", results[0].MatchFrom)
+	}
+	if !strings.Contains(results[0].Snippet, "Launch") {
+		t.Fatalf("expected snippet to reference heading or title, got %q", results[0].Snippet)
+	}
+	if results[0].Score <= 0 {
+		t.Fatalf("expected fuzzy match to have positive score, got %+v", results[0])
+	}
+}
+
+func TestIndexSearchResultsIncludeRelatedNotes(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	source := writeNote(t, dir, "notes/source.md", "[[target]]\nFocus term\n")
+	target := writeNote(t, dir, "notes/target.md", "---\ntitle: Target\n---\nterm reference\n")
+
+	idx := NewIndex(dir, Config{EnableBody: true})
+	if err := idx.Build([]string{source, target}); err != nil {
+		t.Fatalf("Build returned error: %v", err)
+	}
+
+	results := idx.Search(Query{Term: "term"})
+	if len(results) != 2 {
+		t.Fatalf("expected two matches, got %d", len(results))
+	}
+
+	for _, res := range results {
+		if len(res.Related.Outbound) == 0 && len(res.Related.Backlinks) == 0 {
+			t.Fatalf("expected related notes for %s, got %+v", res.Path, res.Related)
+		}
+	}
+}
+
+func BenchmarkIndexSearchRanked(b *testing.B) {
+	dir := b.TempDir()
+	var paths []string
+	for i := 0; i < 200; i++ {
+		content := fmt.Sprintf("---\ntitle: Note %d\ntags:\n  - project\n---\nbody project term %d\n", i, i)
+		path := writeNote(b, dir, fmt.Sprintf("note-%03d.md", i), content)
+		paths = append(paths, path)
+	}
+
+	idx := NewIndex(dir, Config{EnableBody: true})
+	if err := idx.Build(paths); err != nil {
+		b.Fatalf("Build returned error: %v", err)
+	}
+
+	query := Query{Term: "project"}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = idx.Search(query)
+	}
+}
+
+func BenchmarkIndexSearchAlphabetical(b *testing.B) {
+	dir := b.TempDir()
+	var paths []string
+	for i := 0; i < 200; i++ {
+		content := fmt.Sprintf("---\ntitle: Baseline %d\n---\nbody baseline term %d\n", i, i)
+		path := writeNote(b, dir, fmt.Sprintf("baseline-%03d.md", i), content)
+		paths = append(paths, path)
+	}
+
+	idx := NewIndex(dir, Config{EnableBody: true})
+	if err := idx.Build(paths); err != nil {
+		b.Fatalf("Build returned error: %v", err)
+	}
+
+	query := Query{Term: "baseline"}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = alphabeticalSearch(idx, query)
+	}
+}
+
 func cmpSlices(got, want []string) string {
 	if len(got) != len(want) {
 		return fmt.Sprintf("length mismatch got %d want %d (got=%v, want=%v)", len(got), len(want), got, want)
@@ -260,4 +420,43 @@ func cmpSlices(got, want []string) string {
 		}
 	}
 	return ""
+}
+
+func alphabeticalSearch(idx *Index, q Query) []Result {
+	term := strings.TrimSpace(q.Term)
+	loweredTerm := strings.ToLower(term)
+
+	results := make([]Result, 0)
+	for _, doc := range idx.docs {
+		if !doc.matchesFilters(q) {
+			continue
+		}
+
+		if loweredTerm == "" {
+			results = append(results, Result{Path: doc.Path, MatchFrom: "metadata"})
+			continue
+		}
+
+		if snippet, freq := doc.matchFrontMatter(loweredTerm); freq > 0 {
+			results = append(results, Result{Path: doc.Path, Snippet: snippet, MatchFrom: "frontmatter"})
+			continue
+		}
+
+		if snippet, freq := doc.matchLinks(loweredTerm); freq > 0 {
+			results = append(results, Result{Path: doc.Path, Snippet: snippet, MatchFrom: "links"})
+			continue
+		}
+
+		if idx.cfg.EnableBody {
+			if snippet, freq := doc.matchBody(loweredTerm); freq > 0 {
+				results = append(results, Result{Path: doc.Path, Snippet: snippet, MatchFrom: "body"})
+				continue
+			}
+		}
+	}
+
+	sort.SliceStable(results, func(i, j int) bool {
+		return results[i].Path < results[j].Path
+	})
+	return results
 }
