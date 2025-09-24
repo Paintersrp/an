@@ -39,6 +39,9 @@ var AvailableTemplates = map[string]bool{
 	"echo":            true,
 	"sum":             true,
 	"year":            true,
+	"review-daily":    true,
+	"review-weekly":   true,
+	"review-retro":    true,
 }
 
 type SingleTemplate struct {
