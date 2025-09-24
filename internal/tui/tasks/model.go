@@ -3,6 +3,9 @@ package tasks
 import (
 	"fmt"
 	"path/filepath"
+	"sort"
+	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
@@ -13,23 +16,51 @@ import (
 )
 
 type Model struct {
-	service *services.Service
-	state   *state.State
-	list    list.Model
-	keys    keyMap
-	status  string
-	width   int
-	height  int
+	service    *services.Service
+	state      *state.State
+	list       list.Model
+	keys       keyMap
+	status     string
+	width      int
+	height     int
+	items      []services.Item
+	filters    filterState
+	owners     []string
+	projects   []string
+	priorities []string
 }
 
 type keyMap struct {
-	open    key.Binding
-	toggle  key.Binding
-	refresh key.Binding
+	open          key.Binding
+	toggle        key.Binding
+	refresh       key.Binding
+	cycleDue      key.Binding
+	cycleOwner    key.Binding
+	cycleProject  key.Binding
+	cyclePriority key.Binding
+	clearFilters  key.Binding
 }
 
 type listItem struct {
 	item services.Item
+}
+
+type dueMode int
+
+const (
+	dueAll dueMode = iota
+	dueAgenda
+	dueUpcoming
+	dueOverdue
+	dueUnscheduled
+	dueScheduled
+)
+
+type filterState struct {
+	due         dueMode
+	ownerIdx    int
+	projectIdx  int
+	priorityIdx int
 }
 
 func NewModel(s *state.State) (*Model, error) {
@@ -44,16 +75,19 @@ func NewModel(s *state.State) (*Model, error) {
 	}
 
 	delegate := list.NewDefaultDelegate()
-	lm := list.New(toListItems(items), delegate, 0, 0)
+	lm := list.New(nil, delegate, 0, 0)
 	lm.Title = "Tasks"
 	lm.DisableQuitKeybindings()
 
-	return &Model{
+	model := &Model{
 		service: svc,
 		state:   s,
 		list:    lm,
 		keys:    newKeyMap(),
-	}, nil
+	}
+
+	model.setItems(items)
+	return model, nil
 }
 
 func newKeyMap() keyMap {
@@ -69,6 +103,26 @@ func newKeyMap() keyMap {
 		refresh: key.NewBinding(
 			key.WithKeys("ctrl+r"),
 			key.WithHelp("ctrl+r", "refresh"),
+		),
+		cycleDue: key.NewBinding(
+			key.WithKeys("d"),
+			key.WithHelp("d", "cycle due filter"),
+		),
+		cycleOwner: key.NewBinding(
+			key.WithKeys("o"),
+			key.WithHelp("o", "cycle owner"),
+		),
+		cycleProject: key.NewBinding(
+			key.WithKeys("g"),
+			key.WithHelp("g", "cycle project"),
+		),
+		cyclePriority: key.NewBinding(
+			key.WithKeys("p"),
+			key.WithHelp("p", "cycle priority"),
+		),
+		clearFilters: key.NewBinding(
+			key.WithKeys("ctrl+0"),
+			key.WithHelp("ctrl+0", "clear filters"),
 		),
 	}
 }
@@ -86,6 +140,9 @@ func (i listItem) Title() string {
 	if i.item.Completed {
 		prefix = "[x]"
 	}
+	if due := formatDuePrefix(i.item); due != "" {
+		return fmt.Sprintf("%s %s %s", prefix, due, i.item.Content)
+	}
 	return fmt.Sprintf("%s %s", prefix, i.item.Content)
 }
 
@@ -94,11 +151,18 @@ func (i listItem) Description() string {
 	if rel == "" {
 		rel = filepath.Base(i.item.Path)
 	}
-	return fmt.Sprintf("%s:%d", rel, i.item.Line)
+	parts := make([]string, 0, 5)
+	if desc := formatMetadataSummary(i.item); desc != "" {
+		parts = append(parts, desc)
+	}
+	parts = append(parts, fmt.Sprintf("%s:%d", rel, i.item.Line))
+	return strings.Join(parts, " | ")
 }
 
 func (i listItem) FilterValue() string {
-	return i.item.Content
+	fields := []string{i.item.Content, i.item.Owner, i.item.Project, i.item.Priority}
+	fields = append(fields, i.item.References...)
+	return strings.Join(fields, " ")
 }
 
 func (m *Model) Init() tea.Cmd {
@@ -120,6 +184,21 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleOpen()
 		case key.Matches(msg, m.keys.refresh):
 			return m, m.refresh()
+		case key.Matches(msg, m.keys.cycleDue):
+			m.advanceDueFilter()
+			return m, m.applyFilters()
+		case key.Matches(msg, m.keys.cycleOwner):
+			m.advanceOwnerFilter()
+			return m, m.applyFilters()
+		case key.Matches(msg, m.keys.cycleProject):
+			m.advanceProjectFilter()
+			return m, m.applyFilters()
+		case key.Matches(msg, m.keys.cyclePriority):
+			m.advancePriorityFilter()
+			return m, m.applyFilters()
+		case key.Matches(msg, m.keys.clearFilters):
+			m.resetFilters()
+			return m, m.applyFilters()
 		}
 	}
 
@@ -138,6 +217,13 @@ func (m *Model) View() string {
 	}
 
 	status := m.status
+	if summary := m.filterSummary(); summary != "" {
+		if status != "" {
+			status = status + "\n" + summary
+		} else {
+			status = summary
+		}
+	}
 	if pinned != "" {
 		status = fmt.Sprintf("Pinned: %s", pinned)
 		if m.status != "" {
@@ -193,5 +279,221 @@ func (m *Model) refresh() tea.Cmd {
 		return nil
 	}
 
-	return m.list.SetItems(toListItems(items))
+	m.setItems(items)
+	return nil
+}
+
+func uniqueSorted(items []services.Item, selector func(services.Item) string) []string {
+	seen := make(map[string]struct{})
+	values := make([]string, 0)
+	for _, item := range items {
+		val := strings.TrimSpace(selector(item))
+		if val == "" {
+			continue
+		}
+		normalized := strings.ToLower(val)
+		if _, exists := seen[normalized]; exists {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		values = append(values, val)
+	}
+	sort.Slice(values, func(i, j int) bool {
+		return strings.ToLower(values[i]) < strings.ToLower(values[j])
+	})
+	return values
+}
+
+func pickValue(values []string, idx int) string {
+	if idx <= 0 {
+		return ""
+	}
+	actual := idx - 1
+	if actual < 0 || actual >= len(values) {
+		return ""
+	}
+	return values[actual]
+}
+
+func advanceIndex(current, length int) int {
+	if length == 0 {
+		return 0
+	}
+	current++
+	if current > length {
+		return 0
+	}
+	return current
+}
+
+func truncateToDay(t time.Time) time.Time {
+	loc := t.Location()
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, loc)
+}
+
+func formatDuePrefix(item services.Item) string {
+	if item.Due == nil {
+		return ""
+	}
+	due := item.Due.In(time.Now().Location())
+	today := truncateToDay(time.Now())
+	switch {
+	case truncateToDay(due).Before(today):
+		return "(OVERDUE)"
+	case truncateToDay(due).Equal(today):
+		return "(due today)"
+	default:
+		return fmt.Sprintf("(due %s)", due.Format("Jan 02"))
+	}
+}
+
+func formatMetadataSummary(item services.Item) string {
+	var parts []string
+	if item.Owner != "" {
+		parts = append(parts, fmt.Sprintf("owner %s", item.Owner))
+	}
+	if item.Priority != "" {
+		parts = append(parts, fmt.Sprintf("priority %s", item.Priority))
+	}
+	if item.Project != "" {
+		parts = append(parts, fmt.Sprintf("project %s", item.Project))
+	}
+	if item.Scheduled != nil {
+		parts = append(parts, fmt.Sprintf("scheduled %s", item.Scheduled.Format("Jan 02")))
+	}
+	if len(item.References) > 0 {
+		parts = append(parts, "refs "+strings.Join(item.References, ", "))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return strings.Join(parts, " • ")
+}
+
+func (m *Model) setItems(items []services.Item) {
+	m.items = items
+	m.owners = uniqueSorted(items, func(it services.Item) string { return it.Owner })
+	m.projects = uniqueSorted(items, func(it services.Item) string { return it.Project })
+	m.priorities = uniqueSorted(items, func(it services.Item) string { return it.Priority })
+	if m.filters.ownerIdx > len(m.owners) {
+		m.filters.ownerIdx = 0
+	}
+	if m.filters.projectIdx > len(m.projects) {
+		m.filters.projectIdx = 0
+	}
+	if m.filters.priorityIdx > len(m.priorities) {
+		m.filters.priorityIdx = 0
+	}
+	m.applyFilters()
+}
+
+func (m *Model) applyFilters() tea.Cmd {
+	filtered := make([]services.Item, 0, len(m.items))
+	now := time.Now()
+	owner := pickValue(m.owners, m.filters.ownerIdx)
+	project := pickValue(m.projects, m.filters.projectIdx)
+	priority := pickValue(m.priorities, m.filters.priorityIdx)
+	for _, item := range m.items {
+		if owner != "" && !strings.EqualFold(item.Owner, owner) {
+			continue
+		}
+		if project != "" && !strings.EqualFold(item.Project, project) {
+			continue
+		}
+		if priority != "" && !strings.EqualFold(item.Priority, priority) {
+			continue
+		}
+		if !m.matchesDueFilter(item, now) {
+			continue
+		}
+		filtered = append(filtered, item)
+	}
+	m.list.SetItems(toListItems(filtered))
+	return nil
+}
+
+func (m *Model) matchesDueFilter(item services.Item, now time.Time) bool {
+	switch m.filters.due {
+	case dueAll:
+		return true
+	case dueAgenda:
+		if item.Due == nil {
+			return false
+		}
+		today := truncateToDay(now)
+		due := truncateToDay(item.Due.In(now.Location()))
+		return !due.After(today)
+	case dueUpcoming:
+		if item.Due == nil {
+			return false
+		}
+		today := truncateToDay(now)
+		due := truncateToDay(item.Due.In(now.Location()))
+		return due.After(today)
+	case dueOverdue:
+		if item.Due == nil {
+			return false
+		}
+		today := truncateToDay(now)
+		due := truncateToDay(item.Due.In(now.Location()))
+		return due.Before(today)
+	case dueUnscheduled:
+		return item.Due == nil
+	case dueScheduled:
+		return item.Scheduled != nil
+	default:
+		return true
+	}
+}
+
+func (m *Model) advanceDueFilter() {
+	m.filters.due++
+	if m.filters.due > dueScheduled {
+		m.filters.due = dueAll
+	}
+}
+
+func (m *Model) advanceOwnerFilter() {
+	m.filters.ownerIdx = advanceIndex(m.filters.ownerIdx, len(m.owners))
+}
+
+func (m *Model) advanceProjectFilter() {
+	m.filters.projectIdx = advanceIndex(m.filters.projectIdx, len(m.projects))
+}
+
+func (m *Model) advancePriorityFilter() {
+	m.filters.priorityIdx = advanceIndex(m.filters.priorityIdx, len(m.priorities))
+}
+
+func (m *Model) resetFilters() {
+	m.filters = filterState{}
+}
+
+func (m *Model) filterSummary() string {
+	var parts []string
+	switch m.filters.due {
+	case dueAgenda:
+		parts = append(parts, "due: agenda")
+	case dueUpcoming:
+		parts = append(parts, "due: upcoming")
+	case dueOverdue:
+		parts = append(parts, "due: overdue")
+	case dueUnscheduled:
+		parts = append(parts, "due: unscheduled")
+	case dueScheduled:
+		parts = append(parts, "due: scheduled")
+	}
+	if owner := pickValue(m.owners, m.filters.ownerIdx); owner != "" {
+		parts = append(parts, fmt.Sprintf("owner: %s", owner))
+	}
+	if project := pickValue(m.projects, m.filters.projectIdx); project != "" {
+		parts = append(parts, fmt.Sprintf("project: %s", project))
+	}
+	if priority := pickValue(m.priorities, m.filters.priorityIdx); priority != "" {
+		parts = append(parts, fmt.Sprintf("priority: %s", priority))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "Filters → " + strings.Join(parts, ", ")
 }

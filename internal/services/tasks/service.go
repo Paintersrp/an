@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/table"
 
@@ -14,12 +15,18 @@ import (
 )
 
 type Item struct {
-	ID        int
-	Content   string
-	Completed bool
-	Path      string
-	Line      int
-	RelPath   string
+	ID         int
+	Content    string
+	Completed  bool
+	Path       string
+	Line       int
+	RelPath    string
+	Due        *time.Time
+	Scheduled  *time.Time
+	Priority   string
+	Owner      string
+	Project    string
+	References []string
 }
 
 type Service struct {
@@ -55,12 +62,18 @@ func (s *Service) List() ([]Item, error) {
 		}
 
 		items = append(items, Item{
-			ID:        task.ID,
-			Content:   task.Content,
-			Completed: strings.EqualFold(task.Status, "checked"),
-			Path:      task.Path,
-			Line:      task.Line,
-			RelPath:   rel,
+			ID:         task.ID,
+			Content:    task.Content,
+			Completed:  strings.EqualFold(task.Status, "checked"),
+			Path:       task.Path,
+			Line:       task.Line,
+			RelPath:    rel,
+			Due:        task.Metadata.DueDate,
+			Scheduled:  task.Metadata.ScheduledDate,
+			Priority:   task.Metadata.Priority,
+			Owner:      task.Metadata.Owner,
+			Project:    task.Metadata.Project,
+			References: append([]string(nil), task.Metadata.References...),
 		})
 	}
 
@@ -114,7 +127,11 @@ func TableFromItems(items []Item, height int) table.Model {
 	columns := []table.Column{
 		{Title: "ID", Width: 4},
 		{Title: "Status", Width: 10},
-		{Title: "Content", Width: 60},
+		{Title: "Content", Width: 40},
+		{Title: "Due", Width: 12},
+		{Title: "Owner", Width: 16},
+		{Title: "Priority", Width: 10},
+		{Title: "Project", Width: 16},
 		{Title: "Path", Width: 40},
 	}
 
@@ -124,10 +141,18 @@ func TableFromItems(items []Item, height int) table.Model {
 		if item.Completed {
 			status = "checked"
 		}
+		due := ""
+		if item.Due != nil {
+			due = item.Due.Format("2006-01-02")
+		}
 		rows = append(rows, table.Row{
 			fmt.Sprintf("%d", item.ID),
 			status,
 			item.Content,
+			due,
+			item.Owner,
+			item.Priority,
+			item.Project,
 			item.RelPath,
 		})
 	}
