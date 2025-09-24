@@ -12,6 +12,8 @@ import (
 
 var currView string
 
+type noteListRefreshMsg struct{}
+
 func newItemDelegate(
 	keys *delegateKeyMap,
 	h *handler.FileHandler,
@@ -44,8 +46,7 @@ func newItemDelegate(
 					if err := h.Archive(p); err != nil {
 						return m.NewStatusMessage(statusStyle("Failed to archive " + n))
 					}
-					removeItemByPath(m, p)
-					return m.NewStatusMessage(statusStyle("Archived " + n))
+					return batchStatusWithRemoval(m, p, statusStyle("Archived "+n))
 				}
 
 			case key.Matches(msg, keys.delete):
@@ -53,16 +54,14 @@ func newItemDelegate(
 					if err := os.Remove(p); err != nil {
 						return m.NewStatusMessage(statusStyle("Failed to delete " + n))
 					}
-					removeItemByPath(m, p)
-					return m.NewStatusMessage(statusStyle("Deleted " + n))
+					return batchStatusWithRemoval(m, p, statusStyle("Deleted "+n))
 				}
 
 			case key.Matches(msg, keys.trash):
 				if err := h.Trash(p); err != nil {
 					return m.NewStatusMessage(statusStyle("Failed to move " + n + " to trash"))
 				}
-				removeItemByPath(m, p)
-				return m.NewStatusMessage(statusStyle("Moved " + n + " to trash"))
+				return batchStatusWithRemoval(m, p, statusStyle("Moved "+n+" to trash"))
 
 			case key.Matches(msg, keys.undo):
 				switch currView {
@@ -70,15 +69,13 @@ func newItemDelegate(
 					if err := h.Unarchive(p); err != nil {
 						return m.NewStatusMessage(statusStyle("Failed to unarchive " + n))
 					}
-					removeItemByPath(m, p)
-					return m.NewStatusMessage(statusStyle("Restored " + n))
+					return batchStatusWithRemoval(m, p, statusStyle("Restored "+n))
 
 				case "trash":
 					if err := h.Untrash(p); err != nil {
 						return m.NewStatusMessage(statusStyle("Failed to restore " + n))
 					}
-					removeItemByPath(m, p)
-					return m.NewStatusMessage(statusStyle("Restored " + n))
+					return batchStatusWithRemoval(m, p, statusStyle("Restored "+n))
 				}
 
 			case key.Matches(msg, keys.keypadDelete):
@@ -87,15 +84,13 @@ func newItemDelegate(
 					if err := h.Trash(p); err != nil {
 						return m.NewStatusMessage(statusStyle("Failed to move " + n + " to trash"))
 					}
-					removeItemByPath(m, p)
-					return m.NewStatusMessage(statusStyle("Moved " + n + " to trash"))
+					return batchStatusWithRemoval(m, p, statusStyle("Moved "+n+" to trash"))
 
 				case "trash":
 					if err := os.Remove(p); err != nil {
 						return m.NewStatusMessage(statusStyle("Failed to delete " + n))
 					}
-					removeItemByPath(m, p)
-					return m.NewStatusMessage(statusStyle("Deleted " + n))
+					return batchStatusWithRemoval(m, p, statusStyle("Deleted "+n))
 				}
 
 			}
@@ -134,9 +129,16 @@ func newItemDelegate(
 	return d
 }
 
-func removeItemByPath(m *list.Model, path string) {
+func batchStatusWithRemoval(m *list.Model, path, status string) tea.Cmd {
+	removeCmd := removeItemByPath(m, path)
+	statusCmd := m.NewStatusMessage(status)
+
+	return batchCmds(removeCmd, statusCmd, requestListRefresh())
+}
+
+func removeItemByPath(m *list.Model, path string) tea.Cmd {
 	if path == "" {
-		return
+		return nil
 	}
 
 	items := m.Items()
@@ -146,9 +148,37 @@ func removeItemByPath(m *list.Model, path string) {
 			continue
 		}
 		if li.path == path {
-			m.RemoveItem(idx)
-			return
+			newItems := make([]list.Item, 0, len(items)-1)
+			newItems = append(newItems, items[:idx]...)
+			newItems = append(newItems, items[idx+1:]...)
+			return m.SetItems(newItems)
 		}
+	}
+
+	return nil
+}
+
+func requestListRefresh() tea.Cmd {
+	return func() tea.Msg {
+		return noteListRefreshMsg{}
+	}
+}
+
+func batchCmds(cmds ...tea.Cmd) tea.Cmd {
+	filtered := make([]tea.Cmd, 0, len(cmds))
+	for _, cmd := range cmds {
+		if cmd != nil {
+			filtered = append(filtered, cmd)
+		}
+	}
+
+	switch len(filtered) {
+	case 0:
+		return nil
+	case 1:
+		return filtered[0]
+	default:
+		return tea.Batch(filtered...)
 	}
 }
 
