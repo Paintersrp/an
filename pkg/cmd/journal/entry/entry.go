@@ -8,11 +8,9 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/atotto/clipboard"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
-	"github.com/Paintersrp/an/internal/note"
+	"github.com/Paintersrp/an/internal/services/journal"
 	"github.com/Paintersrp/an/internal/state"
-	"github.com/Paintersrp/an/internal/templater"
 	"github.com/Paintersrp/an/pkg/shared/flags"
 	"github.com/Paintersrp/an/utils"
 )
@@ -26,6 +24,8 @@ func NewCmdEntry(
 	templateType string, // Accepts "day", "week", "month", or "year"
 ) *cobra.Command {
 	var index int
+
+	svc := journal.NewService(s.Templater, s.Handler)
 
 	cmd := &cobra.Command{
 		Use: fmt.Sprintf(
@@ -60,7 +60,7 @@ func NewCmdEntry(
 			templateType,
 		)),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd, args, s.Templater, index, templateType)
+			return run(cmd, args, svc, index, templateType)
 		},
 	}
 
@@ -75,7 +75,7 @@ func NewCmdEntry(
 func run(
 	cmd *cobra.Command,
 	args []string,
-	t *templater.Templater,
+	svc *journal.Service,
 	index int,
 	templateType string,
 ) error {
@@ -110,31 +110,14 @@ func run(
 	}
 
 	links := flags.HandleLinks(cmd)
-	date := utils.GenerateDate(index, templateType)
-	vaultDir := viper.GetString("vaultdir")
+	if svc == nil {
+		return fmt.Errorf("journal service is not configured")
+	}
 
-	n := note.NewZettelkastenNote(
-		vaultDir,
-		"atoms",
-		fmt.Sprintf("%s-%s", templateType, date),
-		tags,
-		links,
-		"",
-	)
-
-	exists, _, err := n.FileExists()
+	entry, err := svc.EnsureEntry(templateType, index, tags, links, content)
 	if err != nil {
 		return err
 	}
 
-	if exists {
-		return n.Open()
-	}
-
-	_, createErr := n.Create(templateType, t, content)
-	if createErr != nil {
-		return createErr
-	}
-
-	return n.Open()
+	return svc.Open(entry.Path)
 }

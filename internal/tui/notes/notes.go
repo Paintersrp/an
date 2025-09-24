@@ -22,7 +22,9 @@ import (
 	"github.com/Paintersrp/an/internal/pathutil"
 	"github.com/Paintersrp/an/internal/search"
 	"github.com/Paintersrp/an/internal/state"
+	journaltui "github.com/Paintersrp/an/internal/tui/journal"
 	"github.com/Paintersrp/an/internal/tui/notes/submodels"
+	taskstui "github.com/Paintersrp/an/internal/tui/tasks"
 	v "github.com/Paintersrp/an/internal/views"
 	"github.com/Paintersrp/an/utils"
 )
@@ -978,12 +980,24 @@ func Run(s *state.State, views map[string]v.View, viewFlag string) error {
 		}
 	}()
 
-	m, err := NewNoteListModel(s, viewFlag)
+	noteModel, err := NewNoteListModel(s, viewFlag)
 	if err != nil {
 		return err
 	}
 
-	if _, err := tea.NewProgram(m, tea.WithInput(os.Stdin), tea.WithAltScreen()).Run(); err != nil {
+	tasksModel, err := taskstui.NewModel(s)
+	if err != nil {
+		return err
+	}
+
+	journalModel, err := journaltui.NewModel(s)
+	if err != nil {
+		return err
+	}
+
+	root := NewRootModel(noteModel, tasksModel, journalModel)
+
+	if _, err := tea.NewProgram(root, tea.WithInput(os.Stdin), tea.WithAltScreen()).Run(); err != nil {
 		// handle error for instances where neovim/editor doesn't pass stdin back in time to close gracefully with bubbletea
 		if strings.Contains(err.Error(), "resource temporarily unavailable") {
 			os.Exit(0)

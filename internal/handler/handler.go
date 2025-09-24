@@ -18,6 +18,13 @@ func NewFileHandler(vaultDir string) *FileHandler {
 	return &FileHandler{vaultDir: vaultDir}
 }
 
+func (h *FileHandler) VaultDir() string {
+	if h == nil {
+		return ""
+	}
+	return h.vaultDir
+}
+
 func (h *FileHandler) resolve(path string) (string, error) {
 	if h == nil {
 		return "", fmt.Errorf("file handler is not configured")
