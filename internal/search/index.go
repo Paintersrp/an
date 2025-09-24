@@ -55,22 +55,97 @@ func (idx *Index) Build(paths []string) error {
 	idx.outbound = make(map[string][]string)
 	idx.backlinks = make(map[string][]string)
 	for _, p := range paths {
-		if idx.shouldIgnore(p) {
+		canonical := idx.normalize(p)
+		if canonical == "" {
 			continue
 		}
 
-		doc, err := idx.loadDocument(p)
+		if idx.shouldIgnore(canonical) {
+			continue
+		}
+
+		doc, err := idx.loadDocument(canonical)
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
 				continue
 			}
-			return fmt.Errorf("search: indexing %s: %w", p, err)
+			return fmt.Errorf("search: indexing %s: %w", canonical, err)
 		}
-		idx.docs[filepath.Clean(p)] = doc
+		idx.docs[canonical] = doc
 	}
+	idx.refreshMetadata()
+	return nil
+}
+
+// Update refreshes the indexed representation of the provided path.
+//
+// The method gracefully handles files that have been removed and ignores
+// directories that fall under configured ignore rules.
+func (idx *Index) Update(path string) error {
+	if idx == nil {
+		return nil
+	}
+
+	canonical := idx.normalize(path)
+	if canonical == "" {
+		return nil
+	}
+
+	if idx.shouldIgnore(canonical) {
+		return idx.Remove(canonical)
+	}
+
+	doc, err := idx.loadDocument(canonical)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return idx.Remove(canonical)
+		}
+		return fmt.Errorf("search: indexing %s: %w", canonical, err)
+	}
+
+	if idx.docs == nil {
+		idx.docs = make(map[string]document)
+	}
+	idx.docs[canonical] = doc
+	idx.refreshMetadata()
+	return nil
+}
+
+// Remove deletes the provided path from the index if present.
+func (idx *Index) Remove(path string) error {
+	if idx == nil {
+		return nil
+	}
+
+	canonical := idx.normalize(path)
+	if canonical == "" {
+		return nil
+	}
+
+	if len(idx.docs) == 0 {
+		return nil
+	}
+
+	delete(idx.docs, canonical)
+	idx.refreshMetadata()
+	return nil
+}
+
+func (idx *Index) refreshMetadata() {
 	idx.aliases = idx.buildAliases()
 	idx.computeRelationships()
-	return nil
+}
+
+func (idx *Index) normalize(path string) string {
+	cleaned := filepath.Clean(path)
+	if cleaned == "." || cleaned == "" {
+		return ""
+	}
+	if filepath.IsAbs(cleaned) {
+		return cleaned
+	}
+	joined := filepath.Join(idx.root, cleaned)
+	return filepath.Clean(joined)
 }
 
 // RelatedNotes captures outbound links and backlinks for a note.
