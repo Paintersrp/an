@@ -1144,7 +1144,22 @@ func (m NoteListModel) View() string {
 		return appStyle.Render(layout)
 	}
 
-	list := listStyle.MaxWidth(m.width / 2).Render(m.list.View())
+	listWidth := m.list.Width()
+	if listWidth <= 0 {
+		listWidth = m.width / 2
+	}
+
+	listHeight := m.list.Height()
+	if listHeight <= 0 {
+		listHeight = m.height
+	}
+
+	listContent := lipgloss.NewStyle().
+		Width(listWidth).
+		Height(listHeight).
+		Render(m.list.View())
+
+	list := listStyle.Width(listWidth).Render(listContent)
 
 	if m.copying {
 		textPrompt := textPromptStyle.Render(
