@@ -383,12 +383,21 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case m.creating:
 			return m.handleCreationUpdate(msg)
 		default:
-			m.handleDefaultUpdate(msg)
-
-			if ws := m.state.Config.MustWorkspace(); ws.Editor == "vim" || ws.Editor == "nano" {
+			if cmd, handled := m.handleDefaultUpdate(msg); handled {
 				if key.Matches(msg, m.keys.openNote) {
-					return m, tea.Quit
+					if ws := m.state.Config.MustWorkspace(); ws.Editor == "vim" || ws.Editor == "nano" {
+						if cmd != nil {
+							return m, tea.Batch(cmd, tea.Quit)
+						}
+						return m, tea.Quit
+					}
 				}
+
+				if cmd != nil {
+					return m, cmd
+				}
+
+				return m, nil
 			}
 
 		}
@@ -831,97 +840,101 @@ func (m NoteListModel) editorInstructions() string {
 }
 
 // TODO: returns are kinda unnecessary now
-func (m *NoteListModel) handleDefaultUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *NoteListModel) handleDefaultUpdate(msg tea.KeyMsg) (tea.Cmd, bool) {
 	switch {
 	case key.Matches(msg, m.keys.openNote):
 		if cmd := m.openNote(false); cmd != nil {
-			return m, cmd
+			return cmd, true
 		}
-		return m, nil
+		return nil, true
 
 	case key.Matches(msg, m.keys.openNoteInObsidian):
 		if cmd := m.openNote(true); cmd != nil {
-			return m, cmd
+			return cmd, true
 		}
-		return m, nil
+		return nil, true
 
 	case key.Matches(msg, m.keys.toggleTitleBar):
 		m.toggleTitleBar()
-		return m, nil
+		return nil, true
 
 	case key.Matches(msg, m.keys.toggleStatusBar):
 		m.list.SetShowStatusBar(!m.list.ShowStatusBar())
-		return m, nil
+		return nil, true
 
 	case key.Matches(msg, m.keys.togglePagination):
 		m.list.SetShowPagination(!m.list.ShowPagination())
-		return m, nil
+		return nil, true
 
 	case key.Matches(msg, m.keys.toggleHelpMenu):
 		m.list.SetShowHelp(!m.list.ShowHelp())
-		return m, nil
+		return nil, true
 
 	case key.Matches(msg, m.keys.toggleDisplayView):
-		return m, m.toggleDetails()
+		return m.toggleDetails(), true
 
 	case key.Matches(msg, m.keys.changeView):
-		return m, m.cycleView()
+		return m.cycleView(), true
 
 	case key.Matches(msg, m.keys.switchToDefaultView):
-		return m, m.swapView("default")
+		return m.swapView("default"), true
 
 	case key.Matches(msg, m.keys.switchToUnfulfillView):
-		return m, m.swapView("unfulfilled")
+		return m.swapView("unfulfilled"), true
 
 	case key.Matches(msg, m.keys.switchToOrphanView):
-		return m, m.swapView("orphan")
+		return m.swapView("orphan"), true
 
 	case key.Matches(msg, m.keys.switchToArchiveView):
-		return m, m.swapView("archive")
+		return m.swapView("archive"), true
 
 	case key.Matches(msg, m.keys.switchToTrashView):
-		return m, m.swapView("trash")
+		return m.swapView("trash"), true
 
 	case key.Matches(msg, m.keys.rename):
 		m.toggleRename()
+		return nil, true
 
 	case key.Matches(msg, m.keys.create):
 		m.toggleCreation()
+		return nil, true
 
 	case key.Matches(msg, m.keys.copy):
 		m.toggleCopy()
+		return nil, true
 
 	case key.Matches(msg, m.keys.editInline):
-		return m, m.startInlineEdit()
+		return m.startInlineEdit(), true
 
 	case key.Matches(msg, m.keys.quickCapture):
-		return m, m.startScratchCapture()
+		return m.startScratchCapture(), true
 
 	case key.Matches(msg, m.keys.sortByTitle):
 		m.sortField = sortByTitle
-		return m, m.refreshSort()
+		return m.refreshSort(), true
 
 	case key.Matches(msg, m.keys.sortBySubdir):
 		m.sortField = sortBySubdir
-		return m, m.refreshSort()
+		return m.refreshSort(), true
 
 	case key.Matches(msg, m.keys.sortByModifiedAt):
 		m.sortField = sortByModifiedAt
-		return m, m.refreshSort()
+		return m.refreshSort(), true
 
 	case key.Matches(msg, m.keys.sortAscending):
 		m.sortOrder = ascending
-		return m, m.refreshSort()
+		return m.refreshSort(), true
 
 	case key.Matches(msg, m.keys.sortAscending):
 		m.sortOrder = descending
-		return m, m.refreshSort()
+		return m.refreshSort(), true
 
 	case key.Matches(msg, m.keys.sortDescending):
 		m.sortOrder = descending
-		return m, m.refreshSort()
+		return m.refreshSort(), true
 	}
-	return m, nil
+
+	return nil, false
 }
 
 func (m NoteListModel) View() string {
