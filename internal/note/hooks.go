@@ -75,6 +75,11 @@ func executeHookCommands(phase string, commands []config.CommandTemplate, path s
 			if err := cmd.Wait(); err != nil {
 				return fmt.Errorf("%s hook %q failed: %w", phase, name, err)
 			}
+			continue
+		}
+
+		if err := cmd.Process.Release(); err != nil {
+			return fmt.Errorf("%s hook %q release failed: %w", phase, name, err)
 		}
 	}
 
