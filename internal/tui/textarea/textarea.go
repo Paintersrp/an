@@ -1,85 +1,115 @@
 package textarea
 
 import (
-	"fmt"
-	"log"
-
-	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-type errMsg error
-
-type model struct {
+// Model is a lightweight wrapper around Bubble's textarea model that exposes
+// a focused text editor surface for embedding in other TUI components.
+type Model struct {
 	textarea textarea.Model
-	err      error
 }
 
-func initialModel(yank bool) model {
+// New creates a textarea model sized to the provided dimensions. The editor is
+// configured without a character limit and with a blank prompt so callers can
+// embed it inside their own layouts without extra framing.
+func New(width, height int) *Model {
 	ti := textarea.New()
-	ti.Placeholder = "..."
-	ti.SetHeight(40)
+	ti.Placeholder = ""
+	ti.Prompt = ""
 	ti.CharLimit = 0
-	ti.SetWidth(100)
-	ti.Focus()
-
-	if yank {
-		content, err := clipboard.ReadAll()
-		if err != nil {
-			log.Fatal(err)
-		}
-		ti.SetValue(content)
+	if width > 0 {
+		ti.SetWidth(width)
+	}
+	if height > 0 {
+		ti.SetHeight(height)
 	}
 
-	return model{
-		textarea: ti,
-		err:      nil,
-	}
+	return &Model{textarea: ti}
 }
 
-func (m model) Init() tea.Cmd {
+// Init satisfies the Bubble Tea Model interface so callers can batch the blink
+// command when integrating the textarea into larger update loops.
+func (m *Model) Init() tea.Cmd {
+	if m == nil {
+		return nil
+	}
 	return textarea.Blink
 }
 
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmds []tea.Cmd
-	var cmd tea.Cmd
-
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyEsc:
-			if m.textarea.Focused() {
-				m.textarea.Blur()
-			}
-		case tea.KeyCtrlC:
-			return m, tea.Quit
-		case tea.KeyCtrlS:
-			fmt.Println("Saving note...")
-			return m, tea.Quit
-		default:
-			if !m.textarea.Focused() {
-				cmd = m.textarea.Focus()
-				cmds = append(cmds, cmd)
-			}
-		}
-
-	case errMsg:
-		m.err = msg
-		return m, nil
+// Update applies the incoming message to the underlying textarea and returns
+// the resulting command. Callers are responsible for handling higher-level
+// keyboard shortcuts such as save/discard.
+func (m *Model) Update(msg tea.Msg) tea.Cmd {
+	if m == nil {
+		return nil
 	}
-
+	var cmd tea.Cmd
 	m.textarea, cmd = m.textarea.Update(msg)
-	cmds = append(cmds, cmd)
-	return m, tea.Batch(cmds...)
+	return cmd
 }
 
-func (m model) View() string {
-	return fmt.Sprintf(
-		"Write note content.\n\n%s\n\n%s\n%s",
-		m.textarea.View(),
-		"(ctrl+c to quit)",
-		"(ctrl+s to save note)",
-	) + "\n\n"
+// View renders the textarea contents.
+func (m *Model) View() string {
+	if m == nil {
+		return ""
+	}
+	return m.textarea.View()
+}
+
+// Focus applies focus to the textarea returning the generated command.
+func (m *Model) Focus() tea.Cmd {
+	if m == nil {
+		return nil
+	}
+	return m.textarea.Focus()
+}
+
+// Blur removes focus from the textarea.
+func (m *Model) Blur() tea.Cmd {
+	if m == nil {
+		return nil
+	}
+	m.textarea.Blur()
+	return nil
+}
+
+// SetValue replaces the textarea contents with the provided value while
+// preserving the cursor at the end of the buffer.
+func (m *Model) SetValue(value string) {
+	if m == nil {
+		return
+	}
+	m.textarea.SetValue(value)
+	m.textarea.CursorEnd()
+}
+
+// Value returns the current textarea contents.
+func (m *Model) Value() string {
+	if m == nil {
+		return ""
+	}
+	return m.textarea.Value()
+}
+
+// CursorEnd positions the cursor at the end of the textarea's buffer.
+func (m *Model) CursorEnd() {
+	if m == nil {
+		return
+	}
+	m.textarea.CursorEnd()
+}
+
+// SetSize updates the textarea dimensions.
+func (m *Model) SetSize(width, height int) {
+	if m == nil {
+		return
+	}
+	if width > 0 {
+		m.textarea.SetWidth(width)
+	}
+	if height > 0 {
+		m.textarea.SetHeight(height)
+	}
 }

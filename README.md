@@ -63,6 +63,12 @@ an notes --view default
 
 When the Bubble Tea interface opens you will see a scrollable list of notes, a preview pane, and an on-demand help panel. Use <kbd>↑</kbd>/<kbd>↓</kbd> or <kbd>j</kbd>/<kbd>k</kbd> to move, <kbd>enter</kbd> to open the highlighted note in your editor, <kbd>tab</kbd> to toggle focus between the list and detail panel, and <kbd>?</kbd>/<kbd>h</kbd> to expand the full key binding cheat sheet. Common actions include <kbd>c</kbd> to create a note, <kbd>r</kbd> to rename, <kbd>y</kbd> to copy, <kbd>v</kbd> to switch views, and number keys <kbd>1</kbd>–<kbd>5</kbd> to jump between default, orphan, unfulfilled, archive, and trash views respectively.
 
+### Inline editing & captures
+
+Press <kbd>e</kbd> to open the highlighted note inside an inline editor without leaving the TUI. The textarea honours <kbd>ctrl+s</kbd> for save, <kbd>ctrl+r</kbd> to reload the on-disk version, and <kbd>esc</kbd> to discard changes (press twice to confirm if the buffer is dirty). External modifications are detected—when the backing file changes the editor warns and requires a second save to overwrite so you can reload the newer content instead.
+
+For quick captures, hit <kbd>q</kbd> to spawn a scratch buffer. Saving with <kbd>ctrl+s</kbd> writes the content into the first configured subdirectory (or the vault root when none is set) using a timestamped filename and refreshes the list so the new note is immediately available.
+
 Run `an --help` or any subcommand with `--help` to explore the rest of the command surface (journal, todo, settings, pin management, symlinks, etc.).
 
 ## Testing
