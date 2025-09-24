@@ -1296,7 +1296,9 @@ func (m *NoteListModel) refreshItems() tea.Cmd {
 	sortedItems := sortItems(castToListItems(items), m.sortField, m.sortOrder)
 	attachHighlightStore(sortedItems, m.highlights)
 	m.rebuildSearch(files)
-	return m.list.SetItems(sortedItems)
+	cmd := m.list.SetItems(sortedItems)
+	m.ensureSelectionInBounds()
+	return cmd
 }
 
 func (m *NoteListModel) refreshDelegate() {
