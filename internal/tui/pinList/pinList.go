@@ -18,18 +18,24 @@ import (
 )
 
 type PinListModel struct {
-	list         list.Model
-	keys         *listKeyMap
-	delegateKeys *delegateKeyMap
-	state        *state.State
-	pinType      string
-	findingFor   string
-	renamingFor  string
-	sublist      sublist.SubListModel
-	input        input.NameInputModel
-	finding      bool
-	renaming     bool
-	adding       bool
+	list             list.Model
+	keys             *listKeyMap
+	delegateKeys     *delegateKeyMap
+	state            *state.State
+	pinType          string
+	findingFor       string
+	renamingFor      string
+	sublist          sublist.SubListModel
+	input            input.NameInputModel
+	finding          bool
+	renaming         bool
+	adding           bool
+	closingAfterOpen bool
+}
+
+type pinEditorFinishedMsg struct {
+	err    error
+	waited bool
 }
 
 func NewPinListModel(s *state.State, pinType string) PinListModel {
@@ -76,6 +82,18 @@ func (m PinListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
+	case pinEditorFinishedMsg:
+		if msg.err != nil {
+			m.list.NewStatusMessage(statusMessageStyle(fmt.Sprintf("Open Error: %v", msg.err)))
+			m.closingAfterOpen = false
+			return m, nil
+		}
+
+		if m.closingAfterOpen {
+			return m, tea.Quit
+		}
+
+		return m, nil
 	case tea.WindowSizeMsg:
 		h, v := appStyle.GetFrameSize()
 		m.list.SetSize(msg.Width-h, msg.Height-v)
@@ -248,11 +266,10 @@ func (m PinListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case key.Matches(msg, m.keys.openNote):
-			if ok := m.openNote(); ok {
-				return m, tea.Quit
-			} else {
-				return m, nil
+			if cmd := m.openNote(); cmd != nil {
+				cmds = append(cmds, cmd)
 			}
+			return m, tea.Batch(cmds...)
 		case key.Matches(msg, m.keys.toggleTitleBar):
 			v := !m.list.ShowTitle()
 			m.list.SetShowTitle(v)
@@ -330,28 +347,39 @@ func Run(s *state.State, pinType string) tea.Model {
 	return m
 }
 
-func (m *PinListModel) openNote() bool {
-	var p string
-
-	if i, ok := m.list.SelectedItem().(PinListItem); ok {
-		p = i.description
-
-		if p == "No Default Pinned File" {
-			m.list.NewStatusMessage(statusMessageStyle("Item has no path"))
-			return false
-		}
-	} else {
-		return false
+func (m *PinListModel) openNote() tea.Cmd {
+	item, ok := m.list.SelectedItem().(PinListItem)
+	if !ok {
+		return nil
 	}
 
-	tea.ExitAltScreen()
+	if item.description == "No Default Pinned File" {
+		m.list.NewStatusMessage(statusMessageStyle("Item has no path"))
+		return nil
+	}
 
-	err := note.OpenFromPath(p, false)
+	launch, err := note.EditorLaunchForPath(item.description, false)
 	if err != nil {
-		m.list.NewStatusMessage(statusMessageStyle(fmt.Sprintf("Open Error: %s", err)))
+		m.list.NewStatusMessage(statusMessageStyle(fmt.Sprintf("Open Error: %v", err)))
+		return nil
 	}
 
-	return true
+	m.closingAfterOpen = true
+
+	if !launch.Wait {
+		return func() tea.Msg {
+			startErr := launch.Cmd.Start()
+			if startErr != nil {
+				return pinEditorFinishedMsg{err: startErr}
+			}
+
+			return pinEditorFinishedMsg{waited: false}
+		}
+	}
+
+	return tea.ExecProcess(launch.Cmd, func(execErr error) tea.Msg {
+		return pinEditorFinishedMsg{err: execErr, waited: true}
+	})
 }
 
 func (m *PinListModel) refreshItems(pinType string) tea.Cmd {

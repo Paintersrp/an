@@ -61,6 +61,12 @@ type previewLoadedMsg struct {
 	cacheErr error
 }
 
+type editorFinishedMsg struct {
+	path   string
+	err    error
+	waited bool
+}
+
 func NewNoteListModel(
 	s *state.State,
 	viewName string,
@@ -274,6 +280,20 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		if s, ok := m.list.SelectedItem().(ListItem); ok && s.path == msg.path {
 			m.preview = msg.content
+		}
+
+		return m, nil
+
+	case editorFinishedMsg:
+		if msg.err != nil {
+			m.list.NewStatusMessage(
+				statusStyle(fmt.Sprintf("Open Error: %v", msg.err)),
+			)
+			return m, nil
+		}
+
+		if msg.waited {
+			return m, m.afterExternalEditor()
 		}
 
 		return m, nil
@@ -810,14 +830,14 @@ func (m NoteListModel) editorInstructions() string {
 func (m *NoteListModel) handleDefaultUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.keys.openNote):
-		if ok := m.openNote(false); ok {
-			return m, m.afterExternalEditor()
+		if cmd := m.openNote(false); cmd != nil {
+			return m, cmd
 		}
 		return m, nil
 
 	case key.Matches(msg, m.keys.openNoteInObsidian):
-		if ok := m.openNote(true); ok {
-			return m, m.afterExternalEditor()
+		if cmd := m.openNote(true); cmd != nil {
+			return m, cmd
 		}
 		return m, nil
 
@@ -1115,23 +1135,39 @@ func (m *NoteListModel) refreshSort() tea.Cmd {
 // TODO: should prob use an error over a bool but a "success" flag sort of feels more natural for the context.
 // TODO: unsuccessful opens provide a status message and the program stays live
 // openNote reports success so callers can trigger follow-up updates (like refreshing the preview)
-func (m *NoteListModel) openNote(obsidian bool) bool {
-	var p string
-
-	if i, ok := m.list.SelectedItem().(ListItem); ok {
-		p = i.path
-	} else {
-		return false
+func (m *NoteListModel) openNote(obsidian bool) tea.Cmd {
+	item, ok := m.list.SelectedItem().(ListItem)
+	if !ok {
+		return nil
 	}
 
-	tea.ExitAltScreen()
-
-	err := note.OpenFromPath(p, obsidian)
+	launch, err := note.EditorLaunchForPath(item.path, obsidian)
 	if err != nil {
-		m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Open Error: %s", err)))
+		m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Open Error: %v", err)))
+		return nil
+	}
+	if !launch.Wait {
+		return func() tea.Msg {
+			startErr := launch.Cmd.Start()
+			if startErr != nil {
+				return editorFinishedMsg{path: item.path, err: startErr}
+			}
+
+			return editorFinishedMsg{path: item.path, waited: false}
+		}
 	}
 
-	return true
+	return tea.ExecProcess(launch.Cmd, func(execErr error) tea.Msg {
+		return editorFinishedMsg{path: item.path, err: execErr, waited: true}
+	})
+}
+
+func (m *NoteListModel) afterExternalEditor() tea.Cmd {
+	if cmd := m.handlePreview(true); cmd != nil {
+		return cmd
+	}
+
+	return nil
 }
 
 func (m *NoteListModel) afterExternalEditor() tea.Cmd {
