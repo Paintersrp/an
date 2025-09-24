@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/internal/handler"
 	"github.com/Paintersrp/an/internal/state"
@@ -187,5 +189,24 @@ func TestQuickCaptureCreatesFile(t *testing.T) {
 
 	if string(data) != "scratch body" {
 		t.Fatalf("unexpected scratch file contents: %q", string(data))
+	}
+}
+
+func TestScratchCaptureViewUpdatesWithInput(t *testing.T) {
+	model := newEditorTestModel(t, map[string]string{})
+	_ = model.startScratchCapture()
+
+	if model.editor == nil {
+		t.Fatalf("expected scratch editor to be active")
+	}
+
+	_, cmd := model.handleEditorUpdate(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
+	if cmd != nil {
+		_ = cmd()
+	}
+
+	view := model.View()
+	if !strings.Contains(view, "a") {
+		t.Fatalf("expected scratch view to contain input, got %q", view)
 	}
 }

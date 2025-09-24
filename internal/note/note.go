@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/viper"
 	"golang.org/x/term"
 
+	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/internal/pathutil"
 	"github.com/Paintersrp/an/internal/templater"
 )
@@ -135,6 +136,15 @@ func (note *ZettelkastenNote) Create(
 	if err != nil {
 		cleanup()
 		return false, fmt.Errorf("failed to write to file: %w", err)
+	}
+
+	if file != nil {
+		file.Close()
+		file = nil
+	}
+
+	if err := RunPostCreateHooks(path); err != nil {
+		return false, fmt.Errorf("post-create hook failed: %w", err)
 	}
 
 	return true, nil
@@ -463,31 +473,227 @@ type EditorLaunch struct {
 	Wait bool
 }
 
+type editorCommand struct {
+	command string
+	args    []string
+	wait    bool
+	silence bool
+}
+
+func (cmd editorCommand) launch() (*EditorLaunch, error) {
+	return newEditorLaunch(cmd.command, cmd.args, cmd.wait, cmd.silence)
+}
+
+type editorTemplateContext struct {
+	File     string
+	Vault    string
+	Relative string
+	Filename string
+	Editor   string
+	BaseCmd  string
+	BaseArgs []string
+}
+
 // EditorLaunchForPath prepares an editor command for the provided path without
 // starting it. Callers can decide whether to run the command synchronously or
 // asynchronously based on the returned Wait flag.
 func EditorLaunchForPath(path string, obsidian bool) (*EditorLaunch, error) {
-	var editor string
+	editor := strings.TrimSpace(viper.GetString("editor"))
 	if obsidian {
 		editor = "obsidian"
-	} else {
-		editor = viper.GetString("editor")
 	}
 
+	baseCmd, baseErr := buildEditorCommand(path, editor)
+
+	if !obsidian {
+		var template config.CommandTemplate
+		if err := viper.UnmarshalKey("editor_template", &template); err == nil {
+			if execName := strings.TrimSpace(template.Exec); execName != "" {
+				ctx := buildEditorTemplateContext(path, editor, baseCmd)
+				wrapped, err := applyEditorTemplate(template, ctx, baseCmd)
+				if err != nil {
+					return nil, err
+				}
+				return wrapped.launch()
+			}
+		}
+	}
+
+	if baseErr != nil {
+		return nil, baseErr
+	}
+	if baseCmd == nil {
+		return nil, fmt.Errorf("unable to determine editor command")
+	}
+
+	return baseCmd.launch()
+}
+
+func buildEditorCommand(path string, editor string) (*editorCommand, error) {
 	switch editor {
 	case "nvim":
-		return launchWithNvim(path)
+		return buildNvimCommand(path)
 	case "vim":
-		return newEditorLaunch("vim", []string{path}, true, false)
+		return &editorCommand{command: "vim", args: []string{path}, wait: true}, nil
 	case "nano":
-		return newEditorLaunch("nano", []string{path}, true, false)
+		return &editorCommand{command: "nano", args: []string{path}, wait: true}, nil
 	case "vscode", "code":
-		return launchWithVSCode(path)
+		return buildVSCodeCommand(path)
 	case "obsidian":
-		return launchWithObsidian(path)
+		return buildObsidianCommand(path)
+	case "custom":
+		return nil, fmt.Errorf("custom editor requires an editor_template command")
+	case "":
+		return nil, fmt.Errorf("editor not configured")
 	default:
 		return nil, fmt.Errorf("unsupported editor: %s", editor)
 	}
+}
+
+func buildNvimCommand(path string) (*editorCommand, error) {
+	args := []string{"nvim"}
+	if extra := strings.TrimSpace(viper.GetString("nvimargs")); extra != "" {
+		args = append(args, strings.Fields(extra)...)
+	}
+	args = append(args, path)
+	return &editorCommand{command: args[0], args: args[1:], wait: true}, nil
+}
+
+func buildVSCodeCommand(path string) (*editorCommand, error) {
+	switch runtime.GOOS {
+	case "darwin":
+		return &editorCommand{command: "open", args: []string{"-n", "-b", "com.microsoft.VSCode", "--args", path}, wait: false, silence: true}, nil
+	case "linux":
+		return &editorCommand{command: "code", args: []string{path}, wait: false, silence: true}, nil
+	case "windows":
+		return &editorCommand{command: "cmd", args: []string{"/c", "code", path}, wait: false, silence: true}, nil
+	default:
+		return nil, fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
+	}
+}
+
+func buildObsidianCommand(path string) (*editorCommand, error) {
+	fullVaultDir := viper.GetString("vaultdir")
+	normalizedVaultDir := pathutil.NormalizePath(fullVaultDir)
+	vaultName := filepath.Base(normalizedVaultDir)
+
+	relativePath, err := pathutil.VaultRelative(fullVaultDir, path)
+	if err != nil {
+		return nil, fmt.Errorf("unable to determine relative path for obsidian: %w", err)
+	}
+
+	obsidianURI := fmt.Sprintf("obsidian://open?vault=%s&file=%s", vaultName, relativePath)
+
+	switch runtime.GOOS {
+	case "darwin":
+		return &editorCommand{command: "open", args: []string{obsidianURI}, wait: false, silence: true}, nil
+	case "linux":
+		return &editorCommand{command: "xdg-open", args: []string{obsidianURI}, wait: false, silence: true}, nil
+	case "windows":
+		return &editorCommand{command: "cmd", args: []string{"/c", "start", obsidianURI}, wait: false, silence: true}, nil
+	default:
+		return nil, fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
+	}
+}
+
+func buildEditorTemplateContext(path string, editor string, base *editorCommand) editorTemplateContext {
+	vault := viper.GetString("vaultdir")
+	relative, err := pathutil.VaultRelative(vault, path)
+	if err != nil {
+		relative = path
+	}
+
+	ctx := editorTemplateContext{
+		File:     path,
+		Vault:    vault,
+		Relative: relative,
+		Filename: filepath.Base(path),
+		Editor:   editor,
+		BaseCmd:  editor,
+	}
+
+	if base != nil {
+		if base.command != "" {
+			ctx.BaseCmd = base.command
+		}
+		if len(base.args) > 0 {
+			ctx.BaseArgs = append(ctx.BaseArgs, base.args...)
+		}
+	}
+
+	return ctx
+}
+
+func applyEditorTemplate(template config.CommandTemplate, ctx editorTemplateContext, base *editorCommand) (*editorCommand, error) {
+	execName := strings.TrimSpace(expandEditorPlaceholders(template.Exec, ctx))
+	if execName == "" {
+		return nil, fmt.Errorf("editor_template.exec must not be empty")
+	}
+
+	args := expandTemplateArgs(template.Args, ctx, base)
+
+	wait := true
+	silence := false
+	if base != nil {
+		wait = base.wait
+		silence = base.silence
+	}
+	if template.Wait != nil {
+		wait = *template.Wait
+	}
+	if template.Silence != nil {
+		silence = *template.Silence
+	}
+
+	return &editorCommand{command: execName, args: args, wait: wait, silence: silence}, nil
+}
+
+func expandTemplateArgs(raw []string, ctx editorTemplateContext, base *editorCommand) []string {
+	if len(raw) == 0 {
+		return nil
+	}
+
+	var joined string
+	if base != nil {
+		joined = strings.Join(base.args, " ")
+	}
+
+	args := make([]string, 0, len(raw))
+	for _, token := range raw {
+		trimmed := strings.TrimSpace(token)
+		if trimmed == "{args}" {
+			if base != nil && len(base.args) > 0 {
+				args = append(args, base.args...)
+			}
+			continue
+		}
+
+		expanded := expandEditorPlaceholders(token, ctx)
+		if strings.Contains(expanded, "{args}") {
+			expanded = strings.ReplaceAll(expanded, "{args}", joined)
+		}
+		args = append(args, expanded)
+	}
+
+	return args
+}
+
+func expandEditorPlaceholders(value string, ctx editorTemplateContext) string {
+	replacements := map[string]string{
+		"{file}":     ctx.File,
+		"{vault}":    ctx.Vault,
+		"{relative}": ctx.Relative,
+		"{filename}": ctx.Filename,
+		"{cmd}":      ctx.BaseCmd,
+		"{editor}":   ctx.Editor,
+	}
+
+	result := value
+	for placeholder, replacement := range replacements {
+		result = strings.ReplaceAll(result, placeholder, replacement)
+	}
+
+	return result
 }
 
 // OpenFromPath opens the note in the configured editor.
@@ -495,6 +701,10 @@ func OpenFromPath(path string, obsidian bool) error {
 	launch, err := EditorLaunchForPath(path, obsidian)
 	if err != nil {
 		return err
+	}
+
+	if err := RunPreOpenHooks(path); err != nil {
+		return fmt.Errorf("pre-open hook failed: %w", err)
 	}
 
 	if launch.Wait {
@@ -515,6 +725,9 @@ func OpenFromPath(path string, obsidian bool) error {
 	}
 
 	if !launch.Wait {
+		if err := RunPostOpenHooks(path); err != nil {
+			return fmt.Errorf("post-open hook failed: %w", err)
+		}
 		return nil
 	}
 
@@ -523,58 +736,11 @@ func OpenFromPath(path string, obsidian bool) error {
 		return err
 	}
 
+	if err := RunPostOpenHooks(path); err != nil {
+		return fmt.Errorf("post-open hook failed: %w", err)
+	}
+
 	return nil
-}
-
-func launchWithNvim(path string) (*EditorLaunch, error) {
-	args := []string{"nvim"}
-	if extra := viper.GetString("nvimargs"); extra != "" {
-		args = append(args, strings.Fields(extra)...)
-	}
-	args = append(args, path)
-
-	return newEditorLaunch(args[0], args[1:], true, false)
-}
-
-func launchWithVSCode(path string) (*EditorLaunch, error) {
-	switch runtime.GOOS {
-	case "darwin":
-		return newEditorLaunch("open", []string{"-n", "-b", "com.microsoft.VSCode", "--args", path}, false, true)
-	case "linux":
-		return newEditorLaunch("code", []string{path}, false, true)
-	case "windows":
-		return newEditorLaunch("cmd", []string{"/c", "code", path}, false, true)
-	default:
-		return nil, fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
-	}
-}
-
-func launchWithObsidian(path string) (*EditorLaunch, error) {
-	fullVaultDir := viper.GetString("vaultdir")
-	normalizedVaultDir := pathutil.NormalizePath(fullVaultDir)
-	vaultName := filepath.Base(normalizedVaultDir)
-
-	relativePath, err := pathutil.VaultRelative(fullVaultDir, path)
-	if err != nil {
-		return nil, fmt.Errorf("unable to determine relative path for obsidian: %w", err)
-	}
-
-	obsidianURI := fmt.Sprintf(
-		"obsidian://open?vault=%s&file=%s",
-		vaultName,
-		relativePath,
-	)
-
-	switch runtime.GOOS {
-	case "darwin":
-		return newEditorLaunch("open", []string{obsidianURI}, false, true)
-	case "linux":
-		return newEditorLaunch("xdg-open", []string{obsidianURI}, false, true)
-	case "windows":
-		return newEditorLaunch("cmd", []string{"/c", "start", obsidianURI}, false, true)
-	default:
-		return nil, fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
-	}
 }
 
 func newEditorLaunch(command string, args []string, wait bool, silence bool) (*EditorLaunch, error) {
