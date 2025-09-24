@@ -51,6 +51,40 @@ func TestCycleViewOrder(t *testing.T) {
 	}
 }
 
+func TestEnsureSelectionInBoundsResetsOutOfRangeCursor(t *testing.T) {
+	t.Parallel()
+
+	delegate := list.NewDefaultDelegate()
+	items := []list.Item{
+		ListItem{fileName: "one.md", path: "one"},
+		ListItem{fileName: "two.md", path: "two"},
+		ListItem{fileName: "three.md", path: "three"},
+	}
+
+	l := list.New(items, delegate, 0, 0)
+	l.SetSize(80, 30)
+	l.Select(2)
+
+	model := &NoteListModel{list: l}
+
+	reduced := []list.Item{items[0]}
+	model.list.SetItems(reduced)
+
+	if idx := model.list.Index(); idx == 0 {
+		t.Fatalf("expected index to remain out of bounds before enforcing selection, got %d", idx)
+	}
+
+	model.ensureSelectionInBounds()
+
+	if idx := model.list.Index(); idx != 0 {
+		t.Fatalf("expected index to reset to 0, got %d", idx)
+	}
+
+	if _, ok := model.list.SelectedItem().(ListItem); !ok {
+		t.Fatalf("expected a selected item after resetting selection")
+	}
+}
+
 func TestToggleRenameSeedsInputValue(t *testing.T) {
 	t.Parallel()
 
