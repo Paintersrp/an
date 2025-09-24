@@ -60,7 +60,7 @@ func (s *Service) EnsureEntry(templateType string, index int, tags, links []stri
 	}
 
 	if !exists {
-		if _, err := n.Create(templateType, s.templater, content); err != nil {
+		if _, err := n.Create(templateType, s.templater, content, nil); err != nil {
 			return Entry{}, err
 		}
 		path = n.GetFilepath()

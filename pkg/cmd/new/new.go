@@ -131,7 +131,7 @@ func run(
 	}
 
 	flags.HandlePin(cmd, s.Config, n, "text", title)
-	note.StaticHandleNoteLaunch(n, s.Templater, tmpl, content)
+	note.StaticHandleNoteLaunch(n, s.Templater, tmpl, content, nil)
 
 	if createSymlink {
 		notePath := n.GetFilepath()

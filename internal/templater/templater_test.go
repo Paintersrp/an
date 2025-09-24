@@ -179,3 +179,92 @@ func TestTemplaterExecuteUsesUserTemplateContent(t *testing.T) {
 		t.Fatalf("expected rendered template to match template body %q, got %q", templateBody, rendered)
 	}
 }
+
+func TestManifestResolvesInheritedFields(t *testing.T) {
+	templater := &Templater{
+		templates: TemplateMap{
+			"base": {
+				Content:  "---\nbase\n",
+				Manifest: TemplateManifest{Name: "base", Fields: []TemplateField{{Key: "status", Default: "draft"}}},
+			},
+			"child": {
+				Content:  "child",
+				Manifest: TemplateManifest{Name: "child", Extends: []string{"base"}, Fields: []TemplateField{{Key: "status", Default: "ready"}, {Key: "owner", Required: true}}},
+			},
+		},
+		resolved: make(map[string]resolvedTemplate),
+	}
+
+	manifest, err := templater.Manifest("child")
+	if err != nil {
+		t.Fatalf("Manifest returned error: %v", err)
+	}
+
+	if len(manifest.Fields) != 2 {
+		t.Fatalf("expected two fields, got %d", len(manifest.Fields))
+	}
+
+	if manifest.Fields[0].Key != "status" || manifest.Fields[0].Default != "ready" {
+		t.Fatalf("expected overridden status field, got %#v", manifest.Fields[0])
+	}
+
+	if manifest.Fields[1].Key != "owner" || !manifest.Fields[1].Required {
+		t.Fatalf("expected owner field to be required, got %#v", manifest.Fields[1])
+	}
+}
+
+func TestExecuteInjectsMetadataIntoFrontMatter(t *testing.T) {
+	templater := &Templater{
+		templates: TemplateMap{
+			"custom": {
+				Content:  "---\ntitle: {{.Title}}\n---\nBody",
+				Manifest: TemplateManifest{Name: "custom"},
+			},
+		},
+		resolved: make(map[string]resolvedTemplate),
+	}
+
+	rendered, err := templater.Execute("custom", TemplateData{Title: "Example", Metadata: map[string]interface{}{"status": "draft", "owners": []string{"alex"}}})
+	if err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+
+	if !strings.Contains(rendered, "status: draft") {
+		t.Fatalf("expected front matter to include status, got %q", rendered)
+	}
+
+	if !strings.Contains(rendered, "- alex") {
+		t.Fatalf("expected front matter to include owners list, got %q", rendered)
+	}
+}
+
+func TestEmbeddedProjectReleaseInheritance(t *testing.T) {
+	templater, err := NewTemplater(nil)
+	if err != nil {
+		t.Fatalf("NewTemplater returned error: %v", err)
+	}
+
+	manifest, err := templater.Manifest("project-release")
+	if err != nil {
+		t.Fatalf("Manifest returned error: %v", err)
+	}
+
+	var statusDefault string
+	foundLaunch := false
+	for _, field := range manifest.Fields {
+		if field.Key == "status" {
+			statusDefault = field.Default
+		}
+		if field.Key == "launch_window" {
+			foundLaunch = true
+		}
+	}
+
+	if statusDefault != "building" {
+		t.Fatalf("expected inherited status default to be overridden to 'building', got %q", statusDefault)
+	}
+
+	if !foundLaunch {
+		t.Fatal("expected launch_window field to be present")
+	}
+}

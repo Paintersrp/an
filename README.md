@@ -71,6 +71,23 @@ For quick captures, hit <kbd>q</kbd> to spawn a scratch buffer. Saving with <kbd
 
 Run `an --help` or any subcommand with `--help` to explore the rest of the command surface (journal, todo, settings, pin management, symlinks, etc.).
 
+## Smarter templates & guided capture
+
+Templates can now declare their own metadata requirements and helper text. Each `.tmpl` file may begin with an embedded manifest
+comment (see `internal/templater/templates/project.tmpl` for a complete example) describing extra fields, select options, and
+default values. When you create a note with one of these templates the CLI renders an interactive prompt before opening your
+editor so the answers are recorded in the Markdown front matter automatically—no more ad-hoc status keys.
+
+To make the flow easier to adopt, a dedicated `capture` command guides you through template selection, previews, upstream
+assignment, and view targeting:
+
+```bash
+an capture --template project-release
+```
+
+The capture wizard works with workspace-defined views and any template-specific metadata. You can skip the preview step with
+`--no-preview` or pre-fill values such as `--title` and `--view` when scripting.
+
 ## Testing
 
 Run the unit suite before sending a pull request to confirm core flows still pass:

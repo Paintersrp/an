@@ -1,0 +1,32 @@
+{{/* an:manifest
+name: project-release
+extends:
+  - project
+description: Project template extended with a launch checklist.
+fields:
+  - key: status
+    default: building
+  - key: launch_window
+    prompt: Target launch window
+    required: true
+  - key: rollout_channels
+    prompt: Rollout channels
+    multi: true
+preview: |
+  status: building
+  launch_window: 2024-Q4
+*/}}
+
+---
+## 🚀 Launch Checklist
+- Confirm launch window: {{ index .Metadata "launch_window" }}
+- Identify rollout channels:
+{{- if .Metadata.rollout_channels }}
+{{- range $channel := .Metadata.rollout_channels }}
+  - {{$channel}}
+{{- end}}
+{{- else }}
+  - Add rollout channels after capture.
+{{- end}}
+- Schedule enablement sessions
+- Validate instrumentation coverage

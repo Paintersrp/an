@@ -1,3 +1,29 @@
+{{/* an:manifest
+name: project
+description: Project overview note with delivery status metadata.
+fields:
+  - key: status
+    prompt: Project status
+    type: select
+    options: [ideation, exploring, building, shipped, paused]
+    default: ideation
+    required: true
+  - key: effort
+    prompt: Estimated effort
+    type: select
+    options: [XS, S, M, L, XL]
+    default: M
+  - key: owner
+    prompt: Primary owner
+    required: true
+  - key: stakeholders
+    prompt: Stakeholders
+    multi: true
+preview: |
+  status: ideation
+  effort: M
+  owner: TBD
+*/}}
 ---
 title: {{.Title}}
 created: {{.Date}}
@@ -65,6 +91,17 @@ Detail the technologies, frameworks, and tools that will be utilized in this pro
 - Documentation
 - Issue Tracker
 - Roadmap
+
+{{- with $stakeholders := .Metadata.stakeholders }}
+{{- if gt (len $stakeholders) 0 }}
+---
+
+## 🧑‍🤝‍🧑 Stakeholders
+{{- range $stakeholder := $stakeholders }}
+- {{$stakeholder}}
+{{- end}}
+{{- end}}
+{{- end}}
 
 ---
 
