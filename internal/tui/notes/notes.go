@@ -543,6 +543,8 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.list = nl
 	cmds = append(cmds, cmd)
 
+	m.ensureSelectionInBounds()
+
 	if nextSelection := m.currentSelectionPath(); nextSelection != previousSelection {
 		if nextSelection == "" {
 			m.preview = ""
@@ -562,6 +564,18 @@ func (m NoteListModel) currentSelectionPath() string {
 	}
 
 	return ""
+}
+
+func (m *NoteListModel) ensureSelectionInBounds() {
+	visible := m.list.VisibleItems()
+	if len(visible) == 0 {
+		m.list.ResetSelected()
+		return
+	}
+
+	if idx := m.list.Index(); idx >= len(visible) {
+		m.list.ResetSelected()
+	}
 }
 
 func (m NoteListModel) handleCopyUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
