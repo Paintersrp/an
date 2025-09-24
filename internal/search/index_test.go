@@ -20,6 +20,53 @@ func writeNote(t *testing.T, dir, name, content string) string {
 	return path
 }
 
+func TestIndexUpdateHandlesChangesAndRemovals(t *testing.T) {
+	dir := t.TempDir()
+	path := writeNote(t, dir, "note.md", "---\ntitle: First\n---\noriginal content")
+
+	idx := NewIndex(dir, Config{EnableBody: true})
+	if err := idx.Build([]string{path}); err != nil {
+		t.Fatalf("Build returned error: %v", err)
+	}
+
+	// Modify the note and update using a relative path to ensure normalization
+	// succeeds.
+	updated := "---\ntitle: First\n---\noriginal content with updated term"
+	if err := os.WriteFile(path, []byte(updated), 0o644); err != nil {
+		t.Fatalf("rewrite note: %v", err)
+	}
+
+	rel, err := filepath.Rel(dir, path)
+	if err != nil {
+		t.Fatalf("filepath.Rel returned error: %v", err)
+	}
+
+	if err := idx.Update(rel); err != nil {
+		t.Fatalf("Update returned error: %v", err)
+	}
+
+	results := idx.Search(Query{Term: "updated"})
+	if len(results) != 1 {
+		t.Fatalf("expected updated note to be searchable, got %+v", results)
+	}
+	if results[0].Path != filepath.Clean(path) {
+		t.Fatalf("expected result path %s, got %s", filepath.Clean(path), results[0].Path)
+	}
+
+	if err := os.Remove(path); err != nil {
+		t.Fatalf("remove note: %v", err)
+	}
+
+	if err := idx.Update(path); err != nil {
+		t.Fatalf("Update after removal returned error: %v", err)
+	}
+
+	results = idx.Search(Query{Term: "updated"})
+	if len(results) != 0 {
+		t.Fatalf("expected removed note to disappear from index, got %+v", results)
+	}
+}
+
 func TestIndexSearchBodyRespectsToggle(t *testing.T) {
 	t.Parallel()
 
