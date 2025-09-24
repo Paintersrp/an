@@ -262,6 +262,35 @@ func StaticHandleNoteLaunch(
 }
 
 func CollectTemplateMetadata(t *templater.Templater, templateName string) (map[string]interface{}, error) {
+	interactive := term.IsTerminal(int(os.Stdin.Fd()))
+	if interactive {
+		execName := filepath.Base(os.Args[0])
+		if strings.HasSuffix(execName, ".test") {
+			interactive = false
+		}
+	}
+
+	return collectTemplateMetadata(t, templateName, interactive, func() *bufio.Reader {
+		if interactive {
+			return bufio.NewReader(os.Stdin)
+		}
+		return nil
+	}())
+}
+
+// CollectTemplateMetadataNonInteractive gathers metadata defaults and validates required
+// fields without prompting the user for input. This is intended for callers that cannot
+// interact with stdin, such as the TUI, but still need manifest processing.
+func CollectTemplateMetadataNonInteractive(t *templater.Templater, templateName string) (map[string]interface{}, error) {
+	return collectTemplateMetadata(t, templateName, false, nil)
+}
+
+func collectTemplateMetadata(
+	t *templater.Templater,
+	templateName string,
+	interactive bool,
+	reader *bufio.Reader,
+) (map[string]interface{}, error) {
 	manifest, err := t.Manifest(templateName)
 	if err != nil {
 		return nil, err
@@ -270,17 +299,11 @@ func CollectTemplateMetadata(t *templater.Templater, templateName string) (map[s
 		return map[string]interface{}{}, nil
 	}
 
-	interactive := term.IsTerminal(int(os.Stdin.Fd()))
-	if interactive {
-		execName := filepath.Base(os.Args[0])
-		if strings.HasSuffix(execName, ".test") {
-			interactive = false
-		}
-	}
 	answers := make(map[string]interface{})
 
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Printf("Template %s requires additional details:\n", manifest.Name)
+	if interactive {
+		fmt.Printf("Template %s requires additional details:\n", manifest.Name)
+	}
 
 	for _, field := range manifest.Fields {
 		if field.Key == "" {

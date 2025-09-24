@@ -15,6 +15,15 @@ import (
 	"github.com/Paintersrp/an/internal/templater"
 )
 
+func newTestTemplater(t *testing.T) *templater.Templater {
+	t.Helper()
+	tmpl, err := templater.NewTemplater(nil)
+	if err != nil {
+		t.Fatalf("failed to create templater: %v", err)
+	}
+	return tmpl
+}
+
 func TestHandleSubmitUsesDefaultTemplateWhenEmpty(t *testing.T) {
 	tempDir := t.TempDir()
 
@@ -31,7 +40,7 @@ func TestHandleSubmitUsesDefaultTemplateWhenEmpty(t *testing.T) {
 	model := FormModel{
 		state: &state.State{
 			Vault:     tempDir,
-			Templater: &templater.Templater{},
+			Templater: newTestTemplater(t),
 		},
 		Inputs:           inputs,
 		availableSubdirs: []string{"notes"},
@@ -89,7 +98,7 @@ func TestHandleSubmitAllowsEmptySubdirectory(t *testing.T) {
 	model := FormModel{
 		state: &state.State{
 			Vault:     tempDir,
-			Templater: &templater.Templater{},
+			Templater: newTestTemplater(t),
 		},
 		Inputs:           inputs,
 		availableSubdirs: []string{"notes"},
@@ -145,7 +154,7 @@ func TestHandleSubmitAllowsLongTitle(t *testing.T) {
 
 	model := NewFormModel(&state.State{
 		Vault:     tempDir,
-		Templater: &templater.Templater{},
+		Templater: newTestTemplater(t),
 	})
 
 	longTitle := strings.Repeat("Long title ", 3) + "with more"
@@ -227,7 +236,7 @@ func TestHandleSubmitAllowsNestedSubdirectory(t *testing.T) {
 	model := FormModel{
 		state: &state.State{
 			Vault:     tempDir,
-			Templater: &templater.Templater{},
+			Templater: newTestTemplater(t),
 		},
 		Inputs:           inputs,
 		availableSubdirs: []string{"notes"},
