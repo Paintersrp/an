@@ -591,13 +591,13 @@ func (m NoteListModel) currentSelectionPath() string {
 }
 
 func (m *NoteListModel) ensureSelectionInBounds() {
-	visible := m.list.VisibleItems()
-	if len(visible) == 0 {
+	items := m.list.Items()
+	if len(items) == 0 {
 		m.list.ResetSelected()
 		return
 	}
 
-	if idx := m.list.Index(); idx >= len(visible) {
+	if idx := m.list.Index(); idx >= len(items) {
 		m.list.ResetSelected()
 	}
 }
