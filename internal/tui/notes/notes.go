@@ -1158,7 +1158,6 @@ func (m *NoteListModel) openNote(obsidian bool) tea.Cmd {
 		m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Open Error: %v", err)))
 		return nil
 	}
-
 	if !launch.Wait {
 		return func() tea.Msg {
 			startErr := launch.Cmd.Start()
@@ -1169,6 +1168,7 @@ func (m *NoteListModel) openNote(obsidian bool) tea.Cmd {
 			return editorFinishedMsg{path: item.path, waited: false}
 		}
 	}
+
 	return tea.ExecProcess(launch.Cmd, func(execErr error) tea.Msg {
 		return editorFinishedMsg{path: item.path, err: execErr, waited: true}
 	})
