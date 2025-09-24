@@ -16,6 +16,8 @@ type Task struct {
 	Status  string
 	Content string
 	ID      int
+	Path    string
+	Line    int
 }
 
 type TaskHandler struct {
@@ -30,22 +32,24 @@ func NewTaskHandler() *TaskHandler {
 	}
 }
 
-func (th *TaskHandler) ParseTask(content string) {
+func (th *TaskHandler) ParseTask(content, path string, line int) {
 	if (strings.HasPrefix(content, "[ ]") || strings.HasPrefix(content, "[x]")) &&
 		len(strings.TrimSpace(content[3:])) > 0 {
 		status := "unchecked"
 		if strings.HasPrefix(content, "[x]") {
 			status = "checked"
 		}
-		th.AddTask(status, strings.TrimSpace(content[3:]))
+		th.AddTask(status, strings.TrimSpace(content[3:]), path, line)
 	}
 }
 
-func (th *TaskHandler) AddTask(status, content string) {
+func (th *TaskHandler) AddTask(status, content, path string, line int) {
 	th.Tasks[th.NextID] = Task{
 		ID:      th.NextID,
 		Status:  status,
 		Content: content,
+		Path:    path,
+		Line:    line,
 	}
 	th.NextID++
 }

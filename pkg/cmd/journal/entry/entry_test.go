@@ -10,6 +10,8 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/Paintersrp/an/internal/config"
+	"github.com/Paintersrp/an/internal/handler"
+	"github.com/Paintersrp/an/internal/services/journal"
 	"github.com/Paintersrp/an/internal/state"
 	"github.com/Paintersrp/an/internal/templater"
 	"github.com/Paintersrp/an/utils"
@@ -50,11 +52,14 @@ func setupEntryTest(t *testing.T) (*state.State, string) {
 		t.Fatalf("failed to create templater: %v", err)
 	}
 
+	h := handler.NewFileHandler(vaultDir)
+
 	st := &state.State{
 		Config:        cfg,
 		Workspace:     ws,
 		WorkspaceName: "default",
 		Templater:     tmpl,
+		Handler:       h,
 		Vault:         vaultDir,
 	}
 
@@ -67,7 +72,8 @@ func TestRunWithTagsOnly(t *testing.T) {
 	cmd := NewCmdEntry(st, "day")
 	args := []string{"test-tag"}
 
-	if err := run(cmd, args, st.Templater, 0, "day"); err != nil {
+	svc := journal.NewService(st.Templater, st.Handler)
+	if err := run(cmd, args, svc, 0, "day"); err != nil {
 		t.Fatalf("run returned error: %v", err)
 	}
 
@@ -90,7 +96,8 @@ func TestRunWithTagsAndInlineContent(t *testing.T) {
 	cmd := NewCmdEntry(st, "day")
 	args := []string{"inline-tag", "Inline content! #1"}
 
-	if err := run(cmd, args, st.Templater, 0, "day"); err != nil {
+	svc := journal.NewService(st.Templater, st.Handler)
+	if err := run(cmd, args, svc, 0, "day"); err != nil {
 		t.Fatalf("run returned error: %v", err)
 	}
 
@@ -131,7 +138,8 @@ func TestRunWithPasteContent(t *testing.T) {
 
 	args := []string{"paste-tag"}
 
-	if err := run(cmd, args, st.Templater, 0, "day"); err != nil {
+	svc := journal.NewService(st.Templater, st.Handler)
+	if err := run(cmd, args, svc, 0, "day"); err != nil {
 		t.Fatalf("run returned error: %v", err)
 	}
 

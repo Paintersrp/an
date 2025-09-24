@@ -67,10 +67,27 @@ tags:
 
 func TestTaskHandlerParseTaskIgnoresEmptyContent(t *testing.T) {
 	handler := NewTaskHandler()
-	handler.ParseTask("[ ]   ")
+	handler.ParseTask("[ ]   ", "", 0)
 
 	if len(handler.Tasks) != 0 {
 		t.Fatalf("expected no tasks to be added for empty content, got %#v", handler.Tasks)
+	}
+}
+
+func TestTaskHandlerRecordsPathAndLine(t *testing.T) {
+	handler := NewTaskHandler()
+	handler.ParseTask("[ ] example", "/tmp/note.md", 42)
+
+	if len(handler.Tasks) != 1 {
+		t.Fatalf("expected a single task to be recorded, got %d", len(handler.Tasks))
+	}
+
+	task := handler.Tasks[1]
+	if task.Path != "/tmp/note.md" {
+		t.Fatalf("expected path to be recorded, got %q", task.Path)
+	}
+	if task.Line != 42 {
+		t.Fatalf("expected line number 42, got %d", task.Line)
 	}
 }
 

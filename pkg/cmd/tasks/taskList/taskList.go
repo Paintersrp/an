@@ -3,10 +3,12 @@ package taskList
 import (
 	"fmt"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 
-	"github.com/Paintersrp/an/internal/parser"
+	services "github.com/Paintersrp/an/internal/services/tasks"
 	"github.com/Paintersrp/an/internal/state"
+	tableTui "github.com/Paintersrp/an/internal/tui/table"
 )
 
 func NewCmdTasksList(s *state.State) *cobra.Command {
@@ -28,14 +30,21 @@ func NewCmdTasksList(s *state.State) *cobra.Command {
 }
 
 func run(s *state.State) error {
-	p := parser.NewParser(s.Vault)
+	if s == nil || s.Handler == nil {
+		return fmt.Errorf("task list requires a configured state handler")
+	}
 
-	if err := p.Walk(); err != nil {
-		fmt.Println("Error:", err)
+	svc := services.NewService(s.Handler)
+	items, err := svc.List()
+	if err != nil {
 		return err
 	}
 
-	p.ShowTasksTable()
+	tableModel := services.TableFromItems(items, 20)
+	program := tea.NewProgram(tableTui.NewTableModel(tableModel))
+	if _, err := program.Run(); err != nil {
+		return err
+	}
 
 	return nil
 }

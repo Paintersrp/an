@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -66,11 +67,21 @@ func (p *Parser) parse(path string) error {
 				switch n := n.(type) {
 				case *ast.ListItem:
 					content := strings.TrimSpace(string(n.Text(source)))
+					line := 0
+					if lines := n.Lines(); lines != nil && lines.Len() > 0 {
+						segment := lines.At(0)
+						line = 1 + bytes.Count(source[:segment.Start], []byte("\n"))
+					} else if child := n.FirstChild(); child != nil {
+						if clines := child.Lines(); clines != nil && clines.Len() > 0 {
+							segment := clines.At(0)
+							line = 1 + bytes.Count(source[:segment.Start], []byte("\n"))
+						}
+					}
 
 					if inTagsSection {
 						p.TagHandler.ParseTag(content)
 					} else {
-						p.TaskHandler.ParseTask(content)
+						p.TaskHandler.ParseTask(content, path, line)
 					}
 				case *ast.Text:
 					content := strings.TrimSpace(string(n.Text(source)))
