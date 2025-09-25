@@ -313,14 +313,16 @@ func (vm *ViewManager) defaultViews() map[string]View {
 			Sort:        SortDefinition{Field: SortFieldModified, Order: SortOrderDescending},
 		},
 		"archive": {
-			Name:        "archive",
-			ExcludeDirs: archiveExclude,
-			Sort:        SortDefinition{Field: SortFieldModified, Order: SortOrderDescending},
+			Name:            "archive",
+			IncludePatterns: []string{"archive"},
+			ExcludeDirs:     archiveExclude,
+			Sort:            SortDefinition{Field: SortFieldModified, Order: SortOrderDescending},
 		},
 		"trash": {
-			Name:        "trash",
-			ExcludeDirs: trashExclude,
-			Sort:        SortDefinition{Field: SortFieldModified, Order: SortOrderDescending},
+			Name:            "trash",
+			IncludePatterns: []string{"trash"},
+			ExcludeDirs:     trashExclude,
+			Sort:            SortDefinition{Field: SortFieldModified, Order: SortOrderDescending},
 		},
 	}
 
