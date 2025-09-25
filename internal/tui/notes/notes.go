@@ -21,6 +21,7 @@ import (
 	"github.com/Paintersrp/an/internal/cache"
 	"github.com/Paintersrp/an/internal/note"
 	"github.com/Paintersrp/an/internal/pathutil"
+	"github.com/Paintersrp/an/internal/review"
 	"github.com/Paintersrp/an/internal/search"
 	"github.com/Paintersrp/an/internal/state"
 	journaltui "github.com/Paintersrp/an/internal/tui/journal"
@@ -41,6 +42,7 @@ type NoteListModel struct {
 	delegateKeys        *delegateKeyMap
 	state               *state.State
 	preview             string
+	previewSummary      string
 	viewName            string
 	formModel           submodels.FormModel
 	inputModel          submodels.InputModel
@@ -59,11 +61,13 @@ type NoteListModel struct {
 	lastSearchRebuild   time.Time
 	highlights          *highlightStore
 	pendingIndexUpdates map[string]struct{}
+	reviewQueue         []review.ResurfaceItem
 }
 
 type previewLoadedMsg struct {
 	path     string
-	content  string
+	markdown string
+	summary  string
 	cacheErr error
 }
 
@@ -432,7 +436,8 @@ func (m *NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		if s, ok := m.list.SelectedItem().(ListItem); ok && s.path == msg.path {
-			m.preview = msg.content
+			m.preview = msg.markdown
+			m.previewSummary = msg.summary
 		}
 
 		return m, nil
@@ -575,6 +580,7 @@ func (m *NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if nextSelection := m.currentSelectionPath(); nextSelection != previousSelection {
 		if nextSelection == "" {
 			m.preview = ""
+			m.previewSummary = ""
 		}
 
 		if cmd := m.handlePreview(false); cmd != nil {
@@ -1195,11 +1201,21 @@ func (m NoteListModel) View() string {
 		return appStyle.Render(layout)
 	}
 
+	content := m.preview
+	if summary := strings.TrimSpace(m.previewSummary); summary != "" {
+		renderedSummary := previewSummaryStyle.Render(summary)
+		if strings.TrimSpace(content) != "" {
+			content = fmt.Sprintf("%s\n\n%s", renderedSummary, content)
+		} else {
+			content = renderedSummary
+		}
+	}
+
 	preview := previewStyle.Render(
 		lipgloss.NewStyle().
 			Height(m.list.Height()).
 			MaxHeight(m.list.Height()).
-			Render(fmt.Sprintf("%s\n%s", titleStyle.Render("Preview"), m.preview)),
+			Render(fmt.Sprintf("%s\n%s", titleStyle.Render("Preview"), content)),
 	)
 
 	layout := lipgloss.JoinHorizontal(lipgloss.Top, list, preview)
@@ -1265,21 +1281,53 @@ func (m *NoteListModel) handlePreview(force bool) tea.Cmd {
 		selectedPath = s.path
 	} else {
 		m.preview = ""
+		m.previewSummary = ""
 		return nil
 	}
 
+	width := m.width / 2
+	height := m.list.Height()
+
+	var override *search.RelatedNotes
+	if m.highlights != nil {
+		if related, ok := m.highlights.related(selectedPath); ok {
+			override = &related
+		}
+	}
+
+	vault := ""
+	if m.state != nil {
+		vault = m.state.Vault
+	}
+
+	queuePaths := m.queuePaths()
+
 	cache := m.cache
 	if cache == nil {
-		width := m.width / 2
-		height := m.list.Height()
-		return renderPreviewCmd(selectedPath, width, height, nil)
+		req := previewRequest{
+			path:     selectedPath,
+			width:    width,
+			height:   height,
+			index:    m.searchIndex,
+			vault:    vault,
+			queue:    queuePaths,
+			override: override,
+		}
+		return renderPreviewCmd(req)
 	}
 
 	if !force {
 		if cached, exists, err := cache.Get(selectedPath); err == nil && exists {
-			if preview, ok := cached.(string); ok {
-				m.preview = preview
-				return nil
+			if markdown, ok := cached.(string); ok {
+				req := previewRequest{
+					path:        selectedPath,
+					index:       m.searchIndex,
+					vault:       vault,
+					queue:       queuePaths,
+					override:    override,
+					preRendered: markdown,
+				}
+				return renderPreviewCmd(req)
 			}
 
 			m.list.NewStatusMessage(
@@ -1292,27 +1340,92 @@ func (m *NoteListModel) handlePreview(force bool) tea.Cmd {
 		}
 	}
 
-	width := m.width / 2
-	height := m.list.Height()
-
-	return renderPreviewCmd(selectedPath, width, height, cache)
+	req := previewRequest{
+		path:     selectedPath,
+		width:    width,
+		height:   height,
+		cache:    cache,
+		index:    m.searchIndex,
+		vault:    vault,
+		queue:    queuePaths,
+		override: override,
+	}
+	return renderPreviewCmd(req)
 }
 
-func renderPreviewCmd(path string, width, height int, cache *cache.Cache) tea.Cmd {
-	return func() tea.Msg {
-		rendered := utils.RenderMarkdownPreview(path, width, height)
+type previewRequest struct {
+	path        string
+	width       int
+	height      int
+	cache       *cache.Cache
+	index       *search.Index
+	vault       string
+	queue       []string
+	override    *search.RelatedNotes
+	preRendered string
+}
 
+func renderPreviewCmd(req previewRequest) tea.Cmd {
+	queueCopy := append([]string(nil), req.queue...)
+
+	var overrideCopy *search.RelatedNotes
+	if req.override != nil {
+		related := search.RelatedNotes{}
+		if len(req.override.Outbound) > 0 {
+			related.Outbound = append([]string(nil), req.override.Outbound...)
+		}
+		if len(req.override.Backlinks) > 0 {
+			related.Backlinks = append([]string(nil), req.override.Backlinks...)
+		}
+		overrideCopy = &related
+	}
+
+	return func() tea.Msg {
+		rendered := req.preRendered
 		var cacheErr error
-		if cache != nil {
-			cacheErr = cache.Put(path, rendered)
+
+		if rendered == "" {
+			rendered = utils.RenderMarkdownPreview(req.path, req.width, req.height)
+			if req.cache != nil {
+				cacheErr = req.cache.Put(req.path, rendered)
+			}
 		}
 
+		ctx := buildPreviewContext(req.path, req.index, queueCopy, overrideCopy)
+		summary := formatPreviewContext(ctx, req.vault)
+
 		return previewLoadedMsg{
-			path:     path,
-			content:  rendered,
+			path:     req.path,
+			markdown: rendered,
+			summary:  summary,
 			cacheErr: cacheErr,
 		}
 	}
+}
+
+func (m *NoteListModel) queuePaths() []string {
+	if len(m.reviewQueue) == 0 {
+		return nil
+	}
+
+	seen := make(map[string]struct{}, len(m.reviewQueue))
+	paths := make([]string, 0, len(m.reviewQueue))
+	for _, item := range m.reviewQueue {
+		cleaned := strings.TrimSpace(item.Path)
+		if cleaned == "" {
+			continue
+		}
+		normalized := pathutil.NormalizePath(cleaned)
+		if normalized == "" {
+			continue
+		}
+		if _, ok := seen[normalized]; ok {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		paths = append(paths, normalized)
+	}
+	return paths
 }
 
 func (m *NoteListModel) refresh() tea.Cmd {

@@ -156,6 +156,29 @@ type RelatedNotes struct {
 	Backlinks []string
 }
 
+// Canonical returns the canonical path for the provided identifier if the
+// document exists in the index. The method resolves aliases and normalizes the
+// resulting path before verifying membership in the index.
+func (idx *Index) Canonical(path string) string {
+	if idx == nil {
+		return ""
+	}
+
+	if resolved := idx.resolveAlias(path); resolved != "" {
+		return resolved
+	}
+
+	normalized := idx.normalize(path)
+	if normalized == "" {
+		return ""
+	}
+
+	if _, ok := idx.docs[normalized]; ok {
+		return normalized
+	}
+	return ""
+}
+
 // Related returns the outbound and backlink relationships for the provided
 // note path. The method accepts absolute or relative paths and falls back to
 // alias matching using the index metadata when possible.

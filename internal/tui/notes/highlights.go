@@ -40,3 +40,19 @@ func (s *highlightStore) lookup(path string) (search.Result, bool) {
 	result, ok := s.matches[path]
 	return result, ok
 }
+
+func (s *highlightStore) related(path string) (search.RelatedNotes, bool) {
+	res, ok := s.lookup(path)
+	if !ok {
+		return search.RelatedNotes{}, false
+	}
+
+	related := search.RelatedNotes{}
+	if len(res.Related.Outbound) > 0 {
+		related.Outbound = append([]string(nil), res.Related.Outbound...)
+	}
+	if len(res.Related.Backlinks) > 0 {
+		related.Backlinks = append([]string(nil), res.Related.Backlinks...)
+	}
+	return related, true
+}
