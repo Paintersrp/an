@@ -4,6 +4,7 @@ package notes
 import (
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"os"
@@ -34,7 +35,11 @@ import (
 
 var maxCacheSizeMB int64 = 50
 
-const searchCompactionInterval = time.Hour
+const (
+	searchCompactionInterval  = time.Hour
+	previewChunkSize          = 2048
+	previewLoadingPlaceholder = "Rendering preview..."
+)
 
 type NoteListModel struct {
 	list                list.Model
@@ -77,6 +82,13 @@ type previewLoadedMsg struct {
 	markdown string
 	summary  string
 	cacheErr error
+}
+
+type previewChunkLoadedMsg struct {
+	path  string
+	chunk string
+	reset bool
+	next  tea.Cmd
 }
 
 type editorFinishedMsg struct {
@@ -704,6 +716,18 @@ func (m *NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case submodels.FilterClosedMsg:
 		m.filtering = false
 		return m, nil
+
+	case previewChunkLoadedMsg:
+		if s, ok := m.list.SelectedItem().(ListItem); ok && s.path == msg.path {
+			if msg.reset {
+				m.preview = msg.chunk
+				m.previewSummary = ""
+			} else {
+				m.preview += msg.chunk
+			}
+		}
+
+		return m, msg.next
 
 	case previewLoadedMsg:
 		if msg.cacheErr != nil {
@@ -1786,26 +1810,148 @@ func renderPreviewCmd(req previewRequest) tea.Cmd {
 		overrideCopy = &related
 	}
 
-	return func() tea.Msg {
-		rendered := req.preRendered
-		var cacheErr error
+	streamCmd := func() tea.Msg {
+		ctx := buildPreviewContext(req.path, req.index, queueCopy, overrideCopy)
+		summary := formatPreviewContext(ctx, req.vault)
+		return startPreviewStream(req, summary)
+	}
 
-		if rendered == "" {
-			rendered = utils.RenderMarkdownPreview(req.path, req.width, req.height)
+	if req.preRendered != "" {
+		return streamCmd
+	}
+
+	placeholderCmd := func() tea.Msg {
+		return previewChunkLoadedMsg{
+			path:  req.path,
+			chunk: previewLoadingPlaceholder,
+			reset: true,
+		}
+	}
+
+	return tea.Sequence(placeholderCmd, streamCmd)
+}
+
+func startPreviewStream(req previewRequest, summary string) tea.Msg {
+	if req.preRendered != "" {
+		stream := newCachedPreviewStream(req, summary)
+		return stream.next()
+	}
+
+	renderedContent, err := utils.BuildMarkdownPreviewContent(req.path)
+	if err != nil {
+		return previewLoadedMsg{
+			path:     req.path,
+			markdown: "Error reading file",
+			summary:  summary,
+		}
+	}
+
+	reader, writer := io.Pipe()
+	builder := &strings.Builder{}
+	multiWriter := io.MultiWriter(writer, builder)
+
+	go func() {
+		if err := utils.RenderMarkdownContent(renderedContent, req.width, multiWriter); err != nil {
+			_ = writer.CloseWithError(err)
+			return
+		}
+		_ = writer.Close()
+	}()
+
+	stream := newRenderedPreviewStream(req, summary, reader, builder)
+	return stream.next()
+}
+
+type previewStream struct {
+	path     string
+	reader   io.Reader
+	buf      []byte
+	first    bool
+	finalize func() tea.Msg
+	onError  func(error) tea.Msg
+}
+
+func newCachedPreviewStream(req previewRequest, summary string) *previewStream {
+	return &previewStream{
+		path:   req.path,
+		reader: strings.NewReader(req.preRendered),
+		buf:    make([]byte, previewChunkSize),
+		first:  true,
+		finalize: func() tea.Msg {
+			return previewLoadedMsg{
+				path:     req.path,
+				markdown: req.preRendered,
+				summary:  summary,
+			}
+		},
+	}
+}
+
+func newRenderedPreviewStream(req previewRequest, summary string, reader io.Reader, builder *strings.Builder) *previewStream {
+	return &previewStream{
+		path:   req.path,
+		reader: reader,
+		buf:    make([]byte, previewChunkSize),
+		first:  true,
+		finalize: func() tea.Msg {
+			rendered := builder.String()
+			var cacheErr error
 			if req.cache != nil {
 				cacheErr = req.cache.Put(req.path, rendered)
 			}
+			return previewLoadedMsg{
+				path:     req.path,
+				markdown: rendered,
+				summary:  summary,
+				cacheErr: cacheErr,
+			}
+		},
+		onError: func(err error) tea.Msg {
+			log.Printf("failed to render preview for %s: %v", req.path, err)
+			return previewLoadedMsg{
+				path:     req.path,
+				markdown: "Error rendering markdown",
+				summary:  summary,
+			}
+		},
+	}
+}
+
+func (ps *previewStream) next() tea.Msg {
+	for {
+		n, err := ps.reader.Read(ps.buf)
+		if n > 0 {
+			chunk := string(ps.buf[:n])
+			msg := previewChunkLoadedMsg{
+				path:  ps.path,
+				chunk: chunk,
+				reset: ps.first,
+				next:  ps.nextCmd(),
+			}
+			ps.first = false
+			return msg
 		}
 
-		ctx := buildPreviewContext(req.path, req.index, queueCopy, overrideCopy)
-		summary := formatPreviewContext(ctx, req.vault)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				if ps.finalize != nil {
+					return ps.finalize()
+				}
+				return nil
+			}
 
-		return previewLoadedMsg{
-			path:     req.path,
-			markdown: rendered,
-			summary:  summary,
-			cacheErr: cacheErr,
+			if ps.onError != nil {
+				return ps.onError(err)
+			}
+
+			return nil
 		}
+	}
+}
+
+func (ps *previewStream) nextCmd() tea.Cmd {
+	return func() tea.Msg {
+		return ps.next()
 	}
 }
 
