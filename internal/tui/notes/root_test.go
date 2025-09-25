@@ -136,6 +136,34 @@ func TestRootModelKeepsNotesViewWhenEditorActive(t *testing.T) {
 	}
 }
 
+func TestRootModelViewHeightMatchesWindowSize(t *testing.T) {
+	noteModel := newEditorTestModel(t, map[string]string{"note.md": "content"})
+	root := NewRootModel(noteModel, nil, nil)
+	root.Init()
+
+        const height = 12
+
+        root.Update(tea.WindowSizeMsg{Width: 80, Height: height})
+
+	view := root.View()
+	lines := strings.Split(view, "\n")
+
+	if len(lines) != height {
+		t.Fatalf(
+			"expected %d lines in view, got %d (note height %d, note view lines %d):\n%s",
+			height,
+			len(lines),
+			root.notes.height,
+			lipgloss.Height(root.notes.View()),
+			view,
+		)
+	}
+
+	if len(lines) == 0 || !strings.Contains(lines[0], "Views:") {
+		t.Fatalf("expected header to be visible in view, got %q", view)
+	}
+}
+
 func TestRootViewFillsFrame(t *testing.T) {
 	root := &RootModel{active: viewNotes}
 	root.width = 10
