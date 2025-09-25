@@ -24,26 +24,34 @@ func BuildBacklinkGraph(idx *search.Index, seeds []string) Graph {
 
 	visited := make(map[string]struct{})
 	for _, seed := range seeds {
-		if _, ok := visited[seed]; ok {
+		canonical := idx.Canonical(seed)
+		if canonical == "" {
 			continue
 		}
-		visited[seed] = struct{}{}
+		if _, ok := visited[canonical]; ok {
+			continue
+		}
+		visited[canonical] = struct{}{}
 
-		related := idx.Related(seed)
+		related := idx.Related(canonical)
 		node := GraphNode{
-			Path:      seed,
+			Path:      canonical,
 			Outbound:  append([]string(nil), related.Outbound...),
 			Backlinks: append([]string(nil), related.Backlinks...),
 		}
-		graph.Nodes[seed] = node
+		graph.Nodes[canonical] = node
 
 		for _, neighbor := range append(append([]string(nil), node.Outbound...), node.Backlinks...) {
-			if _, ok := graph.Nodes[neighbor]; ok {
+			normalizedNeighbor := idx.Canonical(neighbor)
+			if normalizedNeighbor == "" {
 				continue
 			}
-			relatedNeighbor := idx.Related(neighbor)
-			graph.Nodes[neighbor] = GraphNode{
-				Path:      neighbor,
+			if _, ok := graph.Nodes[normalizedNeighbor]; ok {
+				continue
+			}
+			relatedNeighbor := idx.Related(normalizedNeighbor)
+			graph.Nodes[normalizedNeighbor] = GraphNode{
+				Path:      normalizedNeighbor,
 				Outbound:  append([]string(nil), relatedNeighbor.Outbound...),
 				Backlinks: append([]string(nil), relatedNeighbor.Backlinks...),
 			}

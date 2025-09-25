@@ -41,6 +41,9 @@ var (
 			Border(lipgloss.NormalBorder(), false, false, false, true).
 			BorderForeground(lipgloss.Color("#334455"))
 
+	previewSummaryStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#94e2d5"))
+
 	textPromptStyle = previewStyle.Copy()
 
 	linkSelectStyle = lipgloss.NewStyle().MarginLeft(1).
