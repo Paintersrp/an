@@ -3,24 +3,25 @@ package notes
 import "github.com/charmbracelet/bubbles/key"
 
 type listKeyMap struct {
-        toggleTitleBar        key.Binding
-        toggleStatusBar       key.Binding
-        togglePagination      key.Binding
-        toggleHelpMenu        key.Binding
-        openNote              key.Binding
-        toggleFocus           key.Binding
-        quit                  key.Binding
-        changeView            key.Binding
-        rename                key.Binding
-        create                key.Binding
-        copy                  key.Binding
-        editInline           key.Binding
-        quickCapture         key.Binding
-        link                  key.Binding
-        submitAltView         key.Binding
-        exitAltView           key.Binding
-        toggleDisplayView     key.Binding
-        switchToDefaultView   key.Binding
+	toggleTitleBar        key.Binding
+	toggleStatusBar       key.Binding
+	togglePagination      key.Binding
+	toggleHelpMenu        key.Binding
+	openNote              key.Binding
+	toggleFocus           key.Binding
+	quit                  key.Binding
+	changeView            key.Binding
+	filterPalette         key.Binding
+	rename                key.Binding
+	create                key.Binding
+	copy                  key.Binding
+	editInline            key.Binding
+	quickCapture          key.Binding
+	link                  key.Binding
+	submitAltView         key.Binding
+	exitAltView           key.Binding
+	toggleDisplayView     key.Binding
+	switchToDefaultView   key.Binding
 	switchToArchiveView   key.Binding
 	switchToOrphanView    key.Binding
 	switchToTrashView     key.Binding
@@ -68,6 +69,10 @@ func newListKeyMap() *listKeyMap {
 			key.WithKeys("V"),
 			key.WithHelp("V", "view"),
 		),
+		filterPalette: key.NewBinding(
+			key.WithKeys("F"),
+			key.WithHelp("F", "filters"),
+		),
 		rename: key.NewBinding(
 			key.WithKeys("R"),
 			key.WithHelp("R", "rename"),
@@ -76,22 +81,22 @@ func newListKeyMap() *listKeyMap {
 			key.WithKeys("C"),
 			key.WithHelp("C", "create"),
 		),
-                copy: key.NewBinding(
-                        key.WithKeys("Y"),
-                        key.WithHelp("Y", "copy"),
-                ),
-                editInline: key.NewBinding(
-                        key.WithKeys("E"),
-                        key.WithHelp("E", "inline edit"),
-                ),
-                quickCapture: key.NewBinding(
-                        key.WithKeys("Q"),
-                        key.WithHelp("Q", "scratch capture"),
-                ),
-                submitAltView: key.NewBinding(
-                        key.WithKeys("enter"),
-                        key.WithHelp("↵", "submit (alt view)"),
-                ),
+		copy: key.NewBinding(
+			key.WithKeys("Y"),
+			key.WithHelp("Y", "copy"),
+		),
+		editInline: key.NewBinding(
+			key.WithKeys("E"),
+			key.WithHelp("E", "inline edit"),
+		),
+		quickCapture: key.NewBinding(
+			key.WithKeys("Q"),
+			key.WithHelp("Q", "scratch capture"),
+		),
+		submitAltView: key.NewBinding(
+			key.WithKeys("enter"),
+			key.WithHelp("↵", "submit (alt view)"),
+		),
 		exitAltView: key.NewBinding(
 			key.WithKeys("esc"),
 			key.WithHelp("esc", "exit alt view"),
@@ -149,12 +154,13 @@ func (m listKeyMap) fullHelp() []key.Binding {
 		m.toggleStatusBar,
 		m.togglePagination,
 		m.toggleHelpMenu,
-                m.toggleDisplayView,
-                m.openNote,
-                m.editInline,
-                m.quickCapture,
-                m.rename,
-                m.copy,
+		m.toggleDisplayView,
+		m.openNote,
+		m.editInline,
+		m.quickCapture,
+		m.filterPalette,
+		m.rename,
+		m.copy,
 		m.changeView,
 		m.switchToDefaultView,
 		m.switchToArchiveView,

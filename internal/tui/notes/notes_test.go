@@ -196,6 +196,90 @@ func TestRefreshItemsClampsSelectionWhenListShrinks(t *testing.T) {
 	}
 }
 
+func TestFilterSummaryFormatting(t *testing.T) {
+	t.Parallel()
+
+	summary := filterSummary([]string{"beta", "alpha"}, map[string][]string{
+		"status": []string{"draft", "active"},
+		"owner":  []string{"alice"},
+	})
+
+	want := "• tags: alpha, beta • owner: alice • status: active, draft"
+	if summary != want {
+		t.Fatalf("expected summary %q, got %q", want, summary)
+	}
+
+	if summary := filterSummary(nil, nil); summary != "" {
+		t.Fatalf("expected empty summary when no filters, got %q", summary)
+	}
+}
+
+func TestApplyActiveFiltersRestrictsItems(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	active := "---\ntitle: Active\ntags:\n  - project\nstatus: active\n---\nbody"
+	done := "---\ntitle: Done\ntags:\n  - project\nstatus: done\n---\nbody"
+
+	activePath := filepath.Join(tempDir, "active.md")
+	donePath := filepath.Join(tempDir, "done.md")
+
+	if err := os.WriteFile(activePath, []byte(active), 0o644); err != nil {
+		t.Fatalf("failed to write active note: %v", err)
+	}
+	if err := os.WriteFile(donePath, []byte(done), 0o644); err != nil {
+		t.Fatalf("failed to write done note: %v", err)
+	}
+
+	fileHandler := handler.NewFileHandler(tempDir)
+	ws := &config.Workspace{VaultDir: tempDir, Search: config.SearchConfig{EnableBody: true}}
+	cfg := &config.Config{
+		Workspaces:       map[string]*config.Workspace{"default": ws},
+		CurrentWorkspace: "default",
+	}
+	if err := cfg.ActivateWorkspace("default"); err != nil {
+		t.Fatalf("failed to activate workspace: %v", err)
+	}
+
+	viewManager, err := views.NewViewManager(fileHandler, cfg)
+	if err != nil {
+		t.Fatalf("NewViewManager returned error: %v", err)
+	}
+
+	model, err := NewNoteListModel(&state.State{
+		Config:        cfg,
+		Workspace:     ws,
+		WorkspaceName: cfg.CurrentWorkspace,
+		Handler:       fileHandler,
+		ViewManager:   viewManager,
+		Vault:         tempDir,
+	}, "default")
+	if err != nil {
+		t.Fatalf("NewNoteListModel returned error: %v", err)
+	}
+
+	model.searchQuery.Tags = []string{"project"}
+	model.searchQuery.Metadata = map[string][]string{"status": []string{"active"}}
+	model.updateFilterStatus()
+	if cmd := model.applyActiveFilters(); cmd != nil {
+		_ = cmd()
+	}
+
+	items := model.list.Items()
+	if len(items) != 1 {
+		t.Fatalf("expected 1 filtered item, got %d", len(items))
+	}
+
+	filtered, ok := items[0].(ListItem)
+	if !ok {
+		t.Fatalf("expected ListItem type, got %T", items[0])
+	}
+
+	if filtered.path != filepath.Clean(activePath) {
+		t.Fatalf("expected filtered path %q, got %q", filepath.Clean(activePath), filtered.path)
+	}
+}
+
 func TestPadAreaPadsViewToRequestedBounds(t *testing.T) {
 	t.Parallel()
 
