@@ -350,16 +350,42 @@ func padFrame(content string, width, height int) string {
 }
 
 func (m *RootModel) updateAll(msg tea.Msg) {
+	var (
+		adjustedMsg tea.WindowSizeMsg
+		useAdjusted bool
+	)
+	if windowMsg, ok := msg.(tea.WindowSizeMsg); ok {
+		adjustedMsg = windowMsg
+		headerLines := lipgloss.Height(m.header())
+		adjustedMsg.Height = windowMsg.Height - headerLines
+		if adjustedMsg.Height < 0 {
+			adjustedMsg.Height = 0
+		}
+		useAdjusted = true
+	}
+
 	if m.notes != nil {
-		model, _ := m.notes.Update(msg)
+		forward := msg
+		if useAdjusted {
+			forward = adjustedMsg
+		}
+		model, _ := m.notes.Update(forward)
 		m.notes = adoptNoteModel(model, m.notes)
 	}
 	if m.tasks != nil {
-		model, _ := m.tasks.Update(msg)
+		forward := msg
+		if useAdjusted {
+			forward = adjustedMsg
+		}
+		model, _ := m.tasks.Update(forward)
 		m.tasks = adoptTasksModel(model, m.tasks)
 	}
 	if m.journal != nil {
-		model, _ := m.journal.Update(msg)
+		forward := msg
+		if useAdjusted {
+			forward = adjustedMsg
+		}
+		model, _ := m.journal.Update(forward)
 		m.journal = adoptJournalModel(model, m.journal)
 	}
 }
