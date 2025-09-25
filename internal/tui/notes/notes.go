@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
 	"time"
 
@@ -45,6 +46,7 @@ type NoteListModel struct {
 	previewSummary      string
 	viewName            string
 	formModel           submodels.FormModel
+	filterModel         *submodels.FilterModel
 	inputModel          submodels.InputModel
 	width               int
 	height              int
@@ -52,6 +54,7 @@ type NoteListModel struct {
 	showDetails         bool
 	creating            bool
 	copying             bool
+	filtering           bool
 	editor              *editorSession
 	sortField           sortField
 	sortOrder           sortOrder
@@ -62,6 +65,10 @@ type NoteListModel struct {
 	highlights          *highlightStore
 	pendingIndexUpdates map[string]struct{}
 	reviewQueue         []review.ResurfaceItem
+	availableTags       []string
+	availableMetadata   map[string][]string
+	allItems            []list.Item
+	searchInitialized   bool
 }
 
 type previewLoadedMsg struct {
@@ -125,6 +132,7 @@ func NewNoteListModel(
 
 	i := submodels.NewInputModel()
 	f := submodels.NewFormModel(s)
+	filterModel := submodels.NewFilterModel()
 
 	m := &NoteListModel{
 		state:               s,
@@ -135,17 +143,26 @@ func NewNoteListModel(
 		delegateKeys:        dkeys,
 		inputModel:          i,
 		formModel:           f,
+		filterModel:         filterModel,
 		renaming:            false,
 		creating:            false,
 		copying:             false,
+		filtering:           false,
 		sortField:           sortField,
 		sortOrder:           sortOrder,
 		highlights:          highlightMatches,
 		pendingIndexUpdates: make(map[string]struct{}),
+		availableMetadata:   make(map[string][]string),
 	}
 
+	m.allItems = append([]list.Item(nil), sortedItems...)
 	m.rebuildSearch(files)
 	m.list.Filter = m.makeFilterFunc()
+	m.updateFilterInventory()
+	m.syncFilterPalette()
+	m.updateFilterStatus()
+	filtered := m.filteredItems()
+	m.list.SetItems(filtered)
 
 	return m, nil
 }
@@ -175,14 +192,21 @@ func (m *NoteListModel) rebuildSearch(paths []string) {
 		IgnoredFolders: append([]string(nil), cfg.IgnoredFolders...),
 	}
 
-	metadata := make(map[string][]string, len(cfg.DefaultMetadataFilters))
-	for key, values := range cfg.DefaultMetadataFilters {
-		metadata[key] = append([]string(nil), values...)
-	}
+	metadata := cloneMetadataMap(cfg.DefaultMetadataFilters)
 
-	m.searchQuery = search.Query{
-		Tags:     append([]string(nil), cfg.DefaultTagFilters...),
-		Metadata: metadata,
+	if !m.searchInitialized {
+		m.searchQuery = search.Query{
+			Tags:     cloneStringSlice(cfg.DefaultTagFilters),
+			Metadata: metadata,
+		}
+		m.searchInitialized = true
+	} else {
+		m.searchQuery.Tags = cloneStringSlice(m.searchQuery.Tags)
+		if len(m.searchQuery.Metadata) == 0 {
+			m.searchQuery.Metadata = make(map[string][]string)
+		} else {
+			m.searchQuery.Metadata = cloneMetadataMap(m.searchQuery.Metadata)
+		}
 	}
 
 	forceRebuild := m.searchIndex == nil ||
@@ -410,6 +434,247 @@ func (m *NoteListModel) makeFilterFunc() list.FilterFunc {
 	}
 }
 
+func (m *NoteListModel) filteredItems() []list.Item {
+	if len(m.allItems) == 0 {
+		return nil
+	}
+
+	if m.searchIndex == nil || (len(m.searchQuery.Tags) == 0 && len(m.searchQuery.Metadata) == 0) {
+		return append([]list.Item(nil), m.allItems...)
+	}
+
+	query := search.Query{
+		Tags:     cloneStringSlice(m.searchQuery.Tags),
+		Metadata: cloneMetadataMap(m.searchQuery.Metadata),
+	}
+
+	matches := m.searchIndex.FilteredDocuments(query)
+	if len(matches) == 0 {
+		return []list.Item{}
+	}
+
+	allowed := make(map[string]struct{}, len(matches))
+	for _, doc := range matches {
+		normalized := pathutil.NormalizePath(doc.Path)
+		if normalized == "" {
+			continue
+		}
+		allowed[normalized] = struct{}{}
+	}
+
+	filtered := make([]list.Item, 0, len(allowed))
+	for _, item := range m.allItems {
+		listItem, ok := item.(ListItem)
+		if !ok {
+			filtered = append(filtered, item)
+			continue
+		}
+		normalized := pathutil.NormalizePath(listItem.path)
+		if _, ok := allowed[normalized]; ok {
+			filtered = append(filtered, item)
+		}
+	}
+
+	return filtered
+}
+
+func (m *NoteListModel) applyActiveFilters() tea.Cmd {
+	filtered := m.filteredItems()
+	cmd := m.list.SetItems(filtered)
+	m.ensureSelectionInBounds()
+	return cmd
+}
+
+func (m *NoteListModel) updateFilterInventory() {
+	tags := make(map[string]struct{})
+	metadataValues := make(map[string]map[string]struct{})
+
+	if m.searchIndex != nil {
+		for _, doc := range m.searchIndex.Documents() {
+			for _, tag := range doc.Tags {
+				trimmed := strings.TrimSpace(tag)
+				if trimmed == "" {
+					continue
+				}
+				tags[trimmed] = struct{}{}
+			}
+			for key, values := range doc.FrontMatter {
+				trimmedKey := strings.TrimSpace(key)
+				if trimmedKey == "" {
+					continue
+				}
+				if _, ok := metadataValues[trimmedKey]; !ok {
+					metadataValues[trimmedKey] = make(map[string]struct{})
+				}
+				for _, value := range values {
+					trimmedValue := strings.TrimSpace(value)
+					if trimmedValue == "" {
+						continue
+					}
+					metadataValues[trimmedKey][trimmedValue] = struct{}{}
+				}
+			}
+		}
+	} else {
+		for _, item := range m.allItems {
+			if listItem, ok := item.(ListItem); ok {
+				for _, tag := range listItem.tags {
+					trimmed := strings.TrimSpace(tag)
+					if trimmed == "" {
+						continue
+					}
+					tags[trimmed] = struct{}{}
+				}
+			}
+		}
+	}
+
+	sortedTags := make([]string, 0, len(tags))
+	for tag := range tags {
+		sortedTags = append(sortedTags, tag)
+	}
+	sort.Strings(sortedTags)
+
+	sortedMetadata := make(map[string][]string, len(metadataValues))
+	keys := make([]string, 0, len(metadataValues))
+	for key := range metadataValues {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		values := metadataValues[key]
+		sortedValues := make([]string, 0, len(values))
+		for value := range values {
+			sortedValues = append(sortedValues, value)
+		}
+		sort.Strings(sortedValues)
+		sortedMetadata[key] = sortedValues
+	}
+
+	m.availableTags = sortedTags
+	m.availableMetadata = sortedMetadata
+
+	if m.filterModel != nil {
+		m.filterModel.SetOptions(sortedTags, sortedMetadata)
+	}
+}
+
+func (m *NoteListModel) syncFilterPalette() {
+	if m.filterModel == nil {
+		return
+	}
+	m.filterModel.SetSelection(m.searchQuery.Tags, m.searchQuery.Metadata)
+}
+
+func (m *NoteListModel) updateFilterStatus() {
+	summary := filterSummary(m.searchQuery.Tags, m.searchQuery.Metadata)
+	singular := "note"
+	plural := "notes"
+	if summary != "" {
+		singular = fmt.Sprintf("note %s", summary)
+		plural = fmt.Sprintf("notes %s", summary)
+	}
+	m.list.SetStatusBarItemName(singular, plural)
+}
+
+func (m *NoteListModel) toggleFilterPalette() tea.Cmd {
+	if m.filtering {
+		m.filtering = false
+		return nil
+	}
+
+	if m.filterModel == nil {
+		m.filterModel = submodels.NewFilterModel()
+	}
+
+	m.filterModel.SetOptions(m.availableTags, m.availableMetadata)
+	m.filterModel.SetSelection(m.searchQuery.Tags, m.searchQuery.Metadata)
+	m.filtering = true
+	return nil
+}
+
+func filterSummary(tags []string, metadata map[string][]string) string {
+	sections := make([]string, 0, 1+len(metadata))
+
+	normalizedTags := cloneStringSlice(tags)
+	if len(normalizedTags) > 0 {
+		sections = append(sections, fmt.Sprintf("tags: %s", strings.Join(normalizedTags, ", ")))
+	}
+
+	keys := make([]string, 0, len(metadata))
+	for key := range metadata {
+		trimmed := strings.TrimSpace(key)
+		if trimmed == "" {
+			continue
+		}
+		keys = append(keys, trimmed)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		values := cloneStringSlice(metadata[key])
+		if len(values) == 0 {
+			continue
+		}
+		sections = append(sections, fmt.Sprintf("%s: %s", key, strings.Join(values, ", ")))
+	}
+
+	if len(sections) == 0 {
+		return ""
+	}
+	return "• " + strings.Join(sections, " • ")
+}
+
+func cloneStringSlice(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+
+	seen := make(map[string]struct{}, len(values))
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			continue
+		}
+		if _, ok := seen[trimmed]; ok {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		out = append(out, trimmed)
+	}
+
+	sort.Strings(out)
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func cloneMetadataMap(src map[string][]string) map[string][]string {
+	if len(src) == 0 {
+		return make(map[string][]string)
+	}
+
+	out := make(map[string][]string, len(src))
+	for key, values := range src {
+		trimmedKey := strings.TrimSpace(key)
+		if trimmedKey == "" {
+			continue
+		}
+		cloned := cloneStringSlice(values)
+		if len(cloned) == 0 {
+			continue
+		}
+		out[trimmedKey] = cloned
+	}
+
+	if len(out) == 0 {
+		return make(map[string][]string)
+	}
+	return out
+}
+
 func (m *NoteListModel) Init() tea.Cmd {
 	var cmds []tea.Cmd
 
@@ -428,6 +693,17 @@ func (m *NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
+	case submodels.FilterSelectionChangedMsg:
+		m.searchQuery.Tags = cloneStringSlice(msg.Tags)
+		m.searchQuery.Metadata = cloneMetadataMap(msg.Metadata)
+		m.syncFilterPalette()
+		m.updateFilterStatus()
+		return m, m.applyActiveFilters()
+
+	case submodels.FilterClosedMsg:
+		m.filtering = false
+		return m, nil
+
 	case previewLoadedMsg:
 		if msg.cacheErr != nil {
 			m.list.NewStatusMessage(
@@ -533,6 +809,11 @@ func (m *NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		if m.list.FilterState() == list.Filtering {
 			break
+		}
+
+		if m.filtering {
+			model, cmd := m.handleFilterUpdate(msg)
+			return model, cmd
 		}
 
 		switch {
@@ -682,6 +963,25 @@ func (m *NoteListModel) handleCreationUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd
 	cmds = append(cmds, cmd)
 
 	return m, tea.Batch(cmds...)
+}
+
+func (m *NoteListModel) handleFilterUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.filterModel == nil {
+		m.filtering = false
+		return m, nil
+	}
+
+	cmd, handled := m.filterModel.Update(msg)
+	if handled {
+		return m, cmd
+	}
+
+	if key.Matches(msg, m.keys.exitAltView) {
+		m.filtering = false
+		return m, nil
+	}
+
+	return m, nil
 }
 
 func (m *NoteListModel) handleEditorUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -1074,6 +1374,9 @@ func (m *NoteListModel) handleDefaultUpdate(msg tea.KeyMsg) (tea.Cmd, bool) {
 	case key.Matches(msg, m.keys.changeView):
 		return m.cycleView(), true
 
+	case key.Matches(msg, m.keys.filterPalette):
+		return m.toggleFilterPalette(), true
+
 	case key.Matches(msg, m.keys.switchToDefaultView):
 		return m.swapView("default"), true
 
@@ -1198,6 +1501,19 @@ func (m NoteListModel) View() string {
 		)
 
 		layout := lipgloss.JoinHorizontal(lipgloss.Top, list, textPrompt)
+		return appStyle.Render(layout)
+	}
+
+	if m.filtering && m.filterModel != nil {
+		palette := filterPaletteStyle.Render(
+			lipgloss.NewStyle().
+				Height(m.list.Height()).
+				MaxHeight(m.list.Height()).
+				Padding(0, 2).
+				Render(m.filterModel.View()),
+		)
+
+		layout := lipgloss.JoinHorizontal(lipgloss.Top, list, palette)
 		return appStyle.Render(layout)
 	}
 
@@ -1451,10 +1767,12 @@ func (m *NoteListModel) refreshItems() tea.Cmd {
 	items := ParseNoteFiles(files, m.state.Vault, m.showDetails)
 	sortedItems := sortItems(castToListItems(items), m.sortField, m.sortOrder)
 	attachHighlightStore(sortedItems, m.highlights)
+	m.allItems = append([]list.Item(nil), sortedItems...)
 	m.rebuildSearch(files)
-	cmd := m.list.SetItems(sortedItems)
-	m.ensureSelectionInBounds()
-	return cmd
+	m.updateFilterInventory()
+	m.syncFilterPalette()
+	m.updateFilterStatus()
+	return m.applyActiveFilters()
 }
 
 func (m *NoteListModel) refreshDelegate() {
@@ -1469,10 +1787,12 @@ func (m *NoteListModel) refreshSort() tea.Cmd {
 		viewSortField(m.sortField),
 		viewSortOrder(m.sortOrder),
 	)
-	items := castToListItems(m.list.Items())
+	items := castToListItems(m.allItems)
 	sortedItems := sortItems(items, m.sortField, m.sortOrder)
+	attachHighlightStore(sortedItems, m.highlights)
+	m.allItems = append([]list.Item(nil), sortedItems...)
 	m.list.ResetSelected()
-	cmd := m.list.SetItems(sortedItems)
+	cmd := m.applyActiveFilters()
 	return tea.Batch(cmd, m.handlePreview(true))
 }
 
