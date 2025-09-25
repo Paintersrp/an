@@ -86,7 +86,11 @@ func NewModel(s *state.State) (*Model, error) {
 		keys:    newKeyMap(),
 	}
 
-	model.setItems(items)
+	if cmd := model.setItems(items); cmd != nil {
+		if msg := cmd(); msg != nil {
+			model.list, _ = model.list.Update(msg)
+		}
+	}
 	return model, nil
 }
 
@@ -279,8 +283,7 @@ func (m *Model) refresh() tea.Cmd {
 		return nil
 	}
 
-	m.setItems(items)
-	return nil
+	return m.setItems(items)
 }
 
 func uniqueSorted(items []services.Item, selector func(services.Item) string) []string {
@@ -370,7 +373,7 @@ func formatMetadataSummary(item services.Item) string {
 	return strings.Join(parts, " • ")
 }
 
-func (m *Model) setItems(items []services.Item) {
+func (m *Model) setItems(items []services.Item) tea.Cmd {
 	m.items = items
 	m.owners = uniqueSorted(items, func(it services.Item) string { return it.Owner })
 	m.projects = uniqueSorted(items, func(it services.Item) string { return it.Project })
@@ -384,7 +387,7 @@ func (m *Model) setItems(items []services.Item) {
 	if m.filters.priorityIdx > len(m.priorities) {
 		m.filters.priorityIdx = 0
 	}
-	m.applyFilters()
+	return m.applyFilters()
 }
 
 func (m *Model) applyFilters() tea.Cmd {
@@ -408,8 +411,7 @@ func (m *Model) applyFilters() tea.Cmd {
 		}
 		filtered = append(filtered, item)
 	}
-	m.list.SetItems(toListItems(filtered))
-	return nil
+	return m.list.SetItems(toListItems(filtered))
 }
 
 func (m *Model) matchesDueFilter(item services.Item, now time.Time) bool {

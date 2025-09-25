@@ -6,6 +6,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/internal/state"
@@ -27,6 +28,8 @@ type RootModel struct {
 	journal *journaltui.Model
 	active  rootView
 	keys    rootKeyMap
+	width   int
+	height  int
 }
 
 type rootKeyMap struct {
@@ -84,6 +87,8 @@ func (m *RootModel) Init() tea.Cmd {
 func (m *RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
 		m.updateAll(msg)
 		return m, nil
 	case tea.QuitMsg:
@@ -160,7 +165,8 @@ func (m *RootModel) View() string {
 		}
 	}
 
-	return strings.Join(sections, "\n")
+	content := strings.Join(sections, "\n")
+	return padFrame(content, m.width, m.height)
 }
 
 func (m *RootModel) header() string {
@@ -313,6 +319,34 @@ func highlight(view rootView, active rootView, label string) string {
 		return fmt.Sprintf("[%s]", label)
 	}
 	return label
+}
+
+func padFrame(content string, width, height int) string {
+	lines := strings.Split(content, "\n")
+	if len(lines) == 0 {
+		lines = []string{""}
+	}
+
+	if width > 0 {
+		for i, line := range lines {
+			pad := width - lipgloss.Width(line)
+			if pad > 0 {
+				lines[i] = line + strings.Repeat(" ", pad)
+			}
+		}
+	}
+
+	if height > len(lines) {
+		blank := ""
+		if width > 0 {
+			blank = strings.Repeat(" ", width)
+		}
+		for len(lines) < height {
+			lines = append(lines, blank)
+		}
+	}
+
+	return strings.Join(lines, "\n")
 }
 
 func (m *RootModel) updateAll(msg tea.Msg) {
