@@ -1,13 +1,17 @@
 package notes
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/charmbracelet/bubbles/list"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/internal/handler"
@@ -56,7 +60,7 @@ func TestCycleViewOrder(t *testing.T) {
 }
 
 func TestApplyViewReplacesListItems(t *testing.T) {
-        tempDir := t.TempDir()
+	tempDir := t.TempDir()
 
 	if err := os.MkdirAll(filepath.Join(tempDir, "trash"), 0o755); err != nil {
 		t.Fatalf("failed to create trash directory: %v", err)
@@ -189,6 +193,90 @@ func TestRefreshItemsClampsSelectionWhenListShrinks(t *testing.T) {
 
 	if _, ok := model.list.SelectedItem().(ListItem); !ok {
 		t.Fatalf("expected a selected item after refreshing list")
+	}
+}
+
+func TestPadAreaPadsViewToRequestedBounds(t *testing.T) {
+	t.Parallel()
+
+	view := "item one\nitem two"
+	width := 12
+	height := 5
+
+	padded := padArea(view, width, height)
+	lines := strings.Split(padded, "\n")
+
+	if len(lines) != height {
+		t.Fatalf("expected %d lines, got %d", height, len(lines))
+	}
+
+	for i, line := range lines {
+		if got := lipgloss.Width(line); got != width {
+			t.Fatalf("line %d: expected width %d, got %d", i, width, got)
+		}
+	}
+
+	for i := 2; i < len(lines); i++ {
+		if strings.TrimSpace(lines[i]) != "" {
+			t.Fatalf("expected padded line %d to be empty, got %q", i, lines[i])
+		}
+	}
+}
+
+type stubMsg struct{}
+
+func TestSequenceWithClearWrapsCommand(t *testing.T) {
+	t.Parallel()
+
+	called := false
+	inner := func() tea.Msg {
+		called = true
+		return stubMsg{}
+	}
+
+	cmd := sequenceWithClear(inner)
+	if cmd == nil {
+		t.Fatalf("expected command, got nil")
+	}
+
+	msg := cmd()
+	seq := reflect.ValueOf(msg)
+	if seq.Kind() != reflect.Slice {
+		t.Fatalf("expected sequence message slice, got %T", msg)
+	}
+
+	if seq.Len() < 1 {
+		t.Fatalf("expected at least one command in sequence, got %d", seq.Len())
+	}
+
+	first, ok := seq.Index(0).Interface().(tea.Cmd)
+	if !ok || first == nil {
+		t.Fatalf("expected clear command to be non-nil")
+	}
+	firstMsg := first()
+	if got := fmt.Sprintf("%T", firstMsg); got != "tea.clearScreenMsg" {
+		t.Fatalf("expected first message to clear screen, got %s", got)
+	}
+
+	if seq.Len() < 2 {
+		t.Fatalf("expected wrapped command to be present, got %d entries", seq.Len())
+	}
+
+	second, ok := seq.Index(1).Interface().(tea.Cmd)
+	if !ok || second == nil {
+		t.Fatalf("expected wrapped command to be non-nil")
+	}
+
+	produced := second()
+	if produced == nil {
+		t.Fatalf("expected wrapped command to produce a message")
+	}
+	if _, ok := produced.(stubMsg); !ok {
+		t.Fatalf("expected wrapped command to return stubMsg, got %T", produced)
+	}
+
+	if !called {
+		t.Fatalf("expected wrapped command to run")
 	}
 }
 
