@@ -624,8 +624,10 @@ func (m *NoteListModel) handleCopyUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			)
 		} else {
 			m.toggleCopy()
-			m.refresh()
-			return m, cmd
+			if refreshCmd := m.refresh(); refreshCmd != nil {
+				cmds = append(cmds, refreshCmd)
+			}
+			return m, tea.Batch(cmds...)
 		}
 	}
 
@@ -651,8 +653,10 @@ func (m *NoteListModel) handleRenameUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 			)
 		} else {
 			m.toggleRename()
-			m.refresh()
-			return m, cmd
+			if refreshCmd := m.refresh(); refreshCmd != nil {
+				cmds = append(cmds, refreshCmd)
+			}
+			return m, tea.Batch(cmds...)
 		}
 	}
 
@@ -1154,10 +1158,7 @@ func (m NoteListModel) View() string {
 		listHeight = m.height
 	}
 
-	listContent := lipgloss.NewStyle().
-		Width(listWidth).
-		Height(listHeight).
-		Render(m.list.View())
+	listContent := padArea(m.list.View(), listWidth, listHeight)
 
 	list := listStyle.Width(listWidth).Render(listContent)
 
@@ -1323,7 +1324,7 @@ func (m *NoteListModel) refresh() tea.Cmd {
 	m.refreshDelegate()
 	cmd := m.refreshItems()
 	m.list.ResetSelected()
-	return tea.Batch(cmd, m.handlePreview(true))
+	return sequenceWithClear(tea.Batch(cmd, m.handlePreview(true)))
 }
 
 func (m *NoteListModel) refreshItems() tea.Cmd {
@@ -1411,6 +1412,41 @@ func (m *NoteListModel) afterExternalEditor() tea.Cmd {
 	return nil
 }
 
+func padArea(view string, width, height int) string {
+	if width <= 0 && height <= 0 {
+		return view
+	}
+
+	lines := strings.Split(view, "\n")
+	if len(lines) == 0 {
+		lines = []string{""}
+	}
+
+	for i, line := range lines {
+		if width <= 0 {
+			continue
+		}
+
+		lineWidth := lipgloss.Width(line)
+		if lineWidth < width {
+			lines[i] = line + strings.Repeat(" ", width-lineWidth)
+		}
+	}
+
+	if height > len(lines) {
+		pad := ""
+		if width > 0 {
+			pad = strings.Repeat(" ", width)
+		}
+
+		for len(lines) < height {
+			lines = append(lines, pad)
+		}
+	}
+
+	return strings.Join(lines, "\n")
+}
+
 func (m *NoteListModel) toggleTitleBar() {
 	v := !m.list.ShowTitle()
 	m.list.SetShowTitle(v)
@@ -1446,6 +1482,10 @@ func (m *NoteListModel) applyView(viewName string) tea.Cmd {
 	m.sortOrder = sortOrderFromView(view.Sort.Order)
 
 	return m.refresh()
+}
+
+func sequenceWithClear(cmd tea.Cmd) tea.Cmd {
+	return tea.Sequence(tea.ClearScreen, cmd)
 }
 
 func sortFieldFromView(field v.SortField) sortField {
