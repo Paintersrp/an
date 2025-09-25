@@ -50,6 +50,7 @@ type NoteListModel struct {
 	inputModel          submodels.InputModel
 	width               int
 	height              int
+	previewWidth        int
 	renaming            bool
 	showDetails         bool
 	creating            bool
@@ -791,7 +792,80 @@ func (m *NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		h, v := appStyle.GetFrameSize()
-		m.list.SetSize(msg.Width-h, msg.Height-v)
+		contentWidth := msg.Width - h
+		contentHeight := msg.Height - v
+		if contentWidth < 0 {
+			contentWidth = msg.Width
+		}
+		if contentWidth < 0 {
+			contentWidth = 0
+		}
+		if contentHeight < 0 {
+			contentHeight = msg.Height
+		}
+		if contentHeight < 0 {
+			contentHeight = 0
+		}
+
+		listFrameWidth, _ := listStyle.GetFrameSize()
+		previewFrameWidth, _ := previewStyle.GetFrameSize()
+		promptFrameWidth, _ := textPromptStyle.GetFrameSize()
+		filterFrameWidth, _ := filterPaletteStyle.GetFrameSize()
+
+		sideFrameWidth := previewFrameWidth
+		if promptFrameWidth > sideFrameWidth {
+			sideFrameWidth = promptFrameWidth
+		}
+		if filterFrameWidth > sideFrameWidth {
+			sideFrameWidth = filterFrameWidth
+		}
+
+		available := contentWidth - listFrameWidth - sideFrameWidth
+		if available < 0 {
+			available = 0
+		}
+
+		listContentWidth := (available * 3) / 5
+		previewContentWidth := available - listContentWidth
+
+		const (
+			minListContent    = 30
+			minPreviewContent = 25
+		)
+
+		if available >= minListContent+minPreviewContent {
+			if listContentWidth < minListContent {
+				listContentWidth = minListContent
+				previewContentWidth = available - listContentWidth
+			}
+			if previewContentWidth < minPreviewContent {
+				previewContentWidth = minPreviewContent
+				listContentWidth = available - previewContentWidth
+			}
+		} else {
+			if previewContentWidth < 0 {
+				previewContentWidth = 0
+			}
+			if listContentWidth < 0 {
+				listContentWidth = 0
+			}
+		}
+
+		if listContentWidth < 0 {
+			listContentWidth = 0
+		}
+		if previewContentWidth < 0 {
+			previewContentWidth = 0
+		}
+
+		// If there isn't enough room for the preview content, allocate the
+		// remaining horizontal space to the list.
+		if previewContentWidth == 0 && available > 0 {
+			listContentWidth = available
+		}
+
+		m.previewWidth = previewContentWidth
+		m.list.SetSize(listContentWidth, contentHeight)
 
 		if m.editor != nil {
 			width, height := m.editorSize()
@@ -1471,14 +1545,21 @@ func (m NoteListModel) View() string {
 
 	list := listStyle.Width(listWidth).Render(listContent)
 
+	sideWidth := m.sidePanelWidth()
+	if sideWidth < 0 {
+		sideWidth = 0
+	}
+
 	if m.copying {
-		textPrompt := textPromptStyle.Render(
-			lipgloss.NewStyle().
-				Height(m.list.Height()).
-				MaxHeight(m.list.Height()).
-				Padding(0, 2).
-				Render(fmt.Sprintf("%s\n\n%s\n\n%s", titleStyle.Render("Choose new name for the copy"), m.inputModel.View(), helpStyle.Render("do not include file extension"))),
-		)
+		promptContent := lipgloss.NewStyle().
+			Width(sideWidth).
+			MaxWidth(sideWidth).
+			Height(listHeight).
+			MaxHeight(listHeight).
+			Padding(0, 2).
+			Render(fmt.Sprintf("%s\n\n%s\n\n%s", titleStyle.Render("Choose new name for the copy"), m.inputModel.View(), helpStyle.Render("do not include file extension")))
+
+		textPrompt := textPromptStyle.Render(promptContent)
 
 		layout := lipgloss.JoinHorizontal(lipgloss.Top, list, textPrompt)
 		return appStyle.Render(layout)
@@ -1492,26 +1573,30 @@ func (m NoteListModel) View() string {
 	}
 
 	if m.renaming {
-		textPrompt := textPromptStyle.Render(
-			lipgloss.NewStyle().
-				Height(m.list.Height()).
-				MaxHeight(m.list.Height()).
-				Padding(0, 2).
-				Render(fmt.Sprintf("%s\n\n%s", titleStyle.Render("Rename File"), m.inputModel.View())),
-		)
+		promptContent := lipgloss.NewStyle().
+			Width(sideWidth).
+			MaxWidth(sideWidth).
+			Height(listHeight).
+			MaxHeight(listHeight).
+			Padding(0, 2).
+			Render(fmt.Sprintf("%s\n\n%s", titleStyle.Render("Rename File"), m.inputModel.View()))
+
+		textPrompt := textPromptStyle.Render(promptContent)
 
 		layout := lipgloss.JoinHorizontal(lipgloss.Top, list, textPrompt)
 		return appStyle.Render(layout)
 	}
 
 	if m.filtering && m.filterModel != nil {
-		palette := filterPaletteStyle.Render(
-			lipgloss.NewStyle().
-				Height(m.list.Height()).
-				MaxHeight(m.list.Height()).
-				Padding(0, 2).
-				Render(m.filterModel.View()),
-		)
+		paletteContent := lipgloss.NewStyle().
+			Width(sideWidth).
+			MaxWidth(sideWidth).
+			Height(listHeight).
+			MaxHeight(listHeight).
+			Padding(0, 2).
+			Render(m.filterModel.View())
+
+		palette := filterPaletteStyle.Render(paletteContent)
 
 		layout := lipgloss.JoinHorizontal(lipgloss.Top, list, palette)
 		return appStyle.Render(layout)
@@ -1527,12 +1612,14 @@ func (m NoteListModel) View() string {
 		}
 	}
 
-	preview := previewStyle.Render(
-		lipgloss.NewStyle().
-			Height(m.list.Height()).
-			MaxHeight(m.list.Height()).
-			Render(fmt.Sprintf("%s\n%s", titleStyle.Render("Preview"), content)),
-	)
+	previewContent := lipgloss.NewStyle().
+		Width(sideWidth).
+		MaxWidth(sideWidth).
+		Height(listHeight).
+		MaxHeight(listHeight).
+		Render(fmt.Sprintf("%s\n%s", titleStyle.Render("Preview"), content))
+
+	preview := previewStyle.Render(previewContent)
 
 	layout := lipgloss.JoinHorizontal(lipgloss.Top, list, preview)
 	return appStyle.Render(layout)
@@ -1601,7 +1688,10 @@ func (m *NoteListModel) handlePreview(force bool) tea.Cmd {
 		return nil
 	}
 
-	width := m.width / 2
+	width := m.sidePanelWidth()
+	if width <= 0 {
+		width = m.width / 2
+	}
 	height := m.list.Height()
 
 	var override *search.RelatedNotes
@@ -1897,6 +1987,23 @@ func (m *NoteListModel) toggleDetails() tea.Cmd {
 func (m *NoteListModel) cycleView() tea.Cmd {
 	next := m.state.ViewManager.NextView(m.viewName)
 	return m.applyView(next)
+}
+
+func (m NoteListModel) sidePanelWidth() int {
+	if m.previewWidth > 0 {
+		return m.previewWidth
+	}
+
+	if m.width <= 0 {
+		return 0
+	}
+
+	fallback := m.width / 2
+	if fallback < 0 {
+		return 0
+	}
+
+	return fallback
 }
 
 func (m *NoteListModel) swapView(newView string) tea.Cmd {
