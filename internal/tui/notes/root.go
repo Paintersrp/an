@@ -334,8 +334,6 @@ func adoptNoteModel(model tea.Model, current *NoteListModel) *NoteListModel {
 	switch m := model.(type) {
 	case *NoteListModel:
 		return m
-	case NoteListModel:
-		return &m
 	default:
 		return current
 	}
