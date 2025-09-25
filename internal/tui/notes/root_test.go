@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/internal/handler"
@@ -135,36 +136,77 @@ func TestRootModelKeepsNotesViewWhenEditorActive(t *testing.T) {
 	}
 }
 
-func TestRootViewPadsToHeight(t *testing.T) {
+func TestRootViewFillsFrame(t *testing.T) {
 	root := &RootModel{active: viewNotes}
+	root.width = 10
 	root.height = 5
 
 	view := root.View()
-	lines := strings.Count(view, "\n") + 1
+	lines := strings.Split(view, "\n")
 
-	if lines < 5 {
-		t.Fatalf("expected view to render at least 5 lines, got %d", lines)
+	if len(lines) != 5 {
+		t.Fatalf("expected view to render 5 lines, got %d", len(lines))
+	}
+
+	for i, line := range lines {
+		if width := lipgloss.Width(line); width < 10 {
+			t.Fatalf("line %d width mismatch: want at least 10, got %d", i, width)
+		}
 	}
 }
 
-func TestPadToHeight(t *testing.T) {
+func TestPadFrame(t *testing.T) {
 	cases := []struct {
 		name    string
 		content string
+		width   int
 		height  int
-		expect  int
+		want    []string
 	}{
-		{name: "no padding when tall", content: "a\nb\nc", height: 2, expect: 3},
-		{name: "pads shorter content", content: "a\nb", height: 5, expect: 5},
-		{name: "handles empty", content: "", height: 3, expect: 3},
+		{
+			name:    "no padding when tall",
+			content: "a\nb\nc",
+			width:   1,
+			height:  2,
+			want:    []string{"a", "b", "c"},
+		},
+		{
+			name:    "pads shorter content",
+			content: "a\nb",
+			width:   3,
+			height:  5,
+			want: []string{
+				"a  ",
+				"b  ",
+				"   ",
+				"   ",
+				"   ",
+			},
+		},
+		{
+			name:    "handles empty",
+			content: "",
+			width:   4,
+			height:  3,
+			want: []string{
+				"    ",
+				"    ",
+				"    ",
+			},
+		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := padToHeight(tc.content, tc.height)
-			lines := strings.Count(got, "\n") + 1
-			if lines != tc.expect {
-				t.Fatalf("expected %d lines, got %d", tc.expect, lines)
+			got := padFrame(tc.content, tc.width, tc.height)
+			lines := strings.Split(got, "\n")
+			if len(lines) != len(tc.want) {
+				t.Fatalf("expected %d lines, got %d", len(tc.want), len(lines))
+			}
+			for i := range lines {
+				if lines[i] != tc.want[i] {
+					t.Fatalf("line %d mismatch: want %q, got %q", i, tc.want[i], lines[i])
+				}
 			}
 		})
 	}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/internal/state"
@@ -165,7 +166,7 @@ func (m *RootModel) View() string {
 	}
 
 	content := strings.Join(sections, "\n")
-	return padToHeight(content, m.height)
+	return padFrame(content, m.width, m.height)
 }
 
 func (m *RootModel) header() string {
@@ -320,17 +321,32 @@ func highlight(view rootView, active rootView, label string) string {
 	return label
 }
 
-func padToHeight(content string, height int) string {
-	if height <= 0 {
-		return content
+func padFrame(content string, width, height int) string {
+	lines := strings.Split(content, "\n")
+	if len(lines) == 0 {
+		lines = []string{""}
 	}
 
-	lines := strings.Count(content, "\n") + 1
-	if lines >= height {
-		return content
+	if width > 0 {
+		for i, line := range lines {
+			pad := width - lipgloss.Width(line)
+			if pad > 0 {
+				lines[i] = line + strings.Repeat(" ", pad)
+			}
+		}
 	}
 
-	return content + strings.Repeat("\n", height-lines)
+	if height > len(lines) {
+		blank := ""
+		if width > 0 {
+			blank = strings.Repeat(" ", width)
+		}
+		for len(lines) < height {
+			lines = append(lines, blank)
+		}
+	}
+
+	return strings.Join(lines, "\n")
 }
 
 func (m *RootModel) updateAll(msg tea.Msg) {
