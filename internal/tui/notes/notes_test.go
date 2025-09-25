@@ -55,6 +55,79 @@ func TestCycleViewOrder(t *testing.T) {
 	}
 }
 
+func TestApplyViewReplacesListItems(t *testing.T) {
+        tempDir := t.TempDir()
+
+	if err := os.MkdirAll(filepath.Join(tempDir, "trash"), 0o755); err != nil {
+		t.Fatalf("failed to create trash directory: %v", err)
+	}
+
+	defaultFiles := []string{"one.md", "two.md"}
+	for _, name := range defaultFiles {
+		path := filepath.Join(tempDir, name)
+		if err := os.WriteFile(path, []byte("default"), 0o644); err != nil {
+			t.Fatalf("failed to write default file %s: %v", name, err)
+		}
+	}
+
+	trashPath := filepath.Join(tempDir, "trash", "trashed.md")
+	if err := os.WriteFile(trashPath, []byte("trashed"), 0o644); err != nil {
+		t.Fatalf("failed to write trashed file: %v", err)
+	}
+
+	fileHandler := handler.NewFileHandler(tempDir)
+	ws := &config.Workspace{VaultDir: tempDir}
+	cfg := &config.Config{
+		Workspaces:       map[string]*config.Workspace{"default": ws},
+		CurrentWorkspace: "default",
+	}
+	if err := cfg.ActivateWorkspace("default"); err != nil {
+		t.Fatalf("failed to activate workspace: %v", err)
+	}
+
+	viewManager, err := views.NewViewManager(fileHandler, cfg)
+	if err != nil {
+		t.Fatalf("NewViewManager returned error: %v", err)
+	}
+
+	state := &state.State{
+		Config:        cfg,
+		Workspace:     ws,
+		WorkspaceName: cfg.CurrentWorkspace,
+		Handler:       fileHandler,
+		ViewManager:   viewManager,
+		Vault:         tempDir,
+	}
+
+	model, err := NewNoteListModel(state, "default")
+	if err != nil {
+		t.Fatalf("NewNoteListModel returned error: %v", err)
+	}
+
+	if got, want := len(model.list.Items()), len(defaultFiles); got != want {
+		t.Fatalf("expected %d default items, got %d", want, got)
+	}
+
+	// Switching to the trash view should replace the current list contents
+	// with only the items present in the trash directory.
+	model.applyView("trash")
+
+	items := model.list.Items()
+	if len(items) != 1 {
+		t.Fatalf("expected 1 trashed item, got %d", len(items))
+	}
+
+	item, ok := items[0].(ListItem)
+	if !ok {
+		t.Fatalf("expected ListItem type, got %T", items[0])
+	}
+
+	expectedPath := filepath.Clean(trashPath)
+	if item.path != expectedPath {
+		t.Fatalf("expected trashed item path %q, got %q", expectedPath, item.path)
+	}
+}
+
 func TestRefreshItemsClampsSelectionWhenListShrinks(t *testing.T) {
 	t.Parallel()
 
