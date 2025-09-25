@@ -406,7 +406,7 @@ func (m *NoteListModel) makeFilterFunc() list.FilterFunc {
 	}
 }
 
-func (m NoteListModel) Init() tea.Cmd {
+func (m *NoteListModel) Init() tea.Cmd {
 	var cmds []tea.Cmd
 
 	if m.state != nil && m.state.Watcher != nil {
@@ -420,7 +420,7 @@ func (m NoteListModel) Init() tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
@@ -585,7 +585,7 @@ func (m NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m NoteListModel) currentSelectionPath() string {
+func (m *NoteListModel) currentSelectionPath() string {
 	if s, ok := m.list.SelectedItem().(ListItem); ok {
 		return s.path
 	}
@@ -605,7 +605,7 @@ func (m *NoteListModel) ensureSelectionInBounds() {
 	}
 }
 
-func (m NoteListModel) handleCopyUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *NoteListModel) handleCopyUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	var cmd tea.Cmd
 
@@ -618,7 +618,7 @@ func (m NoteListModel) handleCopyUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	cmds = append(cmds, cmd)
 
 	if key.Matches(msg, m.keys.submitAltView) {
-		if err := copyFile(m); err != nil {
+		if err := copyFile(*m); err != nil {
 			m.list.NewStatusMessage(
 				statusStyle(fmt.Sprintf("Error copying file: %v", err)),
 			)
@@ -632,7 +632,7 @@ func (m NoteListModel) handleCopyUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m NoteListModel) handleRenameUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *NoteListModel) handleRenameUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	var cmd tea.Cmd
 
@@ -645,7 +645,7 @@ func (m NoteListModel) handleRenameUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	cmds = append(cmds, cmd)
 
 	if key.Matches(msg, m.keys.submitAltView) {
-		if err := renameFile(m); err != nil {
+		if err := renameFile(*m); err != nil {
 			m.list.NewStatusMessage(
 				statusStyle(fmt.Sprintf("Error renaming file: %v", err)),
 			)
@@ -674,7 +674,7 @@ func (m *NoteListModel) handleCreationUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd
 	return m, tea.Batch(cmds...)
 }
 
-func (m NoteListModel) handleEditorUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *NoteListModel) handleEditorUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.editor == nil {
 		return m, nil
 	}
