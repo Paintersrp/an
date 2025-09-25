@@ -61,3 +61,14 @@ var (
 	helpStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#cba6f7"))
 )
+
+func renderHelpWithinWidth(width int, content string) string {
+	if width <= 0 {
+		return helpStyle.Render(content)
+	}
+
+	return helpStyle.Copy().
+		Width(width).
+		MaxWidth(width).
+		Render(content)
+}

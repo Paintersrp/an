@@ -1520,7 +1520,7 @@ func (m NoteListModel) View() string {
 		sections := []string{
 			titleStyle.Render(m.editor.viewHeader()),
 			m.editor.area.View(),
-			helpStyle.Render(m.editorInstructions()),
+			renderHelpWithinWidth(width, m.editorInstructions()),
 		}
 
 		if msg := m.editor.status; msg != "" {
