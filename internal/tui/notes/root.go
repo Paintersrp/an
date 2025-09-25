@@ -27,6 +27,8 @@ type RootModel struct {
 	journal *journaltui.Model
 	active  rootView
 	keys    rootKeyMap
+	width   int
+	height  int
 }
 
 type rootKeyMap struct {
@@ -84,6 +86,8 @@ func (m *RootModel) Init() tea.Cmd {
 func (m *RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
 		m.updateAll(msg)
 		return m, nil
 	case tea.QuitMsg:
@@ -160,7 +164,8 @@ func (m *RootModel) View() string {
 		}
 	}
 
-	return strings.Join(sections, "\n")
+	content := strings.Join(sections, "\n")
+	return padToHeight(content, m.height)
 }
 
 func (m *RootModel) header() string {
@@ -313,6 +318,19 @@ func highlight(view rootView, active rootView, label string) string {
 		return fmt.Sprintf("[%s]", label)
 	}
 	return label
+}
+
+func padToHeight(content string, height int) string {
+	if height <= 0 {
+		return content
+	}
+
+	lines := strings.Count(content, "\n") + 1
+	if lines >= height {
+		return content
+	}
+
+	return content + strings.Repeat("\n", height-lines)
 }
 
 func (m *RootModel) updateAll(msg tea.Msg) {

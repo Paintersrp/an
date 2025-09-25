@@ -195,7 +195,9 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				index := m.list.Index()
 				items := m.list.Items()
 				items[index] = ListItem{title: "Editor", description: c}
-				m.list.SetItems(items)
+				if cmd := m.list.SetItems(items); cmd != nil {
+					cmds = append(cmds, cmd)
+				}
 				m.list.NewStatusMessage(statusMessageStyle("Updated and Saved: Editor"))
 
 				editorSel := selection.New(
@@ -241,7 +243,9 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				index := m.list.Index()
 				items := m.list.Items()
 				items[index] = ListItem{title: "FileSystemMode", description: c}
-				m.list.SetItems(items)
+				if cmd := m.list.SetItems(items); cmd != nil {
+					cmds = append(cmds, cmd)
+				}
 				m.list.NewStatusMessage(statusMessageStyle("Updated and Saved: FileSystemMode"))
 
 				modeSel := selection.New(
@@ -339,7 +343,9 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if updateDescription {
 					items := m.list.Items()
 					items[index] = ListItem{title: title, description: inputValue}
-					m.list.SetItems(items)
+					if cmd := m.list.SetItems(items); cmd != nil {
+						cmds = append(cmds, cmd)
+					}
 				}
 
 				m.configInput.Input.Reset()

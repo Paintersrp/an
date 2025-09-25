@@ -5,10 +5,12 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/internal/handler"
+	services "github.com/Paintersrp/an/internal/services/tasks"
 	"github.com/Paintersrp/an/internal/state"
 )
 
@@ -46,5 +48,40 @@ func TestToggleUpdatesTaskFile(t *testing.T) {
 	}
 	if string(data) != "- [x] example" {
 		t.Fatalf("expected task to be toggled, got %q", string(data))
+	}
+}
+
+func TestApplyFiltersResetsVisibleItemsWhenListFiltered(t *testing.T) {
+	delegate := list.NewDefaultDelegate()
+	lm := list.New(nil, delegate, 0, 0)
+
+	model := &Model{
+		list: lm,
+		keys: newKeyMap(),
+	}
+
+	initial := []services.Item{
+		{Content: "alpha task"},
+		{Content: "zzzz"},
+	}
+
+	model.setItems(initial)
+
+	// Activate filtering and enter a non-empty query so the list reports a filtered state.
+	model.list, _ = model.list.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	model.list, _ = model.list.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
+	model.list, _ = model.list.Update(tea.KeyMsg{Type: tea.KeyEnter})
+
+	if model.list.FilterState() != list.FilterApplied {
+		t.Fatalf("expected filter to be applied, got %v", model.list.FilterState())
+	}
+
+	next := []services.Item{
+		{Content: "zzzz"},
+	}
+
+	cmd := model.setItems(next)
+	if cmd == nil {
+		t.Fatalf("expected applyFilters to return a command when a filter is active")
 	}
 }

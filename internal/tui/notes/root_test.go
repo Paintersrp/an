@@ -134,3 +134,38 @@ func TestRootModelKeepsNotesViewWhenEditorActive(t *testing.T) {
 		t.Fatalf("expected editor to capture input, got %q", got)
 	}
 }
+
+func TestRootViewPadsToHeight(t *testing.T) {
+	root := &RootModel{active: viewNotes}
+	root.height = 5
+
+	view := root.View()
+	lines := strings.Count(view, "\n") + 1
+
+	if lines < 5 {
+		t.Fatalf("expected view to render at least 5 lines, got %d", lines)
+	}
+}
+
+func TestPadToHeight(t *testing.T) {
+	cases := []struct {
+		name    string
+		content string
+		height  int
+		expect  int
+	}{
+		{name: "no padding when tall", content: "a\nb\nc", height: 2, expect: 3},
+		{name: "pads shorter content", content: "a\nb", height: 5, expect: 5},
+		{name: "handles empty", content: "", height: 3, expect: 3},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := padToHeight(tc.content, tc.height)
+			lines := strings.Count(got, "\n") + 1
+			if lines != tc.expect {
+				t.Fatalf("expected %d lines, got %d", tc.expect, lines)
+			}
+		})
+	}
+}
