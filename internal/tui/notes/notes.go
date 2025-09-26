@@ -175,6 +175,7 @@ func NewNoteListModel(
 	m.updateFilterStatus()
 	filtered := m.filteredItems()
 	m.list.SetItems(filtered)
+	m.blurPreview()
 
 	return m, nil
 }
@@ -1450,99 +1451,99 @@ func (m *NoteListModel) handleDefaultUpdate(msg tea.KeyMsg) (tea.Cmd, bool) {
 	}
 
 	switch {
-	case key.Matches(msg, m.keys.openNote):
-		if cmd := m.openNote(false); cmd != nil {
-			return cmd, true
+	case key.Matches(msg, m.keys.toggleFocus):
+		if m.previewHasFocus() {
+			return m.blurPreview(), true
 		}
-		return nil, true
+		return m.focusPreview(), true
+
+	case key.Matches(msg, m.keys.openNote):
+		return batchCmds(m.blurPreview(), m.openNote(false)), true
 
 	case key.Matches(msg, m.keys.openNoteInObsidian):
-		if cmd := m.openNote(true); cmd != nil {
-			return cmd, true
-		}
-		return nil, true
+		return batchCmds(m.blurPreview(), m.openNote(true)), true
 
 	case key.Matches(msg, m.keys.toggleTitleBar):
 		m.toggleTitleBar()
-		return nil, true
+		return batchCmds(m.blurPreview()), true
 
 	case key.Matches(msg, m.keys.toggleStatusBar):
 		m.list.SetShowStatusBar(!m.list.ShowStatusBar())
-		return nil, true
+		return batchCmds(m.blurPreview()), true
 
 	case key.Matches(msg, m.keys.togglePagination):
 		m.list.SetShowPagination(!m.list.ShowPagination())
-		return nil, true
+		return batchCmds(m.blurPreview()), true
 
 	case key.Matches(msg, m.keys.toggleHelpMenu):
 		m.list.SetShowHelp(!m.list.ShowHelp())
-		return nil, true
+		return batchCmds(m.blurPreview()), true
 
 	case key.Matches(msg, m.keys.toggleDisplayView):
-		return m.toggleDetails(), true
+		return batchCmds(m.blurPreview(), m.toggleDetails()), true
 
 	case key.Matches(msg, m.keys.changeView):
-		return m.cycleView(), true
+		return batchCmds(m.blurPreview(), m.cycleView()), true
 
 	case key.Matches(msg, m.keys.filterPalette):
-		return m.toggleFilterPalette(), true
+		return batchCmds(m.blurPreview(), m.toggleFilterPalette()), true
 
 	case key.Matches(msg, m.keys.switchToDefaultView):
-		return m.swapView("default"), true
+		return batchCmds(m.blurPreview(), m.swapView("default")), true
 
 	case key.Matches(msg, m.keys.switchToUnfulfillView):
-		return m.swapView("unfulfilled"), true
+		return batchCmds(m.blurPreview(), m.swapView("unfulfilled")), true
 
 	case key.Matches(msg, m.keys.switchToOrphanView):
-		return m.swapView("orphan"), true
+		return batchCmds(m.blurPreview(), m.swapView("orphan")), true
 
 	case key.Matches(msg, m.keys.switchToArchiveView):
-		return m.swapView("archive"), true
+		return batchCmds(m.blurPreview(), m.swapView("archive")), true
 
 	case key.Matches(msg, m.keys.switchToTrashView):
-		return m.swapView("trash"), true
+		return batchCmds(m.blurPreview(), m.swapView("trash")), true
 
 	case key.Matches(msg, m.keys.rename):
 		m.toggleRename()
-		return nil, true
+		return batchCmds(m.blurPreview()), true
 
 	case key.Matches(msg, m.keys.create):
 		m.toggleCreation()
-		return nil, true
+		return batchCmds(m.blurPreview()), true
 
 	case key.Matches(msg, m.keys.copy):
 		m.toggleCopy()
-		return nil, true
+		return batchCmds(m.blurPreview()), true
 
 	case key.Matches(msg, m.keys.editInline):
-		return m.startInlineEdit(), true
+		return batchCmds(m.blurPreview(), m.startInlineEdit()), true
 
 	case key.Matches(msg, m.keys.quickCapture):
-		return m.startScratchCapture(), true
+		return batchCmds(m.blurPreview(), m.startScratchCapture()), true
 
 	case key.Matches(msg, m.keys.sortByTitle):
 		m.sortField = sortByTitle
-		return m.refreshSort(), true
+		return batchCmds(m.blurPreview(), m.refreshSort()), true
 
 	case key.Matches(msg, m.keys.sortBySubdir):
 		m.sortField = sortBySubdir
-		return m.refreshSort(), true
+		return batchCmds(m.blurPreview(), m.refreshSort()), true
 
 	case key.Matches(msg, m.keys.sortByModifiedAt):
 		m.sortField = sortByModifiedAt
-		return m.refreshSort(), true
+		return batchCmds(m.blurPreview(), m.refreshSort()), true
 
 	case key.Matches(msg, m.keys.sortAscending):
 		m.sortOrder = ascending
-		return m.refreshSort(), true
+		return batchCmds(m.blurPreview(), m.refreshSort()), true
 
 	case key.Matches(msg, m.keys.sortAscending):
 		m.sortOrder = descending
-		return m.refreshSort(), true
+		return batchCmds(m.blurPreview(), m.refreshSort()), true
 
 	case key.Matches(msg, m.keys.sortDescending):
 		m.sortOrder = descending
-		return m.refreshSort(), true
+		return batchCmds(m.blurPreview(), m.refreshSort()), true
 	}
 
 	return nil, false
@@ -2084,6 +2085,58 @@ func (m *NoteListModel) previewHasFocus() bool {
 	return m.previewFocused
 }
 
+func (m *NoteListModel) focusPreview() tea.Cmd {
+	if m == nil {
+		return nil
+	}
+	if m.previewFocused {
+		return nil
+	}
+	m.previewFocused = true
+	return focusViewport(&m.previewViewport)
+}
+
+func (m *NoteListModel) blurPreview() tea.Cmd {
+	if m == nil {
+		return nil
+	}
+	if !m.previewFocused {
+		return blurViewport(&m.previewViewport)
+	}
+	m.previewFocused = false
+	return blurViewport(&m.previewViewport)
+}
+
+func focusViewport(v *viewport.Model) tea.Cmd {
+	if v == nil {
+		return nil
+	}
+	setViewportBindingsEnabled(&v.KeyMap, true)
+	v.MouseWheelEnabled = true
+	return nil
+}
+
+func blurViewport(v *viewport.Model) tea.Cmd {
+	if v == nil {
+		return nil
+	}
+	setViewportBindingsEnabled(&v.KeyMap, false)
+	v.MouseWheelEnabled = false
+	return nil
+}
+
+func setViewportBindingsEnabled(m *viewport.KeyMap, enabled bool) {
+	if m == nil {
+		return
+	}
+	m.PageDown.SetEnabled(enabled)
+	m.PageUp.SetEnabled(enabled)
+	m.HalfPageDown.SetEnabled(enabled)
+	m.HalfPageUp.SetEnabled(enabled)
+	m.Down.SetEnabled(enabled)
+	m.Up.SetEnabled(enabled)
+}
+
 func isPreviewScrollKey(msg tea.KeyMsg) bool {
 	switch msg.Type {
 	case tea.KeyUp, tea.KeyDown, tea.KeyPgUp, tea.KeyPgDown, tea.KeySpace, tea.KeyCtrlU, tea.KeyCtrlD:
@@ -2108,10 +2161,11 @@ func (m *NoteListModel) toggleTitleBar() {
 }
 
 func (m *NoteListModel) toggleDetails() tea.Cmd {
+	blur := m.blurPreview()
 	m.showDetails = !m.showDetails
 	cmd := m.refreshItems()
 	m.list.ResetSelected()
-	return tea.Batch(cmd, m.handlePreview(true))
+	return batchCmds(blur, cmd, m.handlePreview(true))
 }
 
 func (m *NoteListModel) cycleView() tea.Cmd {
@@ -2151,7 +2205,7 @@ func (m *NoteListModel) applyView(viewName string) tea.Cmd {
 	m.sortField = sortFieldFromView(view.Sort.Field)
 	m.sortOrder = sortOrderFromView(view.Sort.Order)
 
-	return m.refresh()
+	return batchCmds(m.blurPreview(), m.refresh())
 }
 
 func sequenceWithClear(cmd tea.Cmd) tea.Cmd {
