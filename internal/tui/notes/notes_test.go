@@ -97,9 +97,20 @@ func TestHandleDefaultUpdateForwardsPreviewScrollKeys(t *testing.T) {
 	model := newEditorTestModel(t, map[string]string{"note.md": "content"})
 	model.previewViewport.Width = 10
 	model.previewViewport.Height = 3
-	model.previewFocused = true
 	model.setPreviewContent("line1\nline2\nline3\nline4", "")
 	model.previewViewport.GotoTop()
+
+	if cmd, handled := model.handleDefaultUpdate(tea.KeyMsg{Type: tea.KeyShiftTab}); handled {
+		if cmd != nil {
+			t.Fatalf("expected nil command when focusing preview, got %T", cmd)
+		}
+	} else {
+		t.Fatalf("expected focus key to be handled")
+	}
+
+	if !model.previewFocused {
+		t.Fatalf("expected preview to gain focus after focus key")
+	}
 
 	cmd, handled := model.handleDefaultUpdate(tea.KeyMsg{Type: tea.KeyDown})
 	if cmd != nil {
@@ -117,9 +128,28 @@ func TestHandleDefaultUpdateSkipsPreviewScrollWhenUnfocused(t *testing.T) {
 	model := newEditorTestModel(t, map[string]string{"note.md": "content"})
 	model.previewViewport.Width = 10
 	model.previewViewport.Height = 3
-	model.previewFocused = false
 	model.setPreviewContent("line1\nline2\nline3\nline4", "")
 	model.previewViewport.GotoTop()
+
+	if cmd, handled := model.handleDefaultUpdate(tea.KeyMsg{Type: tea.KeyShiftTab}); !handled {
+		t.Fatalf("expected focus key to be handled")
+	} else if cmd != nil {
+		t.Fatalf("expected nil command when focusing preview, got %T", cmd)
+	}
+
+	if !model.previewFocused {
+		t.Fatalf("expected preview to gain focus before toggling off")
+	}
+
+	if cmd, handled := model.handleDefaultUpdate(tea.KeyMsg{Type: tea.KeyShiftTab}); !handled {
+		t.Fatalf("expected focus key to toggle off")
+	} else if cmd != nil {
+		t.Fatalf("expected nil command when blurring preview, got %T", cmd)
+	}
+
+	if model.previewFocused {
+		t.Fatalf("expected preview to lose focus after toggling off")
+	}
 
 	yBefore := model.previewViewport.YOffset
 	cmd, handled := model.handleDefaultUpdate(tea.KeyMsg{Type: tea.KeyDown})

@@ -61,6 +61,10 @@ func newListKeyMap() *listKeyMap {
 			key.WithKeys("enter"),
 			key.WithHelp("↵", "open"),
 		),
+		toggleFocus: key.NewBinding(
+			key.WithKeys("shift+tab"),
+			key.WithHelp("⇧+tab", "focus preview"),
+		),
 		openNoteInObsidian: key.NewBinding(
 			key.WithKeys("G"),
 			key.WithHelp("G", "open in obsidian"),
@@ -155,6 +159,7 @@ func (m listKeyMap) fullHelp() []key.Binding {
 		m.togglePagination,
 		m.toggleHelpMenu,
 		m.toggleDisplayView,
+		m.toggleFocus,
 		m.openNote,
 		m.editInline,
 		m.quickCapture,
