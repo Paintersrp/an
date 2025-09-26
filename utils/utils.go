@@ -127,15 +127,19 @@ func FormatFrontmatterAsMarkdown(frontmatter string) string {
 	return strings.Join(formattedLines, "\n\n")
 }
 
-func RenderMarkdownPreview(path string, w, h int) string {
-	const cutoff = 1000
-
-	content, err := ReadFileAndTrimContent(path, cutoff)
+func RenderMarkdownPreview(path string, w, h int, cutoff int) (string, bool) {
+	content, err := os.ReadFile(path)
 	if err != nil {
-		return "Error reading file"
+		return "Error reading file", false
 	}
 
-	frontmatter, markdown := ParseFrontmatter(content)
+	trimmed := false
+	if cutoff > 0 && len(content) > cutoff {
+		content = content[:cutoff]
+		trimmed = true
+	}
+
+	frontmatter, markdown := ParseFrontmatter(string(content))
 	formattedFrontmatter := FormatFrontmatterAsMarkdown(frontmatter)
 
 	var renderedContent string
@@ -153,10 +157,10 @@ func RenderMarkdownPreview(path string, w, h int) string {
 
 	renderedMarkdown, err := r.Render(renderedContent)
 	if err != nil {
-		return "Error rendering markdown"
+		return "Error rendering markdown", trimmed
 	}
 
-	return renderedMarkdown
+	return renderedMarkdown, trimmed
 }
 
 func FormatBytes(size int64) string {

@@ -73,10 +73,17 @@ type NoteListModel struct {
 }
 
 type previewLoadedMsg struct {
-	path     string
-	markdown string
-	summary  string
-	cacheErr error
+	path       string
+	markdown   string
+	summary    string
+	cacheErr   error
+	complete   bool
+	background *previewRequest
+}
+
+type previewCacheEntry struct {
+	Markdown string
+	Complete bool
 }
 
 type editorFinishedMsg struct {
@@ -717,7 +724,15 @@ func (m *NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.previewSummary = msg.summary
 		}
 
-		return m, nil
+		if msg.background != nil {
+			cmds = append(cmds, renderPreviewCmd(*msg.background))
+		}
+
+		if len(cmds) == 0 {
+			return m, nil
+		}
+
+		return m, tea.Batch(cmds...)
 
 	case editorFinishedMsg:
 		if msg.err != nil {
@@ -1709,11 +1724,15 @@ func (m *NoteListModel) handlePreview(force bool) tea.Cmd {
 	queuePaths := m.queuePaths()
 
 	cache := m.cache
+	const previewCutoff = 1000
+
 	if cache == nil {
 		req := previewRequest{
 			path:     selectedPath,
 			width:    width,
 			height:   height,
+			full:     false,
+			cutoff:   previewCutoff,
 			index:    m.searchIndex,
 			vault:    vault,
 			queue:    queuePaths,
@@ -1724,14 +1743,29 @@ func (m *NoteListModel) handlePreview(force bool) tea.Cmd {
 
 	if !force {
 		if cached, exists, err := cache.Get(selectedPath); err == nil && exists {
-			if markdown, ok := cached.(string); ok {
+			switch entry := cached.(type) {
+			case previewCacheEntry:
 				req := previewRequest{
 					path:        selectedPath,
+					cache:       cache,
 					index:       m.searchIndex,
 					vault:       vault,
 					queue:       queuePaths,
 					override:    override,
-					preRendered: markdown,
+					preRendered: entry.Markdown,
+					complete:    entry.Complete,
+				}
+				return renderPreviewCmd(req)
+			case string:
+				req := previewRequest{
+					path:        selectedPath,
+					cache:       cache,
+					index:       m.searchIndex,
+					vault:       vault,
+					queue:       queuePaths,
+					override:    override,
+					preRendered: entry,
+					complete:    false,
 				}
 				return renderPreviewCmd(req)
 			}
@@ -1751,10 +1785,12 @@ func (m *NoteListModel) handlePreview(force bool) tea.Cmd {
 		width:    width,
 		height:   height,
 		cache:    cache,
+		full:     false,
 		index:    m.searchIndex,
 		vault:    vault,
 		queue:    queuePaths,
 		override: override,
+		cutoff:   previewCutoff,
 	}
 	return renderPreviewCmd(req)
 }
@@ -1769,6 +1805,9 @@ type previewRequest struct {
 	queue       []string
 	override    *search.RelatedNotes
 	preRendered string
+	complete    bool
+	full        bool
+	cutoff      int
 }
 
 func renderPreviewCmd(req previewRequest) tea.Cmd {
@@ -1788,23 +1827,55 @@ func renderPreviewCmd(req previewRequest) tea.Cmd {
 
 	return func() tea.Msg {
 		rendered := req.preRendered
+		complete := req.complete
 		var cacheErr error
 
 		if rendered == "" {
-			rendered = utils.RenderMarkdownPreview(req.path, req.width, req.height)
+			cutoff := req.cutoff
+			if req.full {
+				cutoff = 0
+			}
+
+			var trimmed bool
+			rendered, trimmed = utils.RenderMarkdownPreview(req.path, req.width, req.height, cutoff)
+			if req.full {
+				complete = true
+			} else {
+				complete = !trimmed
+			}
+
 			if req.cache != nil {
-				cacheErr = req.cache.Put(req.path, rendered)
+				entry := previewCacheEntry{Markdown: rendered, Complete: complete}
+				cacheErr = req.cache.Put(req.path, entry)
 			}
 		}
 
 		ctx := buildPreviewContext(req.path, req.index, queueCopy, overrideCopy)
 		summary := formatPreviewContext(ctx, req.vault)
 
+		var background *previewRequest
+		if !complete && !req.full {
+			backgroundReq := previewRequest{
+				path:     req.path,
+				width:    req.width,
+				height:   req.height,
+				cache:    req.cache,
+				index:    req.index,
+				vault:    req.vault,
+				queue:    queueCopy,
+				override: overrideCopy,
+				full:     true,
+			}
+			background = &backgroundReq
+		}
+
 		return previewLoadedMsg{
-			path:     req.path,
-			markdown: rendered,
-			summary:  summary,
-			cacheErr: cacheErr,
+			path:       req.path,
+			markdown:   rendered,
+			summary:    summary,
+			cacheErr:   cacheErr,
+			complete:   complete,
+			background: background,
 		}
 	}
 }
