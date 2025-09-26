@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -211,6 +212,67 @@ func TestFilterSummaryFormatting(t *testing.T) {
 
 	if summary := filterSummary(nil, nil); summary != "" {
 		t.Fatalf("expected empty summary when no filters, got %q", summary)
+	}
+}
+
+func TestPreviewChunkAccumulationAvoidsQuadraticGrowth(t *testing.T) {
+	t.Parallel()
+
+	chunk := strings.Repeat("x", previewChunkSize)
+	const chunkCount = 512
+	const notePath = "test.md"
+
+	var best uint64 = ^uint64(0)
+
+	for attempt := 0; attempt < 3; attempt++ {
+		runtime.GC()
+
+		var before runtime.MemStats
+		runtime.ReadMemStats(&before)
+
+		delegate := list.NewDefaultDelegate()
+		items := []list.Item{ListItem{path: notePath}}
+		l := list.New(items, delegate, 0, 0)
+		l.Select(0)
+
+		model := &NoteListModel{list: l}
+
+		for j := 0; j < chunkCount; j++ {
+			model.Update(previewChunkLoadedMsg{
+				path:  notePath,
+				chunk: chunk,
+				reset: j == 0,
+			})
+		}
+
+		model.Update(previewLoadedMsg{
+			path:     notePath,
+			markdown: model.preview,
+		})
+
+		var after runtime.MemStats
+		runtime.ReadMemStats(&after)
+
+		if diff := after.TotalAlloc - before.TotalAlloc; diff < best {
+			best = diff
+		}
+
+		if testing.Verbose() {
+			t.Logf("attempt %d allocated %d bytes", attempt+1, after.TotalAlloc-before.TotalAlloc)
+		}
+	}
+
+	finalSize := uint64(len(chunk) * chunkCount)
+	if best == ^uint64(0) {
+		t.Fatalf("failed to record allocation data")
+	}
+
+	if best > finalSize*8 {
+		t.Fatalf(
+			"expected allocations to remain linear; got %d bytes for %d-byte preview",
+			best,
+			finalSize,
+		)
 	}
 }
 
