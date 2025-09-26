@@ -2,22 +2,13 @@ package utils
 
 import (
 	"fmt"
-	"io"
-	"math"
 	"os"
 	"regexp"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/charmbracelet/glamour"
-	"github.com/charmbracelet/glamour/ansi"
 	"github.com/muesli/termenv"
-	"github.com/yuin/goldmark"
-	"github.com/yuin/goldmark/extension"
-	"github.com/yuin/goldmark/parser"
-	"github.com/yuin/goldmark/renderer"
-	"github.com/yuin/goldmark/util"
 )
 
 func AppendIfNotExists(slice []string, value string) []string {
@@ -83,6 +74,19 @@ func GenerateDate(numUnits int, unitType string) string {
 	return date.Format(dateFormat)
 }
 
+func ReadFileAndTrimContent(path string, cutoff int) (string, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+
+	if len(content) > cutoff {
+		content = content[:cutoff]
+	}
+
+	return string(content), nil
+}
+
 func ParseFrontmatter(content string) (string, string) {
 	frontmatterRegex := regexp.MustCompile(`(?s)\A---\r?\n(.*?)\r?\n---\r?\n?`)
 	matches := frontmatterRegex.FindStringSubmatch(content)
@@ -124,106 +128,35 @@ func FormatFrontmatterAsMarkdown(frontmatter string) string {
 }
 
 func RenderMarkdownPreview(path string, w, h int) string {
-	renderedContent, err := BuildMarkdownPreviewContent(path)
+	const cutoff = 1000
+
+	content, err := ReadFileAndTrimContent(path, cutoff)
 	if err != nil {
 		return "Error reading file"
 	}
 
-	var builder strings.Builder
-	if err := RenderMarkdownContent(renderedContent, w, &builder); err != nil {
+	frontmatter, markdown := ParseFrontmatter(content)
+	formattedFrontmatter := FormatFrontmatterAsMarkdown(frontmatter)
+
+	var renderedContent string
+	if formattedFrontmatter != "" {
+		renderedContent = formattedFrontmatter + "\n\n---\n\n\n" + markdown
+	} else {
+		renderedContent = "No frontmatter found.\n\n---\n\n\n" + markdown
+	}
+
+	r, _ := glamour.NewTermRenderer(
+		glamour.WithStandardStyle("dracula"),
+		glamour.WithWordWrap(100),
+		glamour.WithColorProfile(termenv.ANSI256),
+	)
+
+	renderedMarkdown, err := r.Render(renderedContent)
+	if err != nil {
 		return "Error rendering markdown"
 	}
 
-	return builder.String()
-}
-
-func BuildMarkdownPreviewContent(path string) (string, error) {
-	content, err := os.ReadFile(path)
-	if err != nil {
-		return "", err
-	}
-
-	frontmatter, markdown := ParseFrontmatter(string(content))
-	formattedFrontmatter := FormatFrontmatterAsMarkdown(frontmatter)
-
-	if formattedFrontmatter != "" {
-		return formattedFrontmatter + "\n\n---\n\n\n" + markdown, nil
-	}
-
-	return "No frontmatter found.\n\n---\n\n\n" + markdown, nil
-}
-
-func RenderMarkdownContent(content string, width int, writer io.Writer) error {
-	wordWrap := width
-	if wordWrap <= 0 {
-		wordWrap = 100
-	}
-
-	options := ansi.Options{
-		WordWrap:     wordWrap,
-		ColorProfile: termenv.ANSI256,
-		Styles:       glamour.DraculaStyleConfig,
-	}
-
-	md := goldmark.New(
-		goldmark.WithExtensions(
-			extension.GFM,
-			extension.DefinitionList,
-		),
-		goldmark.WithParserOptions(
-			parser.WithAutoHeadingID(),
-		),
-		goldmark.WithRenderer(
-			renderer.NewRenderer(
-				renderer.WithNodeRenderers(
-					util.Prioritized(ansi.NewRenderer(options), 1000),
-				),
-			),
-		),
-	)
-
-	bw := &passthroughWriter{w: writer}
-	if err := md.Convert([]byte(content), bw); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-type passthroughWriter struct {
-	w io.Writer
-}
-
-func (p *passthroughWriter) Write(b []byte) (int, error) {
-	return p.w.Write(b)
-}
-
-func (p *passthroughWriter) WriteString(s string) (int, error) {
-	return io.WriteString(p.w, s)
-}
-
-func (p *passthroughWriter) WriteByte(c byte) error {
-	_, err := p.w.Write([]byte{c})
-	return err
-}
-
-func (p *passthroughWriter) WriteRune(r rune) (int, error) {
-	var buf [utf8.UTFMax]byte
-	n := utf8.EncodeRune(buf[:], r)
-	_, err := p.w.Write(buf[:n])
-	return n, err
-}
-
-func (p *passthroughWriter) Flush() error {
-	return nil
-}
-
-func (p *passthroughWriter) Available() int {
-	return math.MaxInt32
-}
-
-func (p *passthroughWriter) Buffered() int {
-	return 0
+	return renderedMarkdown
 }
 
 func FormatBytes(size int64) string {
