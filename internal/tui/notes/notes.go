@@ -49,6 +49,7 @@ type NoteListModel struct {
 	state               *state.State
 	preview             string
 	previewSummary      string
+	previewBuilder      strings.Builder
 	viewName            string
 	formModel           submodels.FormModel
 	filterModel         *submodels.FilterModel
@@ -720,11 +721,12 @@ func (m *NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case previewChunkLoadedMsg:
 		if s, ok := m.list.SelectedItem().(ListItem); ok && s.path == msg.path {
 			if msg.reset {
-				m.preview = msg.chunk
+				m.previewBuilder.Reset()
 				m.previewSummary = ""
-			} else {
-				m.preview += msg.chunk
 			}
+
+			m.previewBuilder.WriteString(msg.chunk)
+			m.preview = m.previewBuilder.String()
 		}
 
 		return m, msg.next
@@ -739,6 +741,7 @@ func (m *NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if s, ok := m.list.SelectedItem().(ListItem); ok && s.path == msg.path {
 			m.preview = msg.markdown
 			m.previewSummary = msg.summary
+			m.previewBuilder.Reset()
 		}
 
 		return m, nil
@@ -960,6 +963,7 @@ func (m *NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if nextSelection == "" {
 			m.preview = ""
 			m.previewSummary = ""
+			m.previewBuilder.Reset()
 		}
 
 		if cmd := m.handlePreview(false); cmd != nil {
@@ -1709,6 +1713,7 @@ func (m *NoteListModel) handlePreview(force bool) tea.Cmd {
 	} else {
 		m.preview = ""
 		m.previewSummary = ""
+		m.previewBuilder.Reset()
 		return nil
 	}
 
