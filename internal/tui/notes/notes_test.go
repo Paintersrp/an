@@ -59,6 +59,81 @@ func TestCycleViewOrder(t *testing.T) {
 	}
 }
 
+func TestPreviewViewportUpdatesOnPreviewLoaded(t *testing.T) {
+	model := newEditorTestModel(t, map[string]string{"note.md": "content"})
+
+	model.previewViewport.Width = 80
+	model.previewViewport.Height = 10
+
+	selected, ok := model.list.SelectedItem().(ListItem)
+	if !ok {
+		t.Fatalf("expected selected list item")
+	}
+
+	msg := previewLoadedMsg{path: selected.path, markdown: "body", summary: "Links: 1 outbound"}
+	updated, _ := model.Update(msg)
+
+	noteModel, ok := updated.(*NoteListModel)
+	if !ok {
+		t.Fatalf("expected *NoteListModel, got %T", updated)
+	}
+
+	body := noteModel.previewViewport.View()
+	if body == "" {
+		t.Fatalf("expected viewport view to include content")
+	}
+
+	renderedSummary := previewSummaryStyle.Render(strings.TrimSpace(msg.summary))
+	if !strings.Contains(body, renderedSummary) {
+		t.Fatalf("expected viewport view to include summary %q, got %q", renderedSummary, body)
+	}
+
+	if !strings.Contains(body, msg.markdown) {
+		t.Fatalf("expected viewport view to include markdown %q, got %q", msg.markdown, body)
+	}
+}
+
+func TestHandleDefaultUpdateForwardsPreviewScrollKeys(t *testing.T) {
+	model := newEditorTestModel(t, map[string]string{"note.md": "content"})
+	model.previewViewport.Width = 10
+	model.previewViewport.Height = 3
+	model.previewFocused = true
+	model.setPreviewContent("line1\nline2\nline3\nline4", "")
+	model.previewViewport.GotoTop()
+
+	cmd, handled := model.handleDefaultUpdate(tea.KeyMsg{Type: tea.KeyDown})
+	if cmd != nil {
+		t.Fatalf("expected nil command, got %T", cmd)
+	}
+	if !handled {
+		t.Fatalf("expected preview scroll key to be handled")
+	}
+	if model.previewViewport.YOffset == 0 {
+		t.Fatalf("expected viewport y offset to change after scroll")
+	}
+}
+
+func TestHandleDefaultUpdateSkipsPreviewScrollWhenUnfocused(t *testing.T) {
+	model := newEditorTestModel(t, map[string]string{"note.md": "content"})
+	model.previewViewport.Width = 10
+	model.previewViewport.Height = 3
+	model.previewFocused = false
+	model.setPreviewContent("line1\nline2\nline3\nline4", "")
+	model.previewViewport.GotoTop()
+
+	yBefore := model.previewViewport.YOffset
+	cmd, handled := model.handleDefaultUpdate(tea.KeyMsg{Type: tea.KeyDown})
+	if cmd != nil {
+		t.Fatalf("expected nil command when preview is unfocused, got %T", cmd)
+	}
+	if handled {
+		t.Fatalf("expected key to be handled by list when preview is unfocused")
+	}
+	if model.previewViewport.YOffset != yBefore {
+		t.Fatalf("expected viewport y offset to remain unchanged")
+	}
+}
+
 func TestApplyViewReplacesListItems(t *testing.T) {
 	tempDir := t.TempDir()
 

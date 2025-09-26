@@ -267,6 +267,7 @@ func (m *RootModel) cycleWorkspace() tea.Cmd {
 		newNotes.width = m.notes.width
 		newNotes.height = m.notes.height
 		newNotes.showDetails = m.notes.showDetails
+		newNotes.previewFocused = m.notes.previewFocused
 	}
 
 	newTasks, err := taskstui.NewModel(newState)
