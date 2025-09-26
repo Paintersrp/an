@@ -15,6 +15,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"golang.org/x/term"
@@ -44,6 +45,7 @@ type NoteListModel struct {
 	state               *state.State
 	preview             string
 	previewSummary      string
+	previewViewport     viewport.Model
 	viewName            string
 	formModel           submodels.FormModel
 	filterModel         *submodels.FilterModel
@@ -70,6 +72,7 @@ type NoteListModel struct {
 	availableMetadata   map[string][]string
 	allItems            []list.Item
 	searchInitialized   bool
+	previewFocused      bool
 }
 
 type previewLoadedMsg struct {
@@ -161,6 +164,7 @@ func NewNoteListModel(
 		highlights:          highlightMatches,
 		pendingIndexUpdates: make(map[string]struct{}),
 		availableMetadata:   make(map[string][]string),
+		previewViewport:     viewport.New(0, 0),
 	}
 
 	m.allItems = append([]list.Item(nil), sortedItems...)
@@ -720,8 +724,7 @@ func (m *NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		if s, ok := m.list.SelectedItem().(ListItem); ok && s.path == msg.path {
-			m.preview = msg.markdown
-			m.previewSummary = msg.summary
+			m.setPreviewContent(msg.markdown, msg.summary)
 		}
 
 		if msg.background != nil {
@@ -882,6 +885,16 @@ func (m *NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.previewWidth = previewContentWidth
 		m.list.SetSize(listContentWidth, contentHeight)
 
+		if previewContentWidth < 0 {
+			previewContentWidth = 0
+		}
+		if contentHeight < 0 {
+			contentHeight = 0
+		}
+		m.previewViewport.Width = previewContentWidth
+		m.previewViewport.Height = contentHeight
+		m.previewViewport.SetYOffset(m.previewViewport.YOffset)
+
 		if m.editor != nil {
 			width, height := m.editorSize()
 			m.editor.setSize(width, height)
@@ -949,8 +962,10 @@ func (m *NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	if nextSelection := m.currentSelectionPath(); nextSelection != previousSelection {
 		if nextSelection == "" {
-			m.preview = ""
-			m.previewSummary = ""
+			m.setPreviewContent("", "")
+			m.previewViewport.GotoTop()
+		} else {
+			m.previewViewport.GotoTop()
 		}
 
 		if cmd := m.handlePreview(false); cmd != nil {
@@ -1428,6 +1443,12 @@ func (m *NoteListModel) editorActive() bool {
 
 // TODO: returns are kinda unnecessary now
 func (m *NoteListModel) handleDefaultUpdate(msg tea.KeyMsg) (tea.Cmd, bool) {
+	if m.previewHasFocus() && isPreviewScrollKey(msg) {
+		var cmd tea.Cmd
+		m.previewViewport, cmd = m.previewViewport.Update(msg)
+		return cmd, true
+	}
+
 	switch {
 	case key.Matches(msg, m.keys.openNote):
 		if cmd := m.openNote(false); cmd != nil {
@@ -1617,14 +1638,9 @@ func (m NoteListModel) View() string {
 		return appStyle.Render(layout)
 	}
 
-	content := m.preview
-	if summary := strings.TrimSpace(m.previewSummary); summary != "" {
-		renderedSummary := previewSummaryStyle.Render(summary)
-		if strings.TrimSpace(content) != "" {
-			content = fmt.Sprintf("%s\n\n%s", renderedSummary, content)
-		} else {
-			content = renderedSummary
-		}
+	previewBody := m.previewViewport.View()
+	if m.previewViewport.Width <= 0 || m.previewViewport.Height <= 0 {
+		previewBody = renderPreviewContent(m.preview, m.previewSummary)
 	}
 
 	previewContent := lipgloss.NewStyle().
@@ -1632,7 +1648,7 @@ func (m NoteListModel) View() string {
 		MaxWidth(sideWidth).
 		Height(listHeight).
 		MaxHeight(listHeight).
-		Render(fmt.Sprintf("%s\n%s", titleStyle.Render("Preview"), content))
+		Render(fmt.Sprintf("%s\n%s", titleStyle.Render("Preview"), previewBody))
 
 	preview := previewStyle.Render(previewContent)
 
@@ -1698,8 +1714,8 @@ func (m *NoteListModel) handlePreview(force bool) tea.Cmd {
 	if s, ok := m.list.SelectedItem().(ListItem); ok {
 		selectedPath = s.path
 	} else {
-		m.preview = ""
-		m.previewSummary = ""
+		m.setPreviewContent("", "")
+		m.previewViewport.GotoTop()
 		return nil
 	}
 
@@ -2039,6 +2055,49 @@ func padArea(view string, width, height int) string {
 	}
 
 	return strings.Join(lines, "\n")
+}
+
+func (m *NoteListModel) setPreviewContent(markdown, summary string) {
+	m.preview = markdown
+	m.previewSummary = summary
+	m.previewViewport.SetContent(renderPreviewContent(markdown, summary))
+}
+
+func renderPreviewContent(markdown, summary string) string {
+	trimmedSummary := strings.TrimSpace(summary)
+	content := markdown
+	trimmedContent := strings.TrimSpace(content)
+	if trimmedSummary != "" {
+		renderedSummary := previewSummaryStyle.Render(trimmedSummary)
+		if trimmedContent != "" {
+			return fmt.Sprintf("%s\n\n%s", renderedSummary, content)
+		}
+		return renderedSummary
+	}
+	return content
+}
+
+func (m *NoteListModel) previewHasFocus() bool {
+	if m == nil {
+		return false
+	}
+	return m.previewFocused
+}
+
+func isPreviewScrollKey(msg tea.KeyMsg) bool {
+	switch msg.Type {
+	case tea.KeyUp, tea.KeyDown, tea.KeyPgUp, tea.KeyPgDown, tea.KeySpace, tea.KeyCtrlU, tea.KeyCtrlD:
+		return true
+	case tea.KeyRunes:
+		if len(msg.Runes) != 1 {
+			return false
+		}
+		switch msg.Runes[0] {
+		case 'j', 'k', 'f', 'b', 'd', 'u':
+			return true
+		}
+	}
+	return false
 }
 
 func (m *NoteListModel) toggleTitleBar() {
