@@ -127,6 +127,11 @@ func FormatFrontmatterAsMarkdown(frontmatter string) string {
 	return strings.Join(formattedLines, "\n\n")
 }
 
+const (
+	defaultWrapWidth       = 80
+	previewHorizontalSpace = 4
+)
+
 func RenderMarkdownPreview(path string, w, h int, cutoff int) (string, bool) {
 	content, err := os.ReadFile(path)
 	if err != nil {
@@ -149,9 +154,14 @@ func RenderMarkdownPreview(path string, w, h int, cutoff int) (string, bool) {
 		renderedContent = "No frontmatter found.\n\n---\n\n\n" + markdown
 	}
 
+	wrapWidth := w - previewHorizontalSpace
+	if wrapWidth <= 0 {
+		wrapWidth = defaultWrapWidth
+	}
+
 	r, _ := glamour.NewTermRenderer(
 		glamour.WithStandardStyle("dracula"),
-		glamour.WithWordWrap(100),
+		glamour.WithWordWrap(wrapWidth),
 		glamour.WithColorProfile(termenv.ANSI256),
 	)
 
