@@ -32,8 +32,6 @@ var (
 	rootHeaderActiveStyle = rootHeaderStyle.Copy().
 				Bold(true)
 
-	rootHeaderWorkspaceStyle = rootHeaderActiveStyle.Copy()
-
 	focusedStyle = lipgloss.NewStyle().
 			Bold(true).
 			Background(lipgloss.Color("#0AF")).

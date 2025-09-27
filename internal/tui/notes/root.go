@@ -178,24 +178,6 @@ func (m *RootModel) header() string {
 
 func (m *RootModel) statusLine() string {
 	sections := []string{}
-	if name := m.workspaceName(); name != "" {
-		label := fmt.Sprintf("Workspace: [%s]", name)
-		if m.hasMultipleWorkspaces() {
-			nextHelp := m.keys.next.Help()
-			nextKey := strings.TrimSpace(nextHelp.Key)
-			if nextKey == "" {
-				keys := m.keys.next.Keys()
-				if len(keys) > 0 {
-					nextKey = keys[0]
-				} else {
-					nextKey = "ctrl+w"
-				}
-			}
-			label += fmt.Sprintf(" (%s to switch)", nextKey)
-		}
-		sections = append(sections, rootHeaderWorkspaceStyle.Render(label))
-	}
-
 	sections = append(sections, rootHeaderStyle.Render("Views:"))
 	sections = append(sections, highlight(viewNotes, m.active, formatShortcut(m.keys.notes)))
 	sections = append(sections, highlight(viewTasks, m.active, formatShortcut(m.keys.tasks)))
