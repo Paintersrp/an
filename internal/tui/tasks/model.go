@@ -173,6 +173,10 @@ func (m *Model) Init() tea.Cmd {
 	return nil
 }
 
+func (m *Model) State() *state.State {
+	return m.state
+}
+
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -220,25 +224,31 @@ func (m *Model) View() string {
 		}
 	}
 
-	status := m.status
-	if summary := m.filterSummary(); summary != "" {
-		if status != "" {
-			status = status + "\n" + summary
-		} else {
-			status = summary
-		}
+	statuses := make([]string, 0, 4)
+	if footer := m.rootFooter(); footer != "" {
+		statuses = append(statuses, footer)
 	}
 	if pinned != "" {
-		status = fmt.Sprintf("Pinned: %s", pinned)
-		if m.status != "" {
-			status = status + "\n" + m.status
-		}
+		statuses = append(statuses, fmt.Sprintf("Pinned: %s", pinned))
+	}
+	if summary := m.filterSummary(); summary != "" {
+		statuses = append(statuses, summary)
+	}
+	if msg := strings.TrimSpace(m.status); msg != "" {
+		statuses = append(statuses, msg)
 	}
 
-	if status != "" {
-		return fmt.Sprintf("%s\n%s", m.list.View(), status)
+	if len(statuses) > 0 {
+		return fmt.Sprintf("%s\n%s", m.list.View(), strings.Join(statuses, "\n"))
 	}
 	return m.list.View()
+}
+
+func (m *Model) rootFooter() string {
+	if m.state == nil {
+		return ""
+	}
+	return strings.TrimSuffix(m.state.RootStatus.Footer, "\n")
 }
 
 func (m *Model) handleOpen() (tea.Model, tea.Cmd) {

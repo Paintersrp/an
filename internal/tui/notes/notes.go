@@ -826,6 +826,13 @@ func (m *NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			contentHeight = 0
 		}
 
+		if footer := m.rootFooter(); footer != "" {
+			contentHeight--
+			if contentHeight < 0 {
+				contentHeight = 0
+			}
+		}
+
 		listFrameWidth, _ := listStyle.GetFrameSize()
 		previewFrameWidth, _ := previewStyle.GetFrameSize()
 		promptFrameWidth, _ := textPromptStyle.GetFrameSize()
@@ -1560,12 +1567,13 @@ func (m NoteListModel) View() string {
 			renderHelpWithinWidth(width, m.editorInstructions()),
 		}
 
+		statuses := []string{}
 		if msg := m.editor.status; msg != "" {
-			sections = append(sections, statusStyle(msg))
+			statuses = append(statuses, statusStyle(msg))
 		}
 
 		layout := lipgloss.JoinVertical(lipgloss.Left, sections...)
-		return appStyle.Render(layout)
+		return m.renderWithFooter(layout, statuses...)
 	}
 
 	listWidth := m.list.Width()
@@ -1599,14 +1607,14 @@ func (m NoteListModel) View() string {
 		textPrompt := textPromptStyle.Render(promptContent)
 
 		layout := lipgloss.JoinHorizontal(lipgloss.Top, list, textPrompt)
-		return appStyle.Render(layout)
+		return m.renderWithFooter(layout)
 	}
 
 	if m.creating {
 		modelStyle := lipgloss.NewStyle().
 			Width(m.width).
 			Height(m.height).Padding(0, 1)
-		return appStyle.Render(modelStyle.Render(m.formModel.View()))
+		return m.renderWithFooter(modelStyle.Render(m.formModel.View()))
 	}
 
 	if m.renaming {
@@ -1621,7 +1629,7 @@ func (m NoteListModel) View() string {
 		textPrompt := textPromptStyle.Render(promptContent)
 
 		layout := lipgloss.JoinHorizontal(lipgloss.Top, list, textPrompt)
-		return appStyle.Render(layout)
+		return m.renderWithFooter(layout)
 	}
 
 	if m.filtering && m.filterModel != nil {
@@ -1636,7 +1644,7 @@ func (m NoteListModel) View() string {
 		palette := filterPaletteStyle.Render(paletteContent)
 
 		layout := lipgloss.JoinHorizontal(lipgloss.Top, list, palette)
-		return appStyle.Render(layout)
+		return m.renderWithFooter(layout)
 	}
 
 	previewBody := m.previewViewport.View()
@@ -1654,7 +1662,28 @@ func (m NoteListModel) View() string {
 	preview := previewStyle.Render(previewContent)
 
 	layout := lipgloss.JoinHorizontal(lipgloss.Top, list, preview)
-	return appStyle.Render(layout)
+	return m.renderWithFooter(layout)
+}
+
+func (m NoteListModel) renderWithFooter(layout string, statuses ...string) string {
+	sections := []string{layout}
+	if footer := m.rootFooter(); footer != "" {
+		sections = append(sections, footer)
+	}
+	for _, status := range statuses {
+		if msg := strings.TrimSpace(strings.TrimSuffix(status, "\n")); msg != "" {
+			sections = append(sections, msg)
+		}
+	}
+	combined := lipgloss.JoinVertical(lipgloss.Left, sections...)
+	return appStyle.Render(combined)
+}
+
+func (m NoteListModel) rootFooter() string {
+	if m.state == nil {
+		return ""
+	}
+	return strings.TrimSuffix(m.state.RootStatus.Footer, "\n")
 }
 
 func Run(s *state.State, views map[string]v.View, viewFlag string) error {

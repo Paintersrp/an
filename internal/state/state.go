@@ -13,6 +13,19 @@ import (
 	"github.com/Paintersrp/an/internal/views"
 )
 
+type ViewShortcut struct {
+	View  string
+	Label string
+}
+
+type RootStatus struct {
+	ActiveView    string
+	WorkspaceName string
+	WorkspaceHint string
+	Shortcuts     []ViewShortcut
+	Footer        string
+}
+
 type State struct {
 	Config        *config.Config
 	Workspace     *config.Workspace
@@ -24,6 +37,7 @@ type State struct {
 	Home          string
 	Vault         string
 	Watcher       *VaultWatcher
+	RootStatus    RootStatus
 }
 
 func NewState(workspaceOverride string) (*State, error) {
@@ -75,6 +89,7 @@ func NewState(workspaceOverride string) (*State, error) {
 		Home:          home,
 		Vault:         ws.VaultDir,
 		Watcher:       watcher,
+		RootStatus:    RootStatus{},
 	}, nil
 }
 
