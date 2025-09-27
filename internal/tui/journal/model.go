@@ -123,6 +123,8 @@ func (i entryItem) FilterValue() string {
 
 func (m *Model) Init() tea.Cmd { return nil }
 
+func (m *Model) State() *state.State { return m.state }
+
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
