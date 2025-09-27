@@ -20,6 +20,9 @@ var (
 	statusBannerStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.AdaptiveColor{Light: "#0AF", Dark: "#0AF"})
 
+	previewSummaryStyle = statusBannerStyle.Copy().
+				Padding(0, 1)
+
 	statusStyle = statusBannerStyle.Render
 
 	rootHeaderStyle = lipgloss.NewStyle().

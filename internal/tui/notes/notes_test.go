@@ -83,7 +83,7 @@ func TestPreviewViewportUpdatesOnPreviewLoaded(t *testing.T) {
 		t.Fatalf("expected viewport view to include content")
 	}
 
-	renderedSummary := statusStyle(strings.TrimSpace(msg.summary))
+	renderedSummary := previewSummaryStyle.Render(strings.TrimSpace(msg.summary))
 	if !strings.Contains(body, renderedSummary) {
 		t.Fatalf("expected viewport view to include summary %q, got %q", renderedSummary, body)
 	}
