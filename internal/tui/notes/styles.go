@@ -17,9 +17,10 @@ var (
 			BorderStyle(lipgloss.NormalBorder()).
 			Padding(0, 1).Width(100)
 
-	statusStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.AdaptiveColor{Light: "#0AF", Dark: "#0AF"}).
-			Render
+	statusBannerStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.AdaptiveColor{Light: "#0AF", Dark: "#0AF"})
+
+	statusStyle = statusBannerStyle.Render
 
 	focusedStyle = lipgloss.NewStyle().
 			Bold(true).
@@ -40,9 +41,6 @@ var (
 			MarginLeft(1).
 			Border(lipgloss.NormalBorder(), false, false, false, true).
 			BorderForeground(lipgloss.Color("#334455"))
-
-	previewSummaryStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#94e2d5"))
 
 	textPromptStyle = previewStyle.Copy()
 
