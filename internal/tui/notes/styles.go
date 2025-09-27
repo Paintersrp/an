@@ -49,7 +49,7 @@ var (
 
 	filterPaletteStyle = lipgloss.NewStyle().
 				MarginLeft(1).
-				Border(lipgloss.NormalBorder()).
+				Border(lipgloss.NormalBorder(), false, false, false, true).
 				BorderForeground(lipgloss.Color("#334455"))
 
 	linkSelectStyle = lipgloss.NewStyle().MarginLeft(1).
