@@ -181,13 +181,15 @@ func (m *RootModel) header() string {
 			}
 			label += fmt.Sprintf(" (%s to switch)", nextKey)
 		}
-		sections = append(sections, label)
+		sections = append(sections, rootHeaderWorkspaceStyle.Render(label))
 	}
-	sections = append(sections, "Views:")
+
+	sections = append(sections, rootHeaderStyle.Render("Views:"))
 	sections = append(sections, highlight(viewNotes, m.active, formatShortcut(m.keys.notes)))
 	sections = append(sections, highlight(viewTasks, m.active, formatShortcut(m.keys.tasks)))
 	sections = append(sections, highlight(viewJournal, m.active, formatShortcut(m.keys.journal)))
-	return strings.Join(sections, "  ")
+
+	return lipgloss.JoinHorizontal(lipgloss.Left, sections...)
 }
 
 func (m *RootModel) handleViewSwitch(msg tea.KeyMsg) bool {
@@ -376,9 +378,9 @@ func (m *RootModel) notifyWorkspaceStatus(message string) {
 
 func highlight(view rootView, active rootView, label string) string {
 	if view == active {
-		return fmt.Sprintf("[%s]", label)
+		return rootHeaderActiveStyle.Render(fmt.Sprintf("[%s]", label))
 	}
-	return label
+	return rootHeaderStyle.Render(label)
 }
 
 func padFrame(content string, width, height int) string {
