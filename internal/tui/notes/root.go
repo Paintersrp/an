@@ -3,6 +3,7 @@ package notes
 import (
 	"fmt"
 	"strings"
+	"unicode"
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
@@ -100,17 +101,11 @@ func (m *RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		editorActive := m.active == viewNotes && m.notes != nil && m.notes.editorActive()
 
-		switch {
-		case !editorActive && key.Matches(msg, m.keys.notes):
-			m.active = viewNotes
+		if !editorActive && m.handleViewSwitch(msg) {
 			return m, nil
-		case !editorActive && key.Matches(msg, m.keys.tasks):
-			m.active = viewTasks
-			return m, nil
-		case !editorActive && key.Matches(msg, m.keys.journal):
-			m.active = viewJournal
-			return m, nil
-		case key.Matches(msg, m.keys.next):
+		}
+
+		if key.Matches(msg, m.keys.next) {
 			if cmd := m.cycleWorkspace(); cmd != nil {
 				return m, cmd
 			}
@@ -174,15 +169,86 @@ func (m *RootModel) header() string {
 	if name := m.workspaceName(); name != "" {
 		label := fmt.Sprintf("Workspace: [%s]", name)
 		if m.hasMultipleWorkspaces() {
-			label += " (ctrl+w to switch)"
+			nextHelp := m.keys.next.Help()
+			nextKey := strings.TrimSpace(nextHelp.Key)
+			if nextKey == "" {
+				keys := m.keys.next.Keys()
+				if len(keys) > 0 {
+					nextKey = keys[0]
+				} else {
+					nextKey = "ctrl+w"
+				}
+			}
+			label += fmt.Sprintf(" (%s to switch)", nextKey)
 		}
 		sections = append(sections, label)
 	}
 	sections = append(sections, "Views:")
-	sections = append(sections, highlight(viewNotes, m.active, "ctrl+1 Notes"))
-	sections = append(sections, highlight(viewTasks, m.active, "ctrl+2 Tasks"))
-	sections = append(sections, highlight(viewJournal, m.active, "ctrl+3 Journal"))
+	sections = append(sections, highlight(viewNotes, m.active, formatShortcut(m.keys.notes)))
+	sections = append(sections, highlight(viewTasks, m.active, formatShortcut(m.keys.tasks)))
+	sections = append(sections, highlight(viewJournal, m.active, formatShortcut(m.keys.journal)))
 	return strings.Join(sections, "  ")
+}
+
+func (m *RootModel) handleViewSwitch(msg tea.KeyMsg) bool {
+	switch msg.Type {
+	case tea.KeyCtrlQ:
+		m.active = viewNotes
+		return true
+	case tea.KeyCtrlR:
+		m.active = viewTasks
+		return true
+	case tea.KeyCtrlS:
+		m.active = viewJournal
+		return true
+	}
+
+	switch {
+	case key.Matches(msg, m.keys.notes):
+		m.active = viewNotes
+		return true
+	case key.Matches(msg, m.keys.tasks):
+		m.active = viewTasks
+		return true
+	case key.Matches(msg, m.keys.journal):
+		m.active = viewJournal
+		return true
+	}
+	return false
+}
+
+func formatShortcut(binding key.Binding) string {
+	help := binding.Help()
+	keyStr := strings.TrimSpace(help.Key)
+	desc := strings.TrimSpace(help.Desc)
+
+	if desc != "" {
+		desc = capitalize(desc)
+	}
+
+	switch {
+	case keyStr != "" && desc != "":
+		return fmt.Sprintf("%s %s", keyStr, desc)
+	case keyStr != "":
+		return keyStr
+	case desc != "":
+		return desc
+	}
+
+	keys := binding.Keys()
+	if len(keys) > 0 {
+		return keys[0]
+	}
+	return ""
+}
+
+func capitalize(s string) string {
+	runes := []rune(s)
+	if len(runes) == 0 {
+		return s
+	}
+	runes[0] = unicode.ToUpper(runes[0])
+	return string(runes)
 }
 
 func (m *RootModel) currentConfig() *config.Config {
