@@ -108,14 +108,11 @@ func TestRootModelNavigation(t *testing.T) {
 		t.Fatalf("expected non-empty root status line")
 	}
 	lines := strings.Split(view, "\n")
-	if len(lines) == 0 || !strings.Contains(lines[0], "Workspace:") {
-		t.Fatalf("expected workspace status in header, got %q", view)
+	if len(lines) == 0 {
+		t.Fatalf("expected view to contain header line, got %q", view)
 	}
-	if !strings.Contains(view, "Workspace:") {
-		t.Fatalf("expected root status line to be rendered in view: %q", view)
-	}
-	if workspaceInTail(lines, 3) {
-		t.Fatalf("expected workspace status to be part of header, got %q", view)
+	if !strings.HasPrefix(lines[0], statusLine) {
+		t.Fatalf("expected header to start with root status line: header=%q status=%q", lines[0], statusLine)
 	}
 
 	root.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'i'}})
@@ -130,14 +127,11 @@ func TestRootModelNavigation(t *testing.T) {
 		t.Fatalf("expected tasks shortcut to be highlighted in header: %q", view)
 	}
 	lines = strings.Split(view, "\n")
-	if len(lines) == 0 || !strings.Contains(lines[0], "Workspace:") {
-		t.Fatalf("expected workspace status in header for tasks view: %q", view)
+	if len(lines) == 0 {
+		t.Fatalf("expected view to contain header line, got %q", view)
 	}
-	if !strings.Contains(view, "Workspace:") {
-		t.Fatalf("expected tasks view to include root status line: %q", view)
-	}
-	if workspaceInTail(lines, 3) {
-		t.Fatalf("expected workspace status to appear with header in tasks view: %q", view)
+	if !strings.HasPrefix(lines[0], root.notes.state.RootStatus.Line) {
+		t.Fatalf("expected header to start with root status line for tasks view: header=%q status=%q", lines[0], root.notes.state.RootStatus.Line)
 	}
 
 	root.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'l'}})
@@ -152,14 +146,11 @@ func TestRootModelNavigation(t *testing.T) {
 		t.Fatalf("expected journal shortcut to be highlighted in header: %q", view)
 	}
 	lines = strings.Split(view, "\n")
-	if len(lines) == 0 || !strings.Contains(lines[0], "Workspace:") {
-		t.Fatalf("expected workspace status in header for journal view: %q", view)
+	if len(lines) == 0 {
+		t.Fatalf("expected view to contain header line, got %q", view)
 	}
-	if !strings.Contains(view, "Workspace:") {
-		t.Fatalf("expected journal view to include root status line: %q", view)
-	}
-	if workspaceInTail(lines, 3) {
-		t.Fatalf("expected workspace status to appear with header in journal view: %q", view)
+	if !strings.HasPrefix(lines[0], root.notes.state.RootStatus.Line) {
+		t.Fatalf("expected header to start with root status line for journal view: header=%q status=%q", lines[0], root.notes.state.RootStatus.Line)
 	}
 
 	root.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
@@ -237,21 +228,6 @@ func TestRootViewFillsFrame(t *testing.T) {
 			t.Fatalf("line %d width mismatch: want at least 10, got %d", i, width)
 		}
 	}
-}
-
-func workspaceInTail(lines []string, tail int) bool {
-	if tail <= 0 {
-		tail = 1
-	}
-	if tail > len(lines) {
-		tail = len(lines)
-	}
-	for _, line := range lines[len(lines)-tail:] {
-		if strings.Contains(line, "Workspace:") {
-			return true
-		}
-	}
-	return false
 }
 
 func TestPadFrame(t *testing.T) {
