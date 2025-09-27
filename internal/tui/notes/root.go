@@ -3,7 +3,6 @@ package notes
 import (
 	"fmt"
 	"strings"
-	"unicode"
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
@@ -148,12 +147,7 @@ func (m *RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *RootModel) View() string {
-	header := m.header()
 	sections := []string{}
-	if header != "" {
-		sections = append(sections, header)
-	}
-
 	switch m.active {
 	case viewNotes:
 		if m.notes != nil {
@@ -173,51 +167,6 @@ func (m *RootModel) View() string {
 	return padFrame(content, m.width, m.height)
 }
 
-func (m *RootModel) header() string {
-	line := m.statusLine()
-	m.setRootStatus(line)
-	return line
-}
-
-func (m *RootModel) statusLine() string {
-	entries := []string{}
-
-	if m.notes != nil {
-		entries = append(entries, highlight(viewNotes, m.active, formatShortcut(m.keys.notes)))
-	}
-	if m.tasks != nil {
-		entries = append(entries, highlight(viewTasks, m.active, formatShortcut(m.keys.tasks)))
-	}
-	if m.journal != nil {
-		entries = append(entries, highlight(viewJournal, m.active, formatShortcut(m.keys.journal)))
-	}
-
-	if len(entries) == 0 {
-		return ""
-	}
-
-	sections := []string{rootHeaderStyle.Render("Views:")}
-	sections = append(sections, entries...)
-
-	return lipgloss.JoinHorizontal(lipgloss.Left, sections...)
-}
-
-func (m *RootModel) setRootStatus(line string) {
-	if m.state == nil && m.notes != nil {
-		m.state = m.notes.state
-	}
-
-	if m.state == nil {
-		return
-	}
-
-	if m.state.RootStatus == nil {
-		m.state.RootStatus = &state.RootStatus{}
-	}
-
-	m.state.RootStatus.Line = line
-}
-
 func (m *RootModel) handleViewSwitch(msg tea.KeyMsg) bool {
 	switch {
 	case key.Matches(msg, m.keys.notes):
@@ -231,40 +180,6 @@ func (m *RootModel) handleViewSwitch(msg tea.KeyMsg) bool {
 		return true
 	}
 	return false
-}
-
-func formatShortcut(binding key.Binding) string {
-	help := binding.Help()
-	keyStr := strings.TrimSpace(help.Key)
-	desc := strings.TrimSpace(help.Desc)
-
-	if desc != "" {
-		desc = capitalize(desc)
-	}
-
-	switch {
-	case keyStr != "" && desc != "":
-		return fmt.Sprintf("%s %s", keyStr, desc)
-	case keyStr != "":
-		return keyStr
-	case desc != "":
-		return desc
-	}
-
-	keys := binding.Keys()
-	if len(keys) > 0 {
-		return keys[0]
-	}
-	return ""
-}
-
-func capitalize(s string) string {
-	runes := []rune(s)
-	if len(runes) == 0 {
-		return s
-	}
-	runes[0] = unicode.ToUpper(runes[0])
-	return string(runes)
 }
 
 func (m *RootModel) currentConfig() *config.Config {
@@ -403,13 +318,6 @@ func (m *RootModel) notifyWorkspaceStatus(message string) {
 	}
 }
 
-func highlight(view rootView, active rootView, label string) string {
-	if view == active {
-		return rootHeaderActiveStyle.Render(fmt.Sprintf("[%s]", label))
-	}
-	return rootHeaderStyle.Render(label)
-}
-
 func padFrame(content string, width, height int) string {
 	lines := strings.Split(content, "\n")
 	if len(lines) == 0 {
@@ -439,42 +347,16 @@ func padFrame(content string, width, height int) string {
 }
 
 func (m *RootModel) updateAll(msg tea.Msg) {
-	var (
-		adjustedMsg tea.WindowSizeMsg
-		useAdjusted bool
-	)
-	if windowMsg, ok := msg.(tea.WindowSizeMsg); ok {
-		adjustedMsg = windowMsg
-		headerLines := lipgloss.Height(m.header())
-		adjustedMsg.Height = windowMsg.Height - headerLines
-		if adjustedMsg.Height < 0 {
-			adjustedMsg.Height = 0
-		}
-		useAdjusted = true
-	}
-
 	if m.notes != nil {
-		forward := msg
-		if useAdjusted {
-			forward = adjustedMsg
-		}
-		model, _ := m.notes.Update(forward)
+		model, _ := m.notes.Update(msg)
 		m.notes = adoptNoteModel(model, m.notes)
 	}
 	if m.tasks != nil {
-		forward := msg
-		if useAdjusted {
-			forward = adjustedMsg
-		}
-		model, _ := m.tasks.Update(forward)
+		model, _ := m.tasks.Update(msg)
 		m.tasks = adoptTasksModel(model, m.tasks)
 	}
 	if m.journal != nil {
-		forward := msg
-		if useAdjusted {
-			forward = adjustedMsg
-		}
-		model, _ := m.journal.Update(forward)
+		model, _ := m.journal.Update(msg)
 		m.journal = adoptJournalModel(model, m.journal)
 	}
 }
