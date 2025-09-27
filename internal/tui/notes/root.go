@@ -42,16 +42,16 @@ type rootKeyMap struct {
 func newRootKeyMap() rootKeyMap {
 	return rootKeyMap{
 		notes: key.NewBinding(
-			key.WithKeys("alt+1"),
-			key.WithHelp("alt+1", "notes"),
+			key.WithKeys("ctrl+1", "ctrl+q"),
+			key.WithHelp("ctrl+1", "notes"),
 		),
 		tasks: key.NewBinding(
-			key.WithKeys("alt+2"),
-			key.WithHelp("alt+2", "tasks"),
+			key.WithKeys("ctrl+2", "ctrl+r"),
+			key.WithHelp("ctrl+2", "tasks"),
 		),
 		journal: key.NewBinding(
-			key.WithKeys("alt+3"),
-			key.WithHelp("alt+3", "journal"),
+			key.WithKeys("ctrl+3", "ctrl+s"),
+			key.WithHelp("ctrl+3", "journal"),
 		),
 		next: key.NewBinding(
 			key.WithKeys("ctrl+w"),
@@ -179,9 +179,9 @@ func (m *RootModel) header() string {
 		sections = append(sections, label)
 	}
 	sections = append(sections, "Views:")
-	sections = append(sections, highlight(viewNotes, m.active, "alt+1 Notes"))
-	sections = append(sections, highlight(viewTasks, m.active, "alt+2 Tasks"))
-	sections = append(sections, highlight(viewJournal, m.active, "alt+3 Journal"))
+	sections = append(sections, highlight(viewNotes, m.active, "ctrl+1 Notes"))
+	sections = append(sections, highlight(viewTasks, m.active, "ctrl+2 Tasks"))
+	sections = append(sections, highlight(viewJournal, m.active, "ctrl+3 Journal"))
 	return strings.Join(sections, "  ")
 }
 
