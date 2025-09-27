@@ -230,6 +230,30 @@ func TestRootViewFillsFrame(t *testing.T) {
 	}
 }
 
+func TestRootHeaderOmittedWhenNoViews(t *testing.T) {
+	st := &state.State{RootStatus: &state.RootStatus{}}
+	root := &RootModel{state: st}
+	root.width = 8
+	root.height = 2
+
+	view := root.View()
+	lines := strings.Split(view, "\n")
+
+	if len(lines) != root.height {
+		t.Fatalf("expected %d lines, got %d", root.height, len(lines))
+	}
+
+	for _, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			t.Fatalf("expected blank lines when header and content are empty, got %q", line)
+		}
+	}
+
+	if st.RootStatus.Line != "" {
+		t.Fatalf("expected root status line to be empty, got %q", st.RootStatus.Line)
+	}
+}
+
 func TestPadFrame(t *testing.T) {
 	cases := []struct {
 		name    string

@@ -149,7 +149,10 @@ func (m *RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *RootModel) View() string {
 	header := m.header()
-	sections := []string{header}
+	sections := []string{}
+	if header != "" {
+		sections = append(sections, header)
+	}
 
 	switch m.active {
 	case viewNotes:
@@ -177,11 +180,24 @@ func (m *RootModel) header() string {
 }
 
 func (m *RootModel) statusLine() string {
-	sections := []string{}
-	sections = append(sections, rootHeaderStyle.Render("Views:"))
-	sections = append(sections, highlight(viewNotes, m.active, formatShortcut(m.keys.notes)))
-	sections = append(sections, highlight(viewTasks, m.active, formatShortcut(m.keys.tasks)))
-	sections = append(sections, highlight(viewJournal, m.active, formatShortcut(m.keys.journal)))
+	entries := []string{}
+
+	if m.notes != nil {
+		entries = append(entries, highlight(viewNotes, m.active, formatShortcut(m.keys.notes)))
+	}
+	if m.tasks != nil {
+		entries = append(entries, highlight(viewTasks, m.active, formatShortcut(m.keys.tasks)))
+	}
+	if m.journal != nil {
+		entries = append(entries, highlight(viewJournal, m.active, formatShortcut(m.keys.journal)))
+	}
+
+	if len(entries) == 0 {
+		return ""
+	}
+
+	sections := []string{rootHeaderStyle.Render("Views:")}
+	sections = append(sections, entries...)
 
 	return lipgloss.JoinHorizontal(lipgloss.Left, sections...)
 }
