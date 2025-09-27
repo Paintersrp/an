@@ -2069,7 +2069,7 @@ func renderPreviewContent(markdown, summary string) string {
 	content := markdown
 	trimmedContent := strings.TrimSpace(content)
 	if trimmedSummary != "" {
-		renderedSummary := statusStyle(trimmedSummary)
+		renderedSummary := previewSummaryStyle.Render(trimmedSummary)
 		if trimmedContent != "" {
 			return fmt.Sprintf("%s\n\n%s", renderedSummary, content)
 		}
