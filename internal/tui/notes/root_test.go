@@ -91,21 +91,21 @@ func TestRootModelNavigation(t *testing.T) {
 	root.Init()
 	root.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 
-	if !strings.Contains(root.View(), "[alt+1 Notes]") {
+	if !strings.Contains(root.View(), "[ctrl+1 Notes]") {
 		t.Fatalf("expected notes view to be active")
 	}
 
-	root.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}, Alt: true})
+	root.Update(tea.KeyMsg{Type: tea.KeyCtrlR})
 	if root.active != viewTasks {
-		t.Fatalf("expected tasks view after alt+2, got %v", root.active)
+		t.Fatalf("expected tasks view after ctrl+2, got %v", root.active)
 	}
 	if !strings.Contains(root.View(), "Pinned:") {
 		t.Fatalf("expected tasks view to render pinned status")
 	}
 
-	root.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}, Alt: true})
+	root.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
 	if root.active != viewJournal {
-		t.Fatalf("expected journal view after alt+3, got %v", root.active)
+		t.Fatalf("expected journal view after ctrl+3, got %v", root.active)
 	}
 	if !strings.Contains(root.View(), "Journal") {
 		t.Fatalf("expected journal view content in output")

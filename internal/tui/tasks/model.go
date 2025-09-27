@@ -105,8 +105,8 @@ func newKeyMap() keyMap {
 			key.WithHelp("space", "toggle"),
 		),
 		refresh: key.NewBinding(
-			key.WithKeys("ctrl+r"),
-			key.WithHelp("ctrl+r", "refresh"),
+			key.WithKeys("r"),
+			key.WithHelp("r", "refresh"),
 		),
 		cycleDue: key.NewBinding(
 			key.WithKeys("d"),

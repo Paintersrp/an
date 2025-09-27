@@ -73,8 +73,8 @@ func newKeyMap() keyMap {
 			key.WithHelp("t", "today"),
 		),
 		refresh: key.NewBinding(
-			key.WithKeys("ctrl+r"),
-			key.WithHelp("ctrl+r", "refresh"),
+			key.WithKeys("r"),
+			key.WithHelp("r", "refresh"),
 		),
 		day: key.NewBinding(
 			key.WithKeys("1"),
