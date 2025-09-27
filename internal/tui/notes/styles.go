@@ -22,6 +22,15 @@ var (
 
 	statusStyle = statusBannerStyle.Render
 
+	rootHeaderStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.AdaptiveColor{Light: "#0AF", Dark: "#0AF"}).
+			Padding(0, 1)
+
+	rootHeaderActiveStyle = rootHeaderStyle.Copy().
+				Bold(true)
+
+	rootHeaderWorkspaceStyle = rootHeaderActiveStyle.Copy()
+
 	focusedStyle = lipgloss.NewStyle().
 			Bold(true).
 			Background(lipgloss.Color("#0AF")).
