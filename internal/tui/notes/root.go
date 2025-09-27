@@ -43,16 +43,16 @@ type rootKeyMap struct {
 func newRootKeyMap() rootKeyMap {
 	return rootKeyMap{
 		notes: key.NewBinding(
-			key.WithKeys("alt+1"),
-			key.WithHelp("alt+1", "notes"),
+			key.WithKeys("n"),
+			key.WithHelp("n", "notes"),
 		),
 		tasks: key.NewBinding(
-			key.WithKeys("alt+2"),
-			key.WithHelp("alt+2", "tasks"),
+			key.WithKeys("i"),
+			key.WithHelp("i", "tasks"),
 		),
 		journal: key.NewBinding(
-			key.WithKeys("alt+3"),
-			key.WithHelp("alt+3", "journal"),
+			key.WithKeys("l"),
+			key.WithHelp("l", "journal"),
 		),
 		next: key.NewBinding(
 			key.WithKeys("w"),
