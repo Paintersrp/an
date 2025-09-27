@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/reflow/truncate"
 
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/internal/handler"
@@ -741,5 +742,35 @@ func TestToggleCopySeedsInputValue(t *testing.T) {
 				t.Fatalf("expected input value %q, got %q", tc.want, got)
 			}
 		})
+	}
+}
+
+func TestRootStatusSuffixTruncatesToAvailableWidth(t *testing.T) {
+	t.Parallel()
+
+	baseLine := "Checkmark – All View"
+	status := "Workspace: Extremely Long Name"
+	gap := "  "
+
+	baseWidth := lipgloss.Width(baseLine)
+	available := 5
+	width := baseWidth + lipgloss.Width(gap) + available
+
+	suffix := rootStatusSuffix(baseLine, width, status, gap)
+	if suffix == "" {
+		t.Fatalf("expected non-empty suffix")
+	}
+
+	want := truncate.StringWithTail(status, uint(available), "")
+	if suffix != want {
+		t.Fatalf("expected suffix %q, got %q", want, suffix)
+	}
+
+	if narrow := rootStatusSuffix(baseLine, baseWidth+lipgloss.Width(gap), status, gap); narrow != "" {
+		t.Fatalf("expected no suffix when width only covers gap, got %q", narrow)
+	}
+
+	if noGap := rootStatusSuffix("", available, status, ""); noGap != want {
+		t.Fatalf("expected suffix %q without gap, got %q", want, noGap)
 	}
 }
