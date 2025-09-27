@@ -92,42 +92,42 @@ func TestRootModelNavigation(t *testing.T) {
 	root.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 
 	view := root.View()
-	for _, want := range []string{"n Notes", "k Tasks", "j Journal"} {
+	for _, want := range []string{"alt+1 Notes", "alt+2 Tasks", "alt+3 Journal"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("expected header to include %q, got %q", want, view)
 		}
 	}
-	if !strings.Contains(view, "[n Notes]") {
+	if !strings.Contains(view, "[alt+1 Notes]") {
 		t.Fatalf("expected notes view to be active")
 	}
 
-	root.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	root.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}, Alt: true})
 	if root.active != viewTasks {
-		t.Fatalf("expected tasks view after ctrl+2, got %v", root.active)
+		t.Fatalf("expected tasks view after alt+2, got %v", root.active)
 	}
 	view = root.View()
 	if !strings.Contains(view, "Pinned:") {
 		t.Fatalf("expected tasks view to render pinned status")
 	}
-	if !strings.Contains(view, "[k Tasks]") {
+	if !strings.Contains(view, "[alt+2 Tasks]") {
 		t.Fatalf("expected tasks shortcut to be highlighted in header: %q", view)
 	}
 
-	root.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	root.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}, Alt: true})
 	if root.active != viewJournal {
-		t.Fatalf("expected journal view after ctrl+3, got %v", root.active)
+		t.Fatalf("expected journal view after alt+3, got %v", root.active)
 	}
 	view = root.View()
 	if !strings.Contains(view, "Journal") {
 		t.Fatalf("expected journal view content in output")
 	}
-	if !strings.Contains(view, "[j Journal]") {
+	if !strings.Contains(view, "[alt+3 Journal]") {
 		t.Fatalf("expected journal shortcut to be highlighted in header: %q", view)
 	}
 
-	root.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	root.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'1'}, Alt: true})
 	if root.active != viewNotes {
-		t.Fatalf("expected notes view after ctrl+1 chord, got %v", root.active)
+		t.Fatalf("expected notes view after alt+1 chord, got %v", root.active)
 	}
 }
 
@@ -144,13 +144,13 @@ func TestRootModelKeepsNotesViewWhenEditorActive(t *testing.T) {
 		t.Fatalf("expected scratch editor to be active")
 	}
 
-	_, _ = root.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	_, _ = root.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}, Alt: true})
 
 	if root.active != viewNotes {
 		t.Fatalf("expected to remain on notes view, got %v", root.active)
 	}
 
-	if got := noteModel.editor.value(); got != "k" {
+	if got := noteModel.editor.value(); got != "2" {
 		t.Fatalf("expected editor to capture input, got %q", got)
 	}
 }
