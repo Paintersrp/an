@@ -92,27 +92,8 @@ func TestRootModelNavigation(t *testing.T) {
 	root.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 
 	view := root.View()
-	for _, want := range []string{"n Notes", "i Tasks", "l Journal"} {
-		if !strings.Contains(view, want) {
-			t.Fatalf("expected header to include %q, got %q", want, view)
-		}
-	}
-	if !strings.Contains(view, "[n Notes]") {
-		t.Fatalf("expected notes view to be active")
-	}
-	if root.notes == nil || root.notes.state == nil || root.notes.state.RootStatus == nil {
-		t.Fatalf("expected root status to be initialized")
-	}
-	statusLine := root.notes.state.RootStatus.Line
-	if statusLine == "" {
-		t.Fatalf("expected non-empty root status line")
-	}
-	lines := strings.Split(view, "\n")
-	if len(lines) == 0 {
-		t.Fatalf("expected view to contain header line, got %q", view)
-	}
-	if !strings.HasPrefix(lines[0], statusLine) {
-		t.Fatalf("expected header to start with root status line: header=%q status=%q", lines[0], statusLine)
+	if strings.Contains(view, "Views:") {
+		t.Fatalf("expected view to omit legacy header, got %q", view)
 	}
 
 	root.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'i'}})
@@ -123,15 +104,8 @@ func TestRootModelNavigation(t *testing.T) {
 	if !strings.Contains(view, "Pinned:") {
 		t.Fatalf("expected tasks view to render pinned status")
 	}
-	if !strings.Contains(view, "[i Tasks]") {
-		t.Fatalf("expected tasks shortcut to be highlighted in header: %q", view)
-	}
-	lines = strings.Split(view, "\n")
-	if len(lines) == 0 {
-		t.Fatalf("expected view to contain header line, got %q", view)
-	}
-	if !strings.HasPrefix(lines[0], root.notes.state.RootStatus.Line) {
-		t.Fatalf("expected header to start with root status line for tasks view: header=%q status=%q", lines[0], root.notes.state.RootStatus.Line)
+	if strings.Contains(view, "Views:") {
+		t.Fatalf("expected tasks view to omit legacy header, got %q", view)
 	}
 
 	root.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'l'}})
@@ -142,15 +116,8 @@ func TestRootModelNavigation(t *testing.T) {
 	if !strings.Contains(view, "Journal") {
 		t.Fatalf("expected journal view content in output")
 	}
-	if !strings.Contains(view, "[l Journal]") {
-		t.Fatalf("expected journal shortcut to be highlighted in header: %q", view)
-	}
-	lines = strings.Split(view, "\n")
-	if len(lines) == 0 {
-		t.Fatalf("expected view to contain header line, got %q", view)
-	}
-	if !strings.HasPrefix(lines[0], root.notes.state.RootStatus.Line) {
-		t.Fatalf("expected header to start with root status line for journal view: header=%q status=%q", lines[0], root.notes.state.RootStatus.Line)
+	if strings.Contains(view, "Views:") {
+		t.Fatalf("expected journal view to omit legacy header, got %q", view)
 	}
 
 	root.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
@@ -206,8 +173,8 @@ func TestRootModelViewHeightMatchesWindowSize(t *testing.T) {
 		)
 	}
 
-	if len(lines) == 0 || !strings.Contains(lines[0], "Views:") {
-		t.Fatalf("expected header to be visible in view, got %q", view)
+	if len(lines) == 0 {
+		t.Fatalf("expected non-empty view")
 	}
 }
 
