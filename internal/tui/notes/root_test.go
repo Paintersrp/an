@@ -92,16 +92,16 @@ func TestRootModelNavigation(t *testing.T) {
 	root.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 
 	view := root.View()
-	for _, want := range []string{"ctrl+1 Notes", "ctrl+2 Tasks", "ctrl+3 Journal"} {
+	for _, want := range []string{"n Notes", "k Tasks", "j Journal"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("expected header to include %q, got %q", want, view)
 		}
 	}
-	if !strings.Contains(view, "[ctrl+1 Notes]") {
+	if !strings.Contains(view, "[n Notes]") {
 		t.Fatalf("expected notes view to be active")
 	}
 
-	root.Update(tea.KeyMsg{Type: tea.KeyCtrlR})
+	root.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
 	if root.active != viewTasks {
 		t.Fatalf("expected tasks view after ctrl+2, got %v", root.active)
 	}
@@ -109,11 +109,11 @@ func TestRootModelNavigation(t *testing.T) {
 	if !strings.Contains(view, "Pinned:") {
 		t.Fatalf("expected tasks view to render pinned status")
 	}
-	if !strings.Contains(view, "[ctrl+2 Tasks]") {
+	if !strings.Contains(view, "[k Tasks]") {
 		t.Fatalf("expected tasks shortcut to be highlighted in header: %q", view)
 	}
 
-	root.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	root.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
 	if root.active != viewJournal {
 		t.Fatalf("expected journal view after ctrl+3, got %v", root.active)
 	}
@@ -121,11 +121,11 @@ func TestRootModelNavigation(t *testing.T) {
 	if !strings.Contains(view, "Journal") {
 		t.Fatalf("expected journal view content in output")
 	}
-	if !strings.Contains(view, "[ctrl+3 Journal]") {
+	if !strings.Contains(view, "[j Journal]") {
 		t.Fatalf("expected journal shortcut to be highlighted in header: %q", view)
 	}
 
-	root.Update(tea.KeyMsg{Type: tea.KeyCtrlQ})
+	root.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
 	if root.active != viewNotes {
 		t.Fatalf("expected notes view after ctrl+1 chord, got %v", root.active)
 	}
@@ -144,13 +144,13 @@ func TestRootModelKeepsNotesViewWhenEditorActive(t *testing.T) {
 		t.Fatalf("expected scratch editor to be active")
 	}
 
-	_, _ = root.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	_, _ = root.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
 
 	if root.active != viewNotes {
 		t.Fatalf("expected to remain on notes view, got %v", root.active)
 	}
 
-	if got := noteModel.editor.value(); got != "2" {
+	if got := noteModel.editor.value(); got != "k" {
 		t.Fatalf("expected editor to capture input, got %q", got)
 	}
 }
