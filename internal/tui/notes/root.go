@@ -31,6 +31,7 @@ type RootModel struct {
 	keys    rootKeyMap
 	width   int
 	height  int
+	state   *state.State
 }
 
 type rootKeyMap struct {
@@ -62,12 +63,18 @@ func newRootKeyMap() rootKeyMap {
 }
 
 func NewRootModel(notes *NoteListModel, tasks *taskstui.Model, journal *journaltui.Model) *RootModel {
+	var st *state.State
+	if notes != nil {
+		st = notes.state
+	}
+
 	return &RootModel{
 		notes:   notes,
 		tasks:   tasks,
 		journal: journal,
 		active:  viewNotes,
 		keys:    newRootKeyMap(),
+		state:   st,
 	}
 }
 
@@ -141,9 +148,8 @@ func (m *RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *RootModel) View() string {
-	sections := []string{
-		m.header(),
-	}
+	header := m.header()
+	sections := []string{header}
 
 	switch m.active {
 	case viewNotes:
@@ -165,6 +171,12 @@ func (m *RootModel) View() string {
 }
 
 func (m *RootModel) header() string {
+	line := m.statusLine()
+	m.setRootStatus(line)
+	return line
+}
+
+func (m *RootModel) statusLine() string {
 	sections := []string{}
 	if name := m.workspaceName(); name != "" {
 		label := fmt.Sprintf("Workspace: [%s]", name)
@@ -190,6 +202,22 @@ func (m *RootModel) header() string {
 	sections = append(sections, highlight(viewJournal, m.active, formatShortcut(m.keys.journal)))
 
 	return lipgloss.JoinHorizontal(lipgloss.Left, sections...)
+}
+
+func (m *RootModel) setRootStatus(line string) {
+	if m.state == nil && m.notes != nil {
+		m.state = m.notes.state
+	}
+
+	if m.state == nil {
+		return
+	}
+
+	if m.state.RootStatus == nil {
+		m.state.RootStatus = &state.RootStatus{}
+	}
+
+	m.state.RootStatus.Line = line
 }
 
 func (m *RootModel) handleViewSwitch(msg tea.KeyMsg) bool {
@@ -346,6 +374,7 @@ func (m *RootModel) cycleWorkspace() tea.Cmd {
 	m.notes = newNotes
 	m.tasks = newTasks
 	m.journal = newJournal
+	m.state = newState
 
 	cmds := []tea.Cmd{}
 	if cmd := m.notes.Init(); cmd != nil {

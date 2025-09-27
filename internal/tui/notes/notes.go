@@ -18,6 +18,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/reflow/truncate"
 	"golang.org/x/term"
 
 	"github.com/Paintersrp/an/internal/cache"
@@ -1578,7 +1579,12 @@ func (m NoteListModel) View() string {
 		listHeight = m.height
 	}
 
-	listContent := padArea(m.list.View(), listWidth, listHeight)
+	listView := m.list.View()
+	if status := m.rootStatusLine(); status != "" {
+		listView = injectRootStatus(listView, listWidth, status)
+	}
+
+	listContent := padArea(listView, listWidth, listHeight)
 
 	list := listStyle.Width(listWidth).Render(listContent)
 
@@ -1655,6 +1661,44 @@ func (m NoteListModel) View() string {
 
 	layout := lipgloss.JoinHorizontal(lipgloss.Top, list, preview)
 	return appStyle.Render(layout)
+}
+
+func (m NoteListModel) rootStatusLine() string {
+	if m.state == nil || m.state.RootStatus == nil {
+		return ""
+	}
+	return m.state.RootStatus.Line
+}
+
+func injectRootStatus(view string, width int, status string) string {
+	if status == "" || width <= 0 {
+		return view
+	}
+
+	lines := strings.Split(view, "\n")
+	if len(lines) == 0 {
+		return view
+	}
+
+	line := lines[0]
+	available := width - lipgloss.Width(line)
+	if available <= 0 {
+		return view
+	}
+
+	const gap = "  "
+	available -= lipgloss.Width(gap)
+	if available <= 0 {
+		return view
+	}
+
+	trimmed := truncate.StringWithTail(status, uint(available), "")
+	if trimmed == "" {
+		return view
+	}
+
+	lines[0] = line + gap + trimmed
+	return strings.Join(lines, "\n")
 }
 
 func Run(s *state.State, views map[string]v.View, viewFlag string) error {

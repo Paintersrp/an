@@ -24,6 +24,11 @@ type State struct {
 	Home          string
 	Vault         string
 	Watcher       *VaultWatcher
+	RootStatus    *RootStatus
+}
+
+type RootStatus struct {
+	Line string
 }
 
 func NewState(workspaceOverride string) (*State, error) {
@@ -75,6 +80,7 @@ func NewState(workspaceOverride string) (*State, error) {
 		Home:          home,
 		Vault:         ws.VaultDir,
 		Watcher:       watcher,
+		RootStatus:    &RootStatus{},
 	}, nil
 }
 

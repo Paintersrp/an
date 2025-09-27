@@ -11,6 +11,9 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/reflow/truncate"
+
 	services "github.com/Paintersrp/an/internal/services/tasks"
 	"github.com/Paintersrp/an/internal/state"
 )
@@ -220,25 +223,64 @@ func (m *Model) View() string {
 		}
 	}
 
-	status := m.status
-	if summary := m.filterSummary(); summary != "" {
-		if status != "" {
-			status = status + "\n" + summary
-		} else {
-			status = summary
-		}
-	}
-	if pinned != "" {
-		status = fmt.Sprintf("Pinned: %s", pinned)
-		if m.status != "" {
-			status = status + "\n" + m.status
-		}
+	view := m.list.View()
+	if root := m.rootStatusLine(); root != "" {
+		view = appendRootStatus(view, m.list.Width(), root)
 	}
 
-	if status != "" {
-		return fmt.Sprintf("%s\n%s", m.list.View(), status)
+	var statuses []string
+	if pinned != "" {
+		statuses = append(statuses, fmt.Sprintf("Pinned: %s", pinned))
 	}
-	return m.list.View()
+	if summary := m.filterSummary(); summary != "" {
+		statuses = append(statuses, summary)
+	}
+	if m.status != "" {
+		statuses = append(statuses, m.status)
+	}
+
+	if len(statuses) > 0 {
+		return fmt.Sprintf("%s\n%s", view, strings.Join(statuses, "\n"))
+	}
+	return view
+}
+
+func (m *Model) rootStatusLine() string {
+	if m.state == nil || m.state.RootStatus == nil {
+		return ""
+	}
+	return m.state.RootStatus.Line
+}
+
+func appendRootStatus(view string, width int, status string) string {
+	if status == "" || width <= 0 {
+		return view
+	}
+
+	lines := strings.Split(view, "\n")
+	if len(lines) == 0 {
+		return view
+	}
+
+	line := lines[0]
+	available := width - lipgloss.Width(line)
+	if available <= 0 {
+		return view
+	}
+
+	const gap = "  "
+	available -= lipgloss.Width(gap)
+	if available <= 0 {
+		return view
+	}
+
+	trimmed := truncate.StringWithTail(status, uint(available), "")
+	if trimmed == "" {
+		return view
+	}
+
+	lines[0] = line + gap + trimmed
+	return strings.Join(lines, "\n")
 }
 
 func (m *Model) handleOpen() (tea.Model, tea.Cmd) {
