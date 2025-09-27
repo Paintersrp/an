@@ -43,20 +43,20 @@ type rootKeyMap struct {
 func newRootKeyMap() rootKeyMap {
 	return rootKeyMap{
 		notes: key.NewBinding(
-			key.WithKeys("ctrl+1", "ctrl+q"),
-			key.WithHelp("ctrl+1", "notes"),
+			key.WithKeys("n"),
+			key.WithHelp("n", "notes"),
 		),
 		tasks: key.NewBinding(
-			key.WithKeys("ctrl+2", "ctrl+r"),
-			key.WithHelp("ctrl+2", "tasks"),
+			key.WithKeys("k"),
+			key.WithHelp("k", "tasks"),
 		),
 		journal: key.NewBinding(
-			key.WithKeys("ctrl+3", "ctrl+s"),
-			key.WithHelp("ctrl+3", "journal"),
+			key.WithKeys("j"),
+			key.WithHelp("j", "journal"),
 		),
 		next: key.NewBinding(
-			key.WithKeys("ctrl+w"),
-			key.WithHelp("ctrl+w", "next workspace"),
+			key.WithKeys("w"),
+			key.WithHelp("w", "next workspace"),
 		),
 	}
 }
@@ -191,18 +191,6 @@ func (m *RootModel) header() string {
 }
 
 func (m *RootModel) handleViewSwitch(msg tea.KeyMsg) bool {
-	switch msg.Type {
-	case tea.KeyCtrlQ:
-		m.active = viewNotes
-		return true
-	case tea.KeyCtrlR:
-		m.active = viewTasks
-		return true
-	case tea.KeyCtrlS:
-		m.active = viewJournal
-		return true
-	}
-
 	switch {
 	case key.Matches(msg, m.keys.notes):
 		m.active = viewNotes
