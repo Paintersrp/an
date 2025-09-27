@@ -92,13 +92,12 @@ func TestRootModelNavigation(t *testing.T) {
 	root.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 
 	view := root.View()
-	footer := root.notes.state.RootStatus.Footer
 	for _, want := range []string{"n Notes", "i Tasks", "l Journal"} {
-		if !strings.Contains(footer, want) {
-			t.Fatalf("expected footer to include %q, got %q", want, footer)
+		if !strings.Contains(view, want) {
+			t.Fatalf("expected header to include %q, got %q", want, view)
 		}
 	}
-	if !strings.Contains(footer, "[n Notes]") {
+	if !strings.Contains(view, "[n Notes]") {
 		t.Fatalf("expected notes view to be active")
 	}
 
@@ -107,12 +106,11 @@ func TestRootModelNavigation(t *testing.T) {
 		t.Fatalf("expected tasks view after pressing i, got %v", root.active)
 	}
 	view = root.View()
-	footer = root.notes.state.RootStatus.Footer
 	if !strings.Contains(view, "Pinned:") {
 		t.Fatalf("expected tasks view to render pinned status")
 	}
-	if !strings.Contains(footer, "[i Tasks]") {
-		t.Fatalf("expected tasks shortcut to be highlighted in footer: %q", footer)
+	if !strings.Contains(view, "[i Tasks]") {
+		t.Fatalf("expected tasks shortcut to be highlighted in header: %q", view)
 	}
 
 	root.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'l'}})
@@ -120,12 +118,11 @@ func TestRootModelNavigation(t *testing.T) {
 		t.Fatalf("expected journal view after pressing l, got %v", root.active)
 	}
 	view = root.View()
-	footer = root.notes.state.RootStatus.Footer
 	if !strings.Contains(view, "Journal") {
 		t.Fatalf("expected journal view content in output")
 	}
-	if !strings.Contains(footer, "[l Journal]") {
-		t.Fatalf("expected journal shortcut to be highlighted in footer: %q", footer)
+	if !strings.Contains(view, "[l Journal]") {
+		t.Fatalf("expected journal shortcut to be highlighted in header: %q", view)
 	}
 
 	root.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
@@ -181,9 +178,8 @@ func TestRootModelViewHeightMatchesWindowSize(t *testing.T) {
 		)
 	}
 
-	footer := root.notes.state.RootStatus.Footer
-	if !strings.Contains(footer, "Views:") {
-		t.Fatalf("expected footer to include view shortcuts, got %q", footer)
+	if len(lines) == 0 || !strings.Contains(lines[0], "Views:") {
+		t.Fatalf("expected header to be visible in view, got %q", view)
 	}
 }
 
