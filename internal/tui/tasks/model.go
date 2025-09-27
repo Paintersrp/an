@@ -223,9 +223,23 @@ func (m *Model) View() string {
 		}
 	}
 
+	listWidth := m.list.Width()
+	if listWidth <= 0 {
+		listWidth = m.width
+	}
+
 	view := m.list.View()
 	if root := m.rootStatusLine(); root != "" {
-		view = appendRootStatus(view, m.list.Width(), root)
+		originalTitle := m.list.Title
+		gap := "  "
+		if originalTitle == "" {
+			gap = ""
+		}
+		if suffix := rootStatusSuffix(view, listWidth, root, gap); suffix != "" {
+			m.list.Title = originalTitle + gap + suffix
+			view = m.list.View()
+			m.list.Title = originalTitle
+		}
 	}
 
 	var statuses []string
@@ -252,35 +266,35 @@ func (m *Model) rootStatusLine() string {
 	return m.state.RootStatus.Line
 }
 
-func appendRootStatus(view string, width int, status string) string {
+func rootStatusSuffix(view string, width int, status, gap string) string {
 	if status == "" || width <= 0 {
-		return view
+		return ""
 	}
 
 	lines := strings.Split(view, "\n")
 	if len(lines) == 0 {
-		return view
+		return ""
 	}
 
 	line := lines[0]
 	available := width - lipgloss.Width(line)
 	if available <= 0 {
-		return view
+		return ""
 	}
 
-	const gap = "  "
-	available -= lipgloss.Width(gap)
-	if available <= 0 {
-		return view
+	if gap != "" {
+		available -= lipgloss.Width(gap)
+		if available <= 0 {
+			return ""
+		}
 	}
 
 	trimmed := truncate.StringWithTail(status, uint(available), "")
 	if trimmed == "" {
-		return view
+		return ""
 	}
 
-	lines[0] = line + gap + trimmed
-	return strings.Join(lines, "\n")
+	return trimmed
 }
 
 func (m *Model) handleOpen() (tea.Model, tea.Cmd) {
