@@ -62,15 +62,13 @@ func newRootKeyMap() rootKeyMap {
 }
 
 func NewRootModel(notes *NoteListModel, tasks *taskstui.Model, journal *journaltui.Model) *RootModel {
-	model := &RootModel{
+	return &RootModel{
 		notes:   notes,
 		tasks:   tasks,
 		journal: journal,
 		active:  viewNotes,
 		keys:    newRootKeyMap(),
 	}
-	model.updateRootStatus()
-	return model
 }
 
 func (m *RootModel) Init() tea.Cmd {
@@ -84,7 +82,6 @@ func (m *RootModel) Init() tea.Cmd {
 	if m.journal != nil {
 		cmds = append(cmds, m.journal.Init())
 	}
-	m.updateRootStatus()
 	return tea.Batch(cmds...)
 }
 
@@ -144,7 +141,9 @@ func (m *RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *RootModel) View() string {
-	sections := []string{}
+	sections := []string{
+		m.header(),
+	}
 
 	switch m.active {
 	case viewNotes:
@@ -165,19 +164,44 @@ func (m *RootModel) View() string {
 	return padFrame(content, m.width, m.height)
 }
 
+func (m *RootModel) header() string {
+	sections := []string{}
+	if name := m.workspaceName(); name != "" {
+		label := fmt.Sprintf("Workspace: [%s]", name)
+		if m.hasMultipleWorkspaces() {
+			nextHelp := m.keys.next.Help()
+			nextKey := strings.TrimSpace(nextHelp.Key)
+			if nextKey == "" {
+				keys := m.keys.next.Keys()
+				if len(keys) > 0 {
+					nextKey = keys[0]
+				} else {
+					nextKey = "ctrl+w"
+				}
+			}
+			label += fmt.Sprintf(" (%s to switch)", nextKey)
+		}
+		sections = append(sections, rootHeaderWorkspaceStyle.Render(label))
+	}
+
+	sections = append(sections, rootHeaderStyle.Render("Views:"))
+	sections = append(sections, highlight(viewNotes, m.active, formatShortcut(m.keys.notes)))
+	sections = append(sections, highlight(viewTasks, m.active, formatShortcut(m.keys.tasks)))
+	sections = append(sections, highlight(viewJournal, m.active, formatShortcut(m.keys.journal)))
+
+	return lipgloss.JoinHorizontal(lipgloss.Left, sections...)
+}
+
 func (m *RootModel) handleViewSwitch(msg tea.KeyMsg) bool {
 	switch {
 	case key.Matches(msg, m.keys.notes):
 		m.active = viewNotes
-		m.updateRootStatus()
 		return true
 	case key.Matches(msg, m.keys.tasks):
 		m.active = viewTasks
-		m.updateRootStatus()
 		return true
 	case key.Matches(msg, m.keys.journal):
 		m.active = viewJournal
-		m.updateRootStatus()
 		return true
 	}
 	return false
@@ -339,7 +363,6 @@ func (m *RootModel) cycleWorkspace() tea.Cmd {
 	}
 
 	m.notifyWorkspaceStatus(fmt.Sprintf("Switched to workspace %s", next))
-	m.updateRootStatus()
 
 	if len(cmds) == 0 {
 		return nil
@@ -389,83 +412,44 @@ func padFrame(content string, width, height int) string {
 }
 
 func (m *RootModel) updateAll(msg tea.Msg) {
+	var (
+		adjustedMsg tea.WindowSizeMsg
+		useAdjusted bool
+	)
+	if windowMsg, ok := msg.(tea.WindowSizeMsg); ok {
+		adjustedMsg = windowMsg
+		headerLines := lipgloss.Height(m.header())
+		adjustedMsg.Height = windowMsg.Height - headerLines
+		if adjustedMsg.Height < 0 {
+			adjustedMsg.Height = 0
+		}
+		useAdjusted = true
+	}
+
 	if m.notes != nil {
-		model, _ := m.notes.Update(msg)
+		forward := msg
+		if useAdjusted {
+			forward = adjustedMsg
+		}
+		model, _ := m.notes.Update(forward)
 		m.notes = adoptNoteModel(model, m.notes)
 	}
 	if m.tasks != nil {
-		model, _ := m.tasks.Update(msg)
+		forward := msg
+		if useAdjusted {
+			forward = adjustedMsg
+		}
+		model, _ := m.tasks.Update(forward)
 		m.tasks = adoptTasksModel(model, m.tasks)
 	}
 	if m.journal != nil {
-		model, _ := m.journal.Update(msg)
+		forward := msg
+		if useAdjusted {
+			forward = adjustedMsg
+		}
+		model, _ := m.journal.Update(forward)
 		m.journal = adoptJournalModel(model, m.journal)
 	}
-}
-
-func (m *RootModel) updateRootStatus() {
-	status := state.RootStatus{
-		ActiveView:    string(m.active),
-		WorkspaceName: m.workspaceName(),
-		WorkspaceHint: m.workspaceSwitchHint(),
-		Shortcuts: []state.ViewShortcut{
-			{View: string(viewNotes), Label: formatShortcut(m.keys.notes)},
-			{View: string(viewTasks), Label: formatShortcut(m.keys.tasks)},
-			{View: string(viewJournal), Label: formatShortcut(m.keys.journal)},
-		},
-	}
-
-	status.Footer = m.renderFooter(status)
-	m.applyRootStatus(status)
-}
-
-func (m *RootModel) applyRootStatus(status state.RootStatus) {
-	if m.notes != nil && m.notes.state != nil {
-		m.notes.state.RootStatus = status
-	}
-	if m.tasks != nil && m.tasks.State() != nil {
-		m.tasks.State().RootStatus = status
-	}
-	if m.journal != nil && m.journal.State() != nil {
-		m.journal.State().RootStatus = status
-	}
-}
-
-func (m *RootModel) renderFooter(status state.RootStatus) string {
-	sections := []string{}
-	if status.WorkspaceName != "" {
-		label := fmt.Sprintf("Workspace: [%s]", status.WorkspaceName)
-		if status.WorkspaceHint != "" {
-			label += " " + status.WorkspaceHint
-		}
-		sections = append(sections, rootHeaderWorkspaceStyle.Render(label))
-	}
-
-	sections = append(sections, rootHeaderStyle.Render("Views:"))
-	for _, shortcut := range status.Shortcuts {
-		view := rootView(shortcut.View)
-		sections = append(sections, highlight(view, m.active, shortcut.Label))
-	}
-
-	return lipgloss.JoinHorizontal(lipgloss.Left, sections...)
-}
-
-func (m *RootModel) workspaceSwitchHint() string {
-	if !m.hasMultipleWorkspaces() {
-		return ""
-	}
-
-	nextHelp := m.keys.next.Help()
-	nextKey := strings.TrimSpace(nextHelp.Key)
-	if nextKey == "" {
-		keys := m.keys.next.Keys()
-		if len(keys) > 0 {
-			nextKey = keys[0]
-		} else {
-			nextKey = "ctrl+w"
-		}
-	}
-	return fmt.Sprintf("(%s to switch)", nextKey)
 }
 
 func adoptNoteModel(model tea.Model, current *NoteListModel) *NoteListModel {
