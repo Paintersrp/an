@@ -11,6 +11,7 @@ import (
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/internal/state"
 	journaltui "github.com/Paintersrp/an/internal/tui/journal"
+	reviewtui "github.com/Paintersrp/an/internal/tui/review"
 	taskstui "github.com/Paintersrp/an/internal/tui/tasks"
 )
 
@@ -20,12 +21,14 @@ const (
 	viewNotes   rootView = "notes"
 	viewTasks   rootView = "tasks"
 	viewJournal rootView = "journal"
+	viewReview  rootView = "review"
 )
 
 type RootModel struct {
 	notes   *NoteListModel
 	tasks   *taskstui.Model
 	journal *journaltui.Model
+	review  *reviewtui.Model
 	active  rootView
 	keys    rootKeyMap
 	width   int
@@ -37,6 +40,7 @@ type rootKeyMap struct {
 	notes   key.Binding
 	tasks   key.Binding
 	journal key.Binding
+	review  key.Binding
 	next    key.Binding
 }
 
@@ -54,6 +58,10 @@ func newRootKeyMap() rootKeyMap {
 			key.WithKeys("l"),
 			key.WithHelp("l", "journal"),
 		),
+		review: key.NewBinding(
+			key.WithKeys("r"),
+			key.WithHelp("r", "review"),
+		),
 		next: key.NewBinding(
 			key.WithKeys("w"),
 			key.WithHelp("w", "next workspace"),
@@ -61,7 +69,7 @@ func newRootKeyMap() rootKeyMap {
 	}
 }
 
-func NewRootModel(notes *NoteListModel, tasks *taskstui.Model, journal *journaltui.Model) *RootModel {
+func NewRootModel(notes *NoteListModel, tasks *taskstui.Model, journal *journaltui.Model, review *reviewtui.Model) *RootModel {
 	var st *state.State
 	if notes != nil {
 		st = notes.state
@@ -71,6 +79,7 @@ func NewRootModel(notes *NoteListModel, tasks *taskstui.Model, journal *journalt
 		notes:   notes,
 		tasks:   tasks,
 		journal: journal,
+		review:  review,
 		active:  viewNotes,
 		keys:    newRootKeyMap(),
 		state:   st,
@@ -87,6 +96,9 @@ func (m *RootModel) Init() tea.Cmd {
 	}
 	if m.journal != nil {
 		cmds = append(cmds, m.journal.Init())
+	}
+	if m.review != nil {
+		cmds = append(cmds, m.review.Init())
 	}
 	return tea.Batch(cmds...)
 }
@@ -141,6 +153,13 @@ func (m *RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		model, cmd := m.journal.Update(msg)
 		m.journal = adoptJournalModel(model, m.journal)
 		return m, cmd
+	case viewReview:
+		if m.review == nil {
+			return m, nil
+		}
+		model, cmd := m.review.Update(msg)
+		m.review = adoptReviewModel(model, m.review)
+		return m, cmd
 	}
 
 	return m, nil
@@ -161,6 +180,10 @@ func (m *RootModel) View() string {
 		if m.journal != nil {
 			sections = append(sections, m.journal.View())
 		}
+	case viewReview:
+		if m.review != nil {
+			sections = append(sections, m.review.View())
+		}
 	}
 
 	content := strings.Join(sections, "\n")
@@ -177,6 +200,9 @@ func (m *RootModel) handleViewSwitch(msg tea.KeyMsg) bool {
 		return true
 	case key.Matches(msg, m.keys.journal):
 		m.active = viewJournal
+		return true
+	case key.Matches(msg, m.keys.review):
+		m.active = viewReview
 		return true
 	}
 	return false
@@ -284,9 +310,16 @@ func (m *RootModel) cycleWorkspace() tea.Cmd {
 		return nil
 	}
 
+	newReview, err := reviewtui.NewModel(newState)
+	if err != nil {
+		m.notifyWorkspaceStatus(fmt.Sprintf("Workspace switch failed: %v", err))
+		return nil
+	}
+
 	m.notes = newNotes
 	m.tasks = newTasks
 	m.journal = newJournal
+	m.review = newReview
 	m.state = newState
 
 	cmds := []tea.Cmd{}
@@ -300,6 +333,11 @@ func (m *RootModel) cycleWorkspace() tea.Cmd {
 	}
 	if m.journal != nil {
 		if cmd := m.journal.Init(); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	}
+	if m.review != nil {
+		if cmd := m.review.Init(); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
 	}
@@ -359,6 +397,10 @@ func (m *RootModel) updateAll(msg tea.Msg) {
 		model, _ := m.journal.Update(msg)
 		m.journal = adoptJournalModel(model, m.journal)
 	}
+	if m.review != nil {
+		model, _ := m.review.Update(msg)
+		m.review = adoptReviewModel(model, m.review)
+	}
 }
 
 func adoptNoteModel(model tea.Model, current *NoteListModel) *NoteListModel {
@@ -379,6 +421,13 @@ func adoptTasksModel(model tea.Model, current *taskstui.Model) *taskstui.Model {
 
 func adoptJournalModel(model tea.Model, current *journaltui.Model) *journaltui.Model {
 	if m, ok := model.(*journaltui.Model); ok {
+		return m
+	}
+	return current
+}
+
+func adoptReviewModel(model tea.Model, current *reviewtui.Model) *reviewtui.Model {
+	if m, ok := model.(*reviewtui.Model); ok {
 		return m
 	}
 	return current
