@@ -53,6 +53,28 @@ func buildPreviewContext(
 	return ctx
 }
 
+func previewContextSummary(ctx previewContext) string {
+	outboundCount := len(ctx.Outbound)
+	backlinkCount := len(ctx.Backlinks)
+	neighbourCount := len(ctx.QueueNeighbours)
+
+	summary := fmt.Sprintf(
+		"Links: %d outbound · %d backlinks",
+		outboundCount,
+		backlinkCount,
+	)
+
+	if neighbourCount > 0 {
+		summary = fmt.Sprintf(
+			"%s · %d queue neighbours",
+			summary,
+			neighbourCount,
+		)
+	}
+
+	return summary
+}
+
 func formatPreviewContext(ctx previewContext, vault string) string {
 	outboundCount := len(ctx.Outbound)
 	backlinkCount := len(ctx.Backlinks)
@@ -62,18 +84,7 @@ func formatPreviewContext(ctx previewContext, vault string) string {
 		return "No links yet"
 	}
 
-	summary := fmt.Sprintf(
-		"Links: %d outbound · %d backlinks",
-		outboundCount,
-		backlinkCount,
-	)
-	if neighbourCount > 0 {
-		summary = fmt.Sprintf(
-			"%s · %d queue neighbours",
-			summary,
-			neighbourCount,
-		)
-	}
+	summary := previewContextSummary(ctx)
 
 	sections := []struct {
 		title string

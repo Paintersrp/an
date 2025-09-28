@@ -38,46 +38,51 @@ import (
 var maxCacheSizeMB int64 = 50
 
 type NoteListModel struct {
-	list              list.Model
-	cache             *cache.Cache
-	keys              *listKeyMap
-	delegateKeys      *delegateKeyMap
-	state             *state.State
-	preview           string
-	previewSummary    string
-	previewViewport   viewport.Model
-	viewName          string
-	formModel         submodels.FormModel
-	filterModel       *submodels.FilterModel
-	inputModel        submodels.InputModel
-	width             int
-	height            int
-	previewWidth      int
-	renaming          bool
-	showDetails       bool
-	creating          bool
-	copying           bool
-	filtering         bool
-	editor            *editorSession
-	sortField         sortField
-	sortOrder         sortOrder
-	searchIndex       *search.Index
-	searchQuery       search.Query
-	searchConfig      search.Config
-	highlights        *highlightStore
-	indexedPaths      map[string]struct{}
-	reviewQueue       []review.ResurfaceItem
-	availableTags     []string
-	availableMetadata map[string][]string
-	allItems          []list.Item
-	searchInitialized bool
-	previewFocused    bool
+	list                 list.Model
+	cache                *cache.Cache
+	keys                 *listKeyMap
+	delegateKeys         *delegateKeyMap
+	state                *state.State
+	preview              string
+	previewSummary       string
+	previewContext       previewContext
+	previewViewport      viewport.Model
+	viewName             string
+	formModel            submodels.FormModel
+	filterModel          *submodels.FilterModel
+	inputModel           submodels.InputModel
+	width                int
+	height               int
+	previewWidth         int
+	renaming             bool
+	showDetails          bool
+	creating             bool
+	copying              bool
+	filtering            bool
+	editor               *editorSession
+	sortField            sortField
+	sortOrder            sortOrder
+	searchIndex          *search.Index
+	searchQuery          search.Query
+	searchConfig         search.Config
+	highlights           *highlightStore
+	indexedPaths         map[string]struct{}
+	reviewQueue          []review.ResurfaceItem
+	availableTags        []string
+	availableMetadata    map[string][]string
+	allItems             []list.Item
+	searchInitialized    bool
+	previewFocused       bool
+	previewPaletteOpen   bool
+	previewPaletteRows   []previewPaletteRow
+	previewPaletteCursor int
 }
 
 type previewLoadedMsg struct {
 	path       string
 	markdown   string
 	summary    string
+	context    previewContext
 	cacheErr   error
 	complete   bool
 	background *previewRequest
@@ -86,6 +91,34 @@ type previewLoadedMsg struct {
 type previewCacheEntry struct {
 	Markdown string
 	Complete bool
+}
+
+type previewLinkKind int
+
+const (
+	previewLinkOutbound previewLinkKind = iota
+	previewLinkBacklink
+	previewLinkQueue
+)
+
+type previewPaletteRowKind int
+
+const (
+	previewPaletteRowHeader previewPaletteRowKind = iota
+	previewPaletteRowLink
+	previewPaletteRowEmpty
+)
+
+type previewPaletteLink struct {
+	kind    previewLinkKind
+	path    string
+	display string
+}
+
+type previewPaletteRow struct {
+	kind  previewPaletteRowKind
+	title string
+	link  previewPaletteLink
 }
 
 type editorFinishedMsg struct {
@@ -145,25 +178,26 @@ func NewNoteListModel(
 	filterModel := submodels.NewFilterModel()
 
 	m := &NoteListModel{
-		state:             s,
-		cache:             c,
-		list:              l,
-		viewName:          viewName,
-		keys:              lkeys,
-		delegateKeys:      dkeys,
-		inputModel:        i,
-		formModel:         f,
-		filterModel:       filterModel,
-		renaming:          false,
-		creating:          false,
-		copying:           false,
-		filtering:         false,
-		sortField:         sortField,
-		sortOrder:         sortOrder,
-		highlights:        highlightMatches,
-		indexedPaths:      make(map[string]struct{}),
-		availableMetadata: make(map[string][]string),
-		previewViewport:   viewport.New(0, 0),
+		state:                s,
+		cache:                c,
+		list:                 l,
+		viewName:             viewName,
+		keys:                 lkeys,
+		delegateKeys:         dkeys,
+		inputModel:           i,
+		formModel:            f,
+		filterModel:          filterModel,
+		renaming:             false,
+		creating:             false,
+		copying:              false,
+		filtering:            false,
+		sortField:            sortField,
+		sortOrder:            sortOrder,
+		highlights:           highlightMatches,
+		indexedPaths:         make(map[string]struct{}),
+		availableMetadata:    make(map[string][]string),
+		previewViewport:      viewport.New(0, 0),
+		previewPaletteCursor: -1,
 	}
 
 	m.allItems = append([]list.Item(nil), sortedItems...)
@@ -175,6 +209,7 @@ func NewNoteListModel(
 	filtered := m.filteredItems()
 	m.list.SetItems(filtered)
 	m.blurPreview()
+	m.rebuildPreviewPalette()
 
 	return m, nil
 }
@@ -640,7 +675,7 @@ func (m *NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		if s, ok := m.list.SelectedItem().(ListItem); ok && s.path == msg.path {
-			m.setPreviewContent(msg.markdown, msg.summary)
+			m.setPreviewContent(msg.markdown, msg.summary, msg.context)
 		}
 
 		if msg.background != nil {
@@ -824,6 +859,10 @@ func (m *NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleEditorUpdate(msg)
 		}
 
+		if m.previewPaletteOpen {
+			return m.handlePreviewPaletteUpdate(msg)
+		}
+
 		if m.list.FilterState() == list.Filtering {
 			break
 		}
@@ -877,7 +916,7 @@ func (m *NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	if nextSelection := m.currentSelectionPath(); nextSelection != previousSelection {
 		if nextSelection == "" {
-			m.setPreviewContent("", "")
+			m.setPreviewContent("", "", previewContext{})
 			m.previewViewport.GotoTop()
 		} else {
 			m.previewViewport.GotoTop()
@@ -1402,6 +1441,9 @@ func (m *NoteListModel) handleDefaultUpdate(msg tea.KeyMsg) (tea.Cmd, bool) {
 	case key.Matches(msg, m.keys.filterPalette):
 		return batchCmds(m.blurPreview(), m.toggleFilterPalette()), true
 
+	case key.Matches(msg, m.keys.previewPalette):
+		return batchCmds(m.blurPreview(), m.togglePreviewLinkPalette()), true
+
 	case key.Matches(msg, m.keys.switchToDefaultView):
 		return batchCmds(m.blurPreview(), m.swapView("default")), true
 
@@ -1567,6 +1609,21 @@ func (m NoteListModel) View() string {
 		return appStyle.Render(layout)
 	}
 
+	if m.previewPaletteOpen {
+		paletteContent := lipgloss.NewStyle().
+			Width(sideWidth).
+			MaxWidth(sideWidth).
+			Height(listHeight).
+			MaxHeight(listHeight).
+			Padding(0, 2).
+			Render(m.previewPaletteView())
+
+		palette := previewPaletteStyle.Render(paletteContent)
+
+		layout := lipgloss.JoinHorizontal(lipgloss.Top, list, palette)
+		return appStyle.Render(layout)
+	}
+
 	previewBody := m.previewViewport.View()
 	if m.previewViewport.Width <= 0 || m.previewViewport.Height <= 0 {
 		previewBody = renderPreviewContent(m.preview, m.previewSummary)
@@ -1683,7 +1740,7 @@ func (m *NoteListModel) handlePreview(force bool) tea.Cmd {
 	if s, ok := m.list.SelectedItem().(ListItem); ok {
 		selectedPath = s.path
 	} else {
-		m.setPreviewContent("", "")
+		m.setPreviewContent("", "", previewContext{})
 		m.previewViewport.GotoTop()
 		return nil
 	}
@@ -1862,6 +1919,7 @@ func renderPreviewCmd(req previewRequest) tea.Cmd {
 			path:       req.path,
 			markdown:   rendered,
 			summary:    summary,
+			context:    ctx,
 			cacheErr:   cacheErr,
 			complete:   complete,
 			background: background,
@@ -2034,10 +2092,13 @@ func padArea(view string, width, height int) string {
 	return strings.Join(lines, "\n")
 }
 
-func (m *NoteListModel) setPreviewContent(markdown, summary string) {
+func (m *NoteListModel) setPreviewContent(markdown, summary string, ctx previewContext) {
 	m.preview = markdown
 	m.previewSummary = summary
+	m.previewContext = ctx
 	m.previewViewport.SetContent(renderPreviewContent(markdown, summary))
+	m.rebuildPreviewPalette()
+	m.updatePreviewStatus(ctx)
 }
 
 func renderPreviewContent(markdown, summary string) string {
@@ -2060,6 +2121,368 @@ func renderPreviewContent(markdown, summary string) string {
 		return renderedSummary
 	}
 	return content
+}
+
+func (m *NoteListModel) updatePreviewStatus(ctx previewContext) {
+	summary := previewContextSummary(ctx)
+	m.list.NewStatusMessage(statusStyle(summary))
+}
+
+func (m *NoteListModel) rebuildPreviewPalette() {
+	var vault string
+	if m != nil && m.state != nil {
+		vault = m.state.Vault
+	}
+
+	var current string
+	if link, ok := m.currentPreviewPaletteLink(); ok {
+		current = pathutil.NormalizePath(link.path)
+	}
+
+	m.previewPaletteRows = buildPreviewPaletteRows(m.previewContext, vault)
+	if !m.previewPaletteHasLinks() {
+		m.previewPaletteCursor = -1
+		if m.previewPaletteOpen {
+			m.previewPaletteOpen = false
+		}
+		return
+	}
+
+	if current != "" {
+		if idx := findPreviewPaletteRowByPath(m.previewPaletteRows, current); idx >= 0 {
+			m.previewPaletteCursor = idx
+			return
+		}
+	}
+
+	m.previewPaletteCursor = m.previewPaletteFirstLinkIndex()
+}
+
+func (m *NoteListModel) previewPaletteHasLinks() bool {
+	for _, row := range m.previewPaletteRows {
+		if row.kind == previewPaletteRowLink {
+			return true
+		}
+	}
+	return false
+}
+
+func (m *NoteListModel) previewPaletteFirstLinkIndex() int {
+	for idx, row := range m.previewPaletteRows {
+		if row.kind == previewPaletteRowLink {
+			return idx
+		}
+	}
+	return -1
+}
+
+func findPreviewPaletteRowByPath(rows []previewPaletteRow, target string) int {
+	if target == "" {
+		return -1
+	}
+
+	normalizedTarget := pathutil.NormalizePath(target)
+	for idx, row := range rows {
+		if row.kind != previewPaletteRowLink {
+			continue
+		}
+		if pathutil.NormalizePath(row.link.path) == normalizedTarget {
+			return idx
+		}
+	}
+	return -1
+}
+
+func (m *NoteListModel) ensurePreviewPaletteCursor() {
+	if !m.previewPaletteHasLinks() {
+		m.previewPaletteCursor = -1
+		return
+	}
+	if idx := m.previewPaletteCursor; idx >= 0 && idx < len(m.previewPaletteRows) && m.previewPaletteRows[idx].kind == previewPaletteRowLink {
+		return
+	}
+	m.previewPaletteCursor = m.previewPaletteFirstLinkIndex()
+}
+
+func (m *NoteListModel) movePreviewPaletteCursor(delta int) {
+	if !m.previewPaletteHasLinks() {
+		return
+	}
+
+	m.ensurePreviewPaletteCursor()
+	if delta == 0 {
+		return
+	}
+
+	idx := m.previewPaletteCursor
+	count := len(m.previewPaletteRows)
+	for steps := 0; steps < count; steps++ {
+		idx += delta
+		if idx < 0 {
+			idx = count - 1
+		} else if idx >= count {
+			idx = 0
+		}
+		if m.previewPaletteRows[idx].kind == previewPaletteRowLink {
+			m.previewPaletteCursor = idx
+			return
+		}
+	}
+}
+
+func (m *NoteListModel) currentPreviewPaletteLink() (previewPaletteLink, bool) {
+	idx := m.previewPaletteCursor
+	if idx < 0 || idx >= len(m.previewPaletteRows) {
+		return previewPaletteLink{}, false
+	}
+	row := m.previewPaletteRows[idx]
+	if row.kind != previewPaletteRowLink {
+		return previewPaletteLink{}, false
+	}
+	return row.link, true
+}
+
+func buildPreviewPaletteRows(ctx previewContext, vault string) []previewPaletteRow {
+	sections := []struct {
+		title string
+		kind  previewLinkKind
+		items []string
+	}{
+		{title: "Outbound", kind: previewLinkOutbound, items: ctx.Outbound},
+		{title: "Backlinks", kind: previewLinkBacklink, items: ctx.Backlinks},
+	}
+
+	if len(ctx.QueueNeighbours) > 0 {
+		sections = append(sections, struct {
+			title string
+			kind  previewLinkKind
+			items []string
+		}{title: "Queue neighbours", kind: previewLinkQueue, items: ctx.QueueNeighbours})
+	}
+
+	rows := make([]previewPaletteRow, 0)
+	for _, section := range sections {
+		if len(section.items) == 0 {
+			continue
+		}
+
+		rows = append(rows, previewPaletteRow{kind: previewPaletteRowHeader, title: section.title})
+		display := displayPaths(section.items, vault)
+		for idx, path := range section.items {
+			var label string
+			if idx < len(display) {
+				label = display[idx]
+			}
+			rows = append(rows, previewPaletteRow{
+				kind: previewPaletteRowLink,
+				link: previewPaletteLink{
+					kind:    section.kind,
+					path:    path,
+					display: label,
+				},
+			})
+		}
+	}
+
+	if len(rows) == 0 {
+		rows = append(rows, previewPaletteRow{kind: previewPaletteRowEmpty, title: "No links in preview"})
+	}
+
+	return rows
+}
+
+func previewLinkMarker(kind previewLinkKind) string {
+	switch kind {
+	case previewLinkOutbound:
+		return "→"
+	case previewLinkBacklink:
+		return "←"
+	case previewLinkQueue:
+		return "≈"
+	default:
+		return "•"
+	}
+}
+
+func (m *NoteListModel) togglePreviewLinkPalette() tea.Cmd {
+	if m.previewPaletteOpen {
+		m.previewPaletteOpen = false
+		return nil
+	}
+
+	if !m.previewPaletteHasLinks() {
+		m.list.NewStatusMessage(statusStyle("Preview has no links"))
+		return nil
+	}
+
+	m.previewPaletteOpen = true
+	m.ensurePreviewPaletteCursor()
+	return nil
+}
+
+func (m *NoteListModel) handlePreviewPaletteUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.Type { //nolint:exhaustive // handled via default
+	case tea.KeyUp, tea.KeyCtrlP:
+		m.movePreviewPaletteCursor(-1)
+		return m, nil
+	case tea.KeyDown, tea.KeyCtrlN:
+		m.movePreviewPaletteCursor(1)
+		return m, nil
+	case tea.KeyEnter:
+		link, ok := m.currentPreviewPaletteLink()
+		if !ok {
+			return m, nil
+		}
+		m.previewPaletteOpen = false
+		return m, m.openPreviewPath(link.path)
+	case tea.KeyTab:
+		link, ok := m.currentPreviewPaletteLink()
+		m.previewPaletteOpen = false
+		if !ok {
+			return m, nil
+		}
+		return m, m.focusListOnPreviewLink(link.path)
+	case tea.KeyEsc, tea.KeyCtrlC, tea.KeyCtrlL:
+		m.previewPaletteOpen = false
+		return m, nil
+	}
+
+	switch msg.String() {
+	case "j":
+		m.movePreviewPaletteCursor(1)
+		return m, nil
+	case "k":
+		m.movePreviewPaletteCursor(-1)
+		return m, nil
+	case "q":
+		m.previewPaletteOpen = false
+		return m, nil
+	}
+
+	return m, nil
+}
+
+func (m *NoteListModel) focusListOnPreviewLink(path string) tea.Cmd {
+	resolved := m.resolvePreviewTarget(path)
+	if resolved == "" {
+		return nil
+	}
+
+	normalized := pathutil.NormalizePath(resolved)
+	items := m.list.Items()
+	for idx, item := range items {
+		li, ok := item.(ListItem)
+		if !ok {
+			continue
+		}
+		if pathutil.NormalizePath(li.path) == normalized {
+			m.list.Select(idx)
+			m.previewViewport.GotoTop()
+			if cmd := m.handlePreview(true); cmd != nil {
+				return cmd
+			}
+			return nil
+		}
+	}
+
+	display := displayPath(normalized, m.state.Vault)
+	if display == "" {
+		display = normalized
+	}
+	m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Link not in current view: %s", display)))
+	return nil
+}
+
+func (m *NoteListModel) resolvePreviewTarget(path string) string {
+	canonical := canonicalPath(m.searchIndex, path)
+	if canonical == "" {
+		canonical = path
+	}
+
+	canonical = pathutil.NormalizePath(canonical)
+	if filepath.IsAbs(canonical) {
+		return canonical
+	}
+
+	if m.state != nil && m.state.Vault != "" {
+		return pathutil.NormalizePath(filepath.Join(m.state.Vault, canonical))
+	}
+
+	return canonical
+}
+
+func (m *NoteListModel) openPreviewPath(path string) tea.Cmd {
+	resolved := m.resolvePreviewTarget(path)
+	if resolved == "" {
+		return nil
+	}
+
+	if m.cache != nil {
+		m.cache.Delete(pathutil.NormalizePath(resolved))
+	}
+
+	launch, err := note.EditorLaunchForPath(resolved, false)
+	if err != nil {
+		m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Open Error: %v", err)))
+		return nil
+	}
+	if hookErr := note.RunPreOpenHooks(resolved); hookErr != nil {
+		m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Pre-open hook error: %v", hookErr)))
+		return nil
+	}
+	if !launch.Wait {
+		return func() tea.Msg {
+			startErr := launch.Cmd.Start()
+			if startErr != nil {
+				return editorFinishedMsg{path: resolved, err: startErr}
+			}
+			if err := note.RunPostOpenHooks(resolved); err != nil {
+				return editorFinishedMsg{path: resolved, err: err, waited: false}
+			}
+			return editorFinishedMsg{path: resolved, waited: false}
+		}
+	}
+
+	return tea.ExecProcess(launch.Cmd, func(execErr error) tea.Msg {
+		if execErr == nil {
+			if err := note.RunPostOpenHooks(resolved); err != nil {
+				return editorFinishedMsg{path: resolved, err: err, waited: true}
+			}
+		}
+		return editorFinishedMsg{path: resolved, err: execErr, waited: true}
+	})
+}
+
+func (m *NoteListModel) previewPaletteView() string {
+	lines := []string{previewPaletteTitleStyle.Render("Preview links")}
+
+	if len(m.previewPaletteRows) == 0 {
+		lines = append(lines, previewPaletteEmptyStyle.Render("No links in preview"))
+	} else {
+		for idx, row := range m.previewPaletteRows {
+			switch row.kind {
+			case previewPaletteRowHeader:
+				if len(lines) > 1 {
+					lines = append(lines, "")
+				}
+				lines = append(lines, previewPaletteHeaderStyle.Render(row.title))
+			case previewPaletteRowLink:
+				marker := previewLinkMarker(row.link.kind)
+				label := strings.TrimSpace(fmt.Sprintf("%s %s", marker, row.link.display))
+				style := previewPaletteInactiveStyle
+				if idx == m.previewPaletteCursor {
+					style = previewPaletteCursorStyle
+				}
+				lines = append(lines, style.Render(label))
+			case previewPaletteRowEmpty:
+				lines = append(lines, previewPaletteEmptyStyle.Render(row.title))
+			}
+		}
+	}
+
+	help := "↑/↓ navigate • enter open • tab focus list • esc close"
+	lines = append(lines, "", previewPaletteHelpStyle.Render(help))
+	return strings.Join(lines, "\n")
 }
 
 func (m *NoteListModel) previewHasFocus() bool {
