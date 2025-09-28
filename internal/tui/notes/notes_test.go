@@ -229,7 +229,7 @@ func TestPreviewPaletteToggleAndView(t *testing.T) {
 
 	noteModel = drainNoteCmd(t, noteModel, cmd)
 
-	if cmd, handled := noteModel.handleDefaultUpdate(tea.KeyMsg{Type: tea.KeyCtrlL}); !handled {
+	if cmd, handled := noteModel.handleDefaultUpdate(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'L'}}); !handled {
 		t.Fatalf("expected preview palette toggle to be handled")
 	} else if cmd != nil {
 		noteModel = drainNoteCmd(t, noteModel, cmd)
@@ -278,7 +278,7 @@ func TestPreviewPaletteTabFocusesList(t *testing.T) {
 
 	noteModel = drainNoteCmd(t, noteModel, cmd)
 
-	if cmd, handled := noteModel.handleDefaultUpdate(tea.KeyMsg{Type: tea.KeyCtrlL}); !handled {
+	if cmd, handled := noteModel.handleDefaultUpdate(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'L'}}); !handled {
 		t.Fatalf("expected preview palette toggle to be handled")
 	} else if cmd != nil {
 		noteModel = drainNoteCmd(t, noteModel, cmd)
