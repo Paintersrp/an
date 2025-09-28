@@ -11,7 +11,7 @@ import (
 
 	"github.com/Paintersrp/an/internal/handler"
 	"github.com/Paintersrp/an/internal/note"
-	"github.com/Paintersrp/an/internal/parser"
+	taskindex "github.com/Paintersrp/an/internal/services/tasks/index"
 )
 
 type Item struct {
@@ -29,40 +29,46 @@ type Item struct {
 	References []string
 }
 
-type Service struct {
-	handler       *handler.FileHandler
-	parserFactory func(string) *parser.Parser
-	openFunc      func(string, bool) error
+type Index interface {
+	AcquireSnapshot() (*taskindex.Snapshot, error)
 }
 
-func NewService(h *handler.FileHandler) *Service {
+type Service struct {
+	handler  *handler.FileHandler
+	index    Index
+	openFunc func(string, bool) error
+}
+
+func NewService(h *handler.FileHandler, idx Index) *Service {
 	return &Service{
-		handler:       h,
-		parserFactory: parser.NewParser,
-		openFunc:      note.OpenFromPath,
+		handler:  h,
+		index:    idx,
+		openFunc: note.OpenFromPath,
 	}
 }
 
 func (s *Service) List() ([]Item, error) {
-	if s == nil || s.handler == nil {
+	if s == nil || s.handler == nil || s.index == nil {
 		return nil, errors.New("task service is not configured")
 	}
 
-	vault := s.handler.VaultDir()
-	p := s.parserFactory(vault)
-	if err := p.Walk(); err != nil {
+	snapshot, err := s.index.AcquireSnapshot()
+	if err != nil {
 		return nil, err
 	}
 
-	items := make([]Item, 0, len(p.TaskHandler.Tasks))
-	for _, task := range p.TaskHandler.Tasks {
+	tasks := snapshot.Tasks()
+	items := make([]Item, 0, len(tasks))
+	vault := s.handler.VaultDir()
+
+	for i, task := range tasks {
 		rel := task.Path
 		if relPath, err := filepath.Rel(vault, task.Path); err == nil {
 			rel = filepath.ToSlash(relPath)
 		}
 
 		items = append(items, Item{
-			ID:         task.ID,
+			ID:         i + 1,
 			Content:    task.Content,
 			Completed:  strings.EqualFold(task.Status, "checked"),
 			Path:       task.Path,

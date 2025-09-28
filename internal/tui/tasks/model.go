@@ -67,11 +67,11 @@ type filterState struct {
 }
 
 func NewModel(s *state.State) (*Model, error) {
-	if s == nil || s.Handler == nil {
+	if s == nil || s.Handler == nil || s.Tasks == nil {
 		return nil, fmt.Errorf("task model requires a configured state handler")
 	}
 
-	svc := services.NewService(s.Handler)
+	svc := services.NewService(s.Handler, s.Tasks)
 	items, err := svc.List()
 	if err != nil {
 		return nil, err
@@ -214,6 +214,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.resetFilters()
 			return m, m.applyFilters()
 		}
+	case state.VaultNoteChangedMsg:
+		cmd := m.refresh()
+		if m.state != nil && m.state.Watcher != nil {
+			return m, tea.Batch(cmd, m.state.Watcher.Start())
+		}
+		return m, cmd
 	case state.IndexStatsMsg:
 		if m.state != nil && m.state.Watcher != nil {
 			return m, m.state.Watcher.Start()

@@ -11,6 +11,7 @@ import (
 
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/internal/handler"
+	taskindex "github.com/Paintersrp/an/internal/services/tasks/index"
 	"github.com/Paintersrp/an/internal/state"
 	"github.com/Paintersrp/an/internal/templater"
 	journaltui "github.com/Paintersrp/an/internal/tui/journal"
@@ -73,6 +74,7 @@ func TestRootModelNavigation(t *testing.T) {
 		ViewManager:   viewManager,
 		Views:         viewManager.Views,
 		Vault:         dir,
+		Tasks:         taskindex.NewService(dir),
 	}
 
 	noteModel, err := NewNoteListModel(st, "default")

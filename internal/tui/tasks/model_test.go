@@ -11,6 +11,7 @@ import (
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/internal/handler"
 	services "github.com/Paintersrp/an/internal/services/tasks"
+	taskindex "github.com/Paintersrp/an/internal/services/tasks/index"
 	"github.com/Paintersrp/an/internal/state"
 )
 
@@ -31,7 +32,7 @@ func TestToggleUpdatesTaskFile(t *testing.T) {
 		t.Fatalf("failed to activate workspace: %v", err)
 	}
 
-	st := &state.State{Handler: handler.NewFileHandler(dir), Config: cfg}
+	st := &state.State{Handler: handler.NewFileHandler(dir), Config: cfg, Tasks: taskindex.NewService(dir)}
 	model, err := NewModel(st)
 	if err != nil {
 		t.Fatalf("failed to create tasks model: %v", err)

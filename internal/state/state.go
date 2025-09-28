@@ -15,6 +15,7 @@ import (
 	"github.com/Paintersrp/an/internal/handler"
 	"github.com/Paintersrp/an/internal/search"
 	indexsvc "github.com/Paintersrp/an/internal/services/index"
+	taskidx "github.com/Paintersrp/an/internal/services/tasks/index"
 	"github.com/Paintersrp/an/internal/templater"
 	"github.com/Paintersrp/an/internal/views"
 )
@@ -32,6 +33,7 @@ type State struct {
 	Vault         string
 	Watcher       *VaultWatcher
 	Index         IndexService
+	Tasks         TaskIndexService
 	RootStatus    *RootStatus
 }
 
@@ -65,6 +67,12 @@ type IndexService interface {
 	AcquireSnapshot() (*search.Index, error)
 	QueueUpdate(string)
 	Stats() indexsvc.Stats
+	Close() error
+}
+
+type TaskIndexService interface {
+	AcquireSnapshot() (*taskidx.Snapshot, error)
+	QueueUpdate(string)
 	Close() error
 }
 
@@ -113,14 +121,21 @@ func NewState(workspaceOverride string) (*State, error) {
 		IgnoredFolders: append([]string(nil), ws.Search.IgnoredFolders...),
 	}
 	indexService := indexsvc.NewService(ws.VaultDir, searchCfg)
+	taskIndex := taskidx.NewService(ws.VaultDir)
 	watcher.OnChange(func(rel string) {
 		if indexService != nil {
 			indexService.QueueUpdate(rel)
+		}
+		if taskIndex != nil {
+			taskIndex.QueueUpdate(rel)
 		}
 	})
 	watcher.OnClose(func() {
 		if indexService != nil {
 			_ = indexService.Close()
+		}
+		if taskIndex != nil {
+			_ = taskIndex.Close()
 		}
 	})
 
@@ -137,6 +152,7 @@ func NewState(workspaceOverride string) (*State, error) {
 		Vault:         ws.VaultDir,
 		Watcher:       watcher,
 		Index:         indexService,
+		Tasks:         taskIndex,
 		RootStatus:    &RootStatus{},
 	}
 
@@ -190,6 +206,12 @@ func (s *State) Close() error {
 			errs = append(errs, err)
 		}
 		s.Index = nil
+	}
+	if s.Tasks != nil {
+		if err := s.Tasks.Close(); err != nil && !errors.Is(err, taskidx.ErrClosed) {
+			errs = append(errs, err)
+		}
+		s.Tasks = nil
 	}
 
 	if len(errs) == 0 {
