@@ -37,6 +37,8 @@ import (
 
 var maxCacheSizeMB int64 = 50
 
+const maxGraphPaneNeighbors = 48
+
 type NoteListModel struct {
 	list                 list.Model
 	cache                *cache.Cache
@@ -76,6 +78,11 @@ type NoteListModel struct {
 	previewPaletteOpen   bool
 	previewPaletteRows   []previewPaletteRow
 	previewPaletteCursor int
+	graphPaneOpen        bool
+	graphPaneQueueOnly   bool
+	graphPaneCursor      int
+	graphPaneRows        []graphPaneRow
+	graphPaneGraph       review.Graph
 }
 
 type previewLoadedMsg struct {
@@ -119,6 +126,29 @@ type previewPaletteRow struct {
 	kind  previewPaletteRowKind
 	title string
 	link  previewPaletteLink
+}
+
+type graphPaneRowKind int
+
+const (
+	graphPaneRowHeader graphPaneRowKind = iota
+	graphPaneRowNeighbor
+	graphPaneRowEmpty
+)
+
+type graphPaneNeighbor struct {
+	path          string
+	outbound      bool
+	backlink      bool
+	outboundCount int
+	backlinkCount int
+	inQueue       bool
+}
+
+type graphPaneRow struct {
+	kind     graphPaneRowKind
+	title    string
+	neighbor graphPaneNeighbor
 }
 
 type editorFinishedMsg struct {
@@ -198,6 +228,7 @@ func NewNoteListModel(
 		availableMetadata:    make(map[string][]string),
 		previewViewport:      viewport.New(0, 0),
 		previewPaletteCursor: -1,
+		graphPaneCursor:      -1,
 	}
 
 	m.allItems = append([]list.Item(nil), sortedItems...)
@@ -872,6 +903,10 @@ func (m *NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleEditorUpdate(msg)
 		}
 
+		if m.graphPaneOpen {
+			return m.handleGraphPaneUpdate(msg)
+		}
+
 		if m.previewPaletteOpen {
 			return m.handlePreviewPaletteUpdate(msg)
 		}
@@ -936,6 +971,10 @@ func (m *NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		if cmd := m.handlePreview(false); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+
+		if cmd := m.rebuildGraphPane(); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
 	}
@@ -1456,6 +1495,27 @@ func (m *NoteListModel) handleDefaultUpdate(msg tea.KeyMsg) (tea.Cmd, bool) {
 
 	case key.Matches(msg, m.keys.previewPalette):
 		return batchCmds(m.blurPreview(), m.togglePreviewLinkPalette()), true
+	case key.Matches(msg, m.keys.toggleGraphPane):
+		if m.graphPaneOpen {
+			m.graphPaneOpen = false
+			m.graphPaneCursor = -1
+			return nil, true
+		}
+
+		if m.searchIndex == nil {
+			m.list.NewStatusMessage(statusStyle("Backlink graph requires the search index"))
+			return nil, true
+		}
+
+		if m.currentSelectionPath() == "" {
+			m.list.NewStatusMessage(statusStyle("Select a note to open the backlink graph"))
+			return nil, true
+		}
+
+		m.previewPaletteOpen = false
+		m.graphPaneOpen = true
+		m.graphPaneQueueOnly = false
+		return batchCmds(m.blurPreview(), m.rebuildGraphPane()), true
 
 	case key.Matches(msg, m.keys.switchToDefaultView):
 		return batchCmds(m.blurPreview(), m.swapView("default")), true
@@ -1634,6 +1694,21 @@ func (m NoteListModel) View() string {
 		palette := previewPaletteStyle.Render(paletteContent)
 
 		layout := lipgloss.JoinHorizontal(lipgloss.Top, list, palette)
+		return appStyle.Render(layout)
+	}
+
+	if m.graphPaneOpen {
+		paneContent := lipgloss.NewStyle().
+			Width(sideWidth).
+			MaxWidth(sideWidth).
+			Height(listHeight).
+			MaxHeight(listHeight).
+			Padding(0, 2).
+			Render(m.graphPaneView())
+
+		pane := graphPaneStyle.Render(paneContent)
+
+		layout := lipgloss.JoinHorizontal(lipgloss.Top, list, pane)
 		return appStyle.Render(layout)
 	}
 
@@ -2112,6 +2187,7 @@ func (m *NoteListModel) setPreviewContent(markdown, summary string, ctx previewC
 	m.previewViewport.SetContent(renderPreviewContent(markdown, summary))
 	m.rebuildPreviewPalette()
 	m.updatePreviewStatus(ctx)
+	m.rebuildGraphPane()
 }
 
 func renderPreviewContent(markdown, summary string) string {
@@ -2499,6 +2575,444 @@ func (m *NoteListModel) previewPaletteView() string {
 	help := "↑/↓ navigate • enter open • tab focus list • esc close"
 	lines = append(lines, "", previewPaletteHelpStyle.Render(help))
 	return strings.Join(lines, "\n")
+}
+
+func (m *NoteListModel) handleGraphPaneUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.Type { //nolint:exhaustive // handled via default
+	case tea.KeyUp, tea.KeyCtrlP:
+		m.moveGraphPaneCursor(-1)
+		return m, nil
+	case tea.KeyDown, tea.KeyCtrlN:
+		m.moveGraphPaneCursor(1)
+		return m, nil
+	case tea.KeyEnter:
+		neighbor, ok := m.currentGraphPaneNeighbor()
+		if !ok {
+			return m, nil
+		}
+		return m, m.focusListOnPreviewLink(neighbor.path)
+	case tea.KeyTab:
+		neighbor, ok := m.currentGraphPaneNeighbor()
+		m.graphPaneOpen = false
+		if !ok {
+			return m, nil
+		}
+		return m, m.focusListOnPreviewLink(neighbor.path)
+	case tea.KeyEsc, tea.KeyCtrlC:
+		m.graphPaneOpen = false
+		return m, nil
+	}
+
+	switch msg.String() {
+	case "g", "G":
+		m.graphPaneOpen = false
+		return m, nil
+	case "q", "Q":
+		return m, m.toggleGraphPaneQueueFilter()
+	case "j":
+		m.moveGraphPaneCursor(1)
+		return m, nil
+	case "k":
+		m.moveGraphPaneCursor(-1)
+		return m, nil
+	}
+
+	return m, nil
+}
+
+func (m *NoteListModel) toggleGraphPaneQueueFilter() tea.Cmd {
+	m.graphPaneQueueOnly = !m.graphPaneQueueOnly
+	return m.rebuildGraphPane()
+}
+
+func (m *NoteListModel) graphPaneView() string {
+	lines := []string{graphPaneTitleStyle.Render("Backlink graph")}
+
+	if len(m.graphPaneRows) == 0 {
+		lines = append(lines, graphPaneEmptyStyle.Render("No backlink data available"))
+	} else {
+		for idx, row := range m.graphPaneRows {
+			switch row.kind {
+			case graphPaneRowHeader:
+				if len(lines) > 1 {
+					lines = append(lines, "")
+				}
+				lines = append(lines, graphPaneHeaderStyle.Render(row.title))
+			case graphPaneRowNeighbor:
+				label := row.title
+				if label == "" {
+					vault := ""
+					if m.state != nil {
+						vault = m.state.Vault
+					}
+					label = graphPaneNeighborLabel(row.neighbor, vault)
+				}
+				style := graphPaneInactiveStyle
+				if row.neighbor.inQueue {
+					style = graphPaneQueueStyle
+				}
+				if idx == m.graphPaneCursor {
+					style = graphPaneCursorStyle
+				}
+				lines = append(lines, style.Render(label))
+			case graphPaneRowEmpty:
+				lines = append(lines, graphPaneEmptyStyle.Render(row.title))
+			}
+		}
+	}
+
+	help := "↑/↓ navigate • enter focus note • q toggle queue filter • g close"
+	lines = append(lines, "", graphPaneHelpStyle.Render(help))
+	return strings.Join(lines, "\n")
+}
+
+func (m *NoteListModel) rebuildGraphPane() tea.Cmd {
+	if m == nil {
+		return nil
+	}
+
+	if m.searchIndex == nil {
+		m.graphPaneGraph = review.Graph{}
+		m.graphPaneRows = nil
+		m.graphPaneCursor = -1
+		return nil
+	}
+
+	selection := canonicalPath(m.searchIndex, m.currentSelectionPath())
+	if selection == "" {
+		m.graphPaneGraph = review.Graph{}
+		m.graphPaneRows = nil
+		m.graphPaneCursor = -1
+		return nil
+	}
+
+	queueSeeds, queueSet := canonicalQueue(m.queuePaths(), m.searchIndex)
+	seeds := make([]string, 0, len(queueSeeds)+1)
+	seeds = append(seeds, selection)
+	for _, seed := range queueSeeds {
+		if seed == selection {
+			continue
+		}
+		seeds = append(seeds, seed)
+	}
+
+	graph := review.BuildBacklinkGraph(m.searchIndex, seeds)
+	m.graphPaneGraph = graph
+
+	node, ok := graph.Nodes[selection]
+	if !ok {
+		node = review.GraphNode{Path: selection}
+	}
+
+	allNeighbors := gatherGraphPaneNeighbors(graph, selection, queueSet)
+	visibleNeighbors := filterGraphPaneNeighbors(allNeighbors, m.graphPaneQueueOnly)
+	limitedNeighbors, hidden := limitGraphPaneNeighbors(visibleNeighbors, maxGraphPaneNeighbors)
+
+	vault := ""
+	if m.state != nil {
+		vault = m.state.Vault
+	}
+
+	m.graphPaneRows = buildGraphPaneRows(selection, node, allNeighbors, limitedNeighbors, hidden, m.graphPaneQueueOnly, vault)
+	m.ensureGraphPaneCursor()
+	return nil
+}
+
+func (m *NoteListModel) ensureGraphPaneCursor() {
+	if !m.graphPaneHasNeighbors() {
+		m.graphPaneCursor = -1
+		return
+	}
+
+	if m.graphPaneCursor < 0 || m.graphPaneCursor >= len(m.graphPaneRows) || m.graphPaneRows[m.graphPaneCursor].kind != graphPaneRowNeighbor {
+		m.graphPaneCursor = m.graphPaneFirstNeighborIndex()
+	}
+}
+
+func (m *NoteListModel) graphPaneHasNeighbors() bool {
+	for _, row := range m.graphPaneRows {
+		if row.kind == graphPaneRowNeighbor {
+			return true
+		}
+	}
+	return false
+}
+
+func (m *NoteListModel) graphPaneFirstNeighborIndex() int {
+	for idx, row := range m.graphPaneRows {
+		if row.kind == graphPaneRowNeighbor {
+			return idx
+		}
+	}
+	return -1
+}
+
+func (m *NoteListModel) moveGraphPaneCursor(delta int) {
+	if len(m.graphPaneRows) == 0 {
+		m.graphPaneCursor = -1
+		return
+	}
+
+	if !m.graphPaneHasNeighbors() {
+		m.graphPaneCursor = -1
+		return
+	}
+
+	idx := m.graphPaneCursor
+	if idx < 0 || idx >= len(m.graphPaneRows) || m.graphPaneRows[idx].kind != graphPaneRowNeighbor {
+		idx = m.graphPaneFirstNeighborIndex()
+	}
+
+	count := len(m.graphPaneRows)
+	for attempts := 0; attempts < count; attempts++ {
+		idx += delta
+		if idx < 0 {
+			idx = count - 1
+		} else if idx >= count {
+			idx = 0
+		}
+		if m.graphPaneRows[idx].kind == graphPaneRowNeighbor {
+			m.graphPaneCursor = idx
+			return
+		}
+	}
+}
+
+func (m *NoteListModel) currentGraphPaneNeighbor() (graphPaneNeighbor, bool) {
+	idx := m.graphPaneCursor
+	if idx < 0 || idx >= len(m.graphPaneRows) {
+		return graphPaneNeighbor{}, false
+	}
+	row := m.graphPaneRows[idx]
+	if row.kind != graphPaneRowNeighbor {
+		return graphPaneNeighbor{}, false
+	}
+	return row.neighbor, true
+}
+
+func gatherGraphPaneNeighbors(graph review.Graph, current string, queueSet map[string]struct{}) []graphPaneNeighbor {
+	node, ok := graph.Nodes[current]
+	if !ok {
+		return nil
+	}
+
+	neighbors := make(map[string]*graphPaneNeighbor)
+
+	add := func(candidate string, outbound, backlink bool) {
+		cleaned := pathutil.NormalizePath(candidate)
+		if cleaned == "" || cleaned == current {
+			return
+		}
+
+		existing, ok := neighbors[cleaned]
+		if !ok {
+			existing = &graphPaneNeighbor{path: cleaned}
+			neighbors[cleaned] = existing
+		}
+
+		if outbound {
+			existing.outbound = true
+		}
+		if backlink {
+			existing.backlink = true
+		}
+	}
+
+	for _, outbound := range node.Outbound {
+		add(outbound, true, false)
+	}
+	for _, backlink := range node.Backlinks {
+		add(backlink, false, true)
+	}
+
+	out := make([]graphPaneNeighbor, 0, len(neighbors))
+	for path, entry := range neighbors {
+		if neighborNode, ok := graph.Nodes[path]; ok {
+			entry.outboundCount = len(neighborNode.Outbound)
+			entry.backlinkCount = len(neighborNode.Backlinks)
+		}
+		if queueSet != nil {
+			if _, ok := queueSet[path]; ok {
+				entry.inQueue = true
+			}
+		}
+		out = append(out, *entry)
+	}
+
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].inQueue != out[j].inQueue {
+			return out[i].inQueue
+		}
+
+		weightI := graphPaneNeighborWeight(out[i])
+		weightJ := graphPaneNeighborWeight(out[j])
+		if weightI != weightJ {
+			return weightI > weightJ
+		}
+
+		return out[i].path < out[j].path
+	})
+
+	return out
+}
+
+func filterGraphPaneNeighbors(neighbors []graphPaneNeighbor, queueOnly bool) []graphPaneNeighbor {
+	if !queueOnly {
+		out := make([]graphPaneNeighbor, len(neighbors))
+		copy(out, neighbors)
+		return out
+	}
+
+	filtered := make([]graphPaneNeighbor, 0, len(neighbors))
+	for _, neighbor := range neighbors {
+		if neighbor.inQueue {
+			filtered = append(filtered, neighbor)
+		}
+	}
+	return filtered
+}
+
+func limitGraphPaneNeighbors(neighbors []graphPaneNeighbor, limit int) ([]graphPaneNeighbor, int) {
+	if limit <= 0 || len(neighbors) <= limit {
+		out := make([]graphPaneNeighbor, len(neighbors))
+		copy(out, neighbors)
+		return out, 0
+	}
+
+	trimmed := make([]graphPaneNeighbor, limit)
+	copy(trimmed, neighbors[:limit])
+	hidden := len(neighbors) - limit
+	return trimmed, hidden
+}
+
+func graphPaneNeighborWeight(n graphPaneNeighbor) int {
+	switch {
+	case n.outbound && n.backlink:
+		return 2
+	case n.outbound || n.backlink:
+		return 1
+	default:
+		return 0
+	}
+}
+
+func buildGraphPaneRows(
+	current string,
+	node review.GraphNode,
+	allNeighbors []graphPaneNeighbor,
+	visible []graphPaneNeighbor,
+	hidden int,
+	queueOnly bool,
+	vault string,
+) []graphPaneRow {
+	rows := []graphPaneRow{
+		{kind: graphPaneRowHeader, title: fmt.Sprintf("Backlink graph · %s", displayPath(current, vault))},
+		{kind: graphPaneRowHeader, title: fmt.Sprintf("Links: %d outbound · %d backlinks", len(node.Outbound), len(node.Backlinks))},
+	}
+
+	totalNeighbors := len(allNeighbors)
+	queueCount := 0
+	for _, neighbor := range allNeighbors {
+		if neighbor.inQueue {
+			queueCount++
+		}
+	}
+
+	if totalNeighbors > 0 {
+		summary := fmt.Sprintf("Neighbors: showing %d of %d", len(visible), totalNeighbors)
+		if queueCount > 0 {
+			summary = fmt.Sprintf("%s (%d in queue)", summary, queueCount)
+		}
+		rows = append(rows, graphPaneRow{kind: graphPaneRowHeader, title: summary})
+	} else {
+		rows = append(rows, graphPaneRow{kind: graphPaneRowHeader, title: "Neighbors: none yet"})
+	}
+
+	if filterSummary := graphPaneFilterSummary(queueOnly, queueCount); filterSummary != "" {
+		rows = append(rows, graphPaneRow{kind: graphPaneRowHeader, title: filterSummary})
+	}
+
+	if len(visible) == 0 {
+		message := "No linked notes"
+		if queueOnly {
+			if queueCount > 0 {
+				message = "No queue neighbours in graph"
+			} else {
+				message = "No queue neighbours"
+			}
+		}
+		rows = append(rows, graphPaneRow{kind: graphPaneRowEmpty, title: message})
+		return rows
+	}
+
+	for _, neighbor := range visible {
+		rows = append(rows, graphPaneRow{
+			kind:     graphPaneRowNeighbor,
+			title:    graphPaneNeighborLabel(neighbor, vault),
+			neighbor: neighbor,
+		})
+	}
+
+	if hidden > 0 {
+		rows = append(rows, graphPaneRow{kind: graphPaneRowEmpty, title: fmt.Sprintf("… and %d more not shown", hidden)})
+	}
+
+	return rows
+}
+
+func graphPaneFilterSummary(queueOnly bool, queueCount int) string {
+	switch {
+	case queueOnly && queueCount > 0:
+		return "Queue filter: on (press q to show all)"
+	case queueOnly && queueCount == 0:
+		return "Queue filter: on (no queue neighbours)"
+	case !queueOnly && queueCount > 0:
+		return "Queue filter: off (press q for queue only)"
+	default:
+		return "Queue filter: off"
+	}
+}
+
+func graphPaneNeighborLabel(n graphPaneNeighbor, vault string) string {
+	display := displayPath(n.path, vault)
+	marker := graphPaneNeighborMarker(n)
+	queueTag := ""
+	if n.inQueue {
+		queueTag = " [queue]"
+	}
+	counts := graphPaneNeighborCounts(n)
+	label := strings.TrimSpace(fmt.Sprintf("%s %s%s", marker, display, queueTag))
+	if counts != "" {
+		label = fmt.Sprintf("%s %s", label, counts)
+	}
+	return label
+}
+
+func graphPaneNeighborMarker(n graphPaneNeighbor) string {
+	switch {
+	case n.outbound && n.backlink:
+		return "↔"
+	case n.outbound:
+		return "→"
+	case n.backlink:
+		return "←"
+	default:
+		return "•"
+	}
+}
+
+func graphPaneNeighborCounts(n graphPaneNeighbor) string {
+	parts := make([]string, 0, 2)
+	if n.outboundCount > 0 {
+		parts = append(parts, fmt.Sprintf("→%d", n.outboundCount))
+	}
+	if n.backlinkCount > 0 {
+		parts = append(parts, fmt.Sprintf("←%d", n.backlinkCount))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("(%s)", strings.Join(parts, " · "))
 }
 
 func (m *NoteListModel) previewHasFocus() bool {
