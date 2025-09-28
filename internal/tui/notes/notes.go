@@ -514,7 +514,7 @@ func (m *NoteListModel) updateFilterInventory() {
 			}
 			for key, values := range doc.FrontMatter {
 				trimmedKey := strings.TrimSpace(key)
-				if trimmedKey == "" {
+				if trimmedKey == "" || submodels.ShouldExcludeMetadataKey(trimmedKey) {
 					continue
 				}
 				if _, ok := metadataValues[trimmedKey]; !ok {
