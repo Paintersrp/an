@@ -165,6 +165,45 @@ func TestHandleDefaultUpdateSkipsPreviewScrollWhenUnfocused(t *testing.T) {
 	}
 }
 
+func TestHandlePreviewCachedBackgroundUsesActiveWidth(t *testing.T) {
+	t.Parallel()
+
+	model := newEditorTestModel(t, map[string]string{"note.md": "content"})
+
+	selected, ok := model.list.SelectedItem().(ListItem)
+	if !ok {
+		t.Fatalf("expected selected list item")
+	}
+
+	expectedWidth := 42
+	model.previewWidth = expectedWidth
+
+	entry := previewCacheEntry{Markdown: "cached", Complete: false}
+	if err := model.cache.Put(selected.path, entry); err != nil {
+		t.Fatalf("failed to seed cache: %v", err)
+	}
+
+	cmd := model.handlePreview(false)
+	if cmd == nil {
+		t.Fatalf("expected preview command")
+	}
+
+	result := cmd()
+
+	msg, ok := result.(previewLoadedMsg)
+	if !ok {
+		t.Fatalf("expected previewLoadedMsg, got %T", result)
+	}
+
+	if msg.background == nil {
+		t.Fatalf("expected background request when preview incomplete")
+	}
+
+	if msg.background.width != expectedWidth {
+		t.Fatalf("expected background width %d, got %d", expectedWidth, msg.background.width)
+	}
+}
+
 func TestApplyViewReplacesListItems(t *testing.T) {
 	tempDir := t.TempDir()
 

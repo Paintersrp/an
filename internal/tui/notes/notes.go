@@ -1817,6 +1817,8 @@ func (m *NoteListModel) handlePreview(force bool) tea.Cmd {
 			case previewCacheEntry:
 				req := previewRequest{
 					path:        selectedPath,
+					width:       width,
+					height:      height,
 					cache:       cache,
 					index:       m.searchIndex,
 					vault:       vault,
@@ -1829,6 +1831,8 @@ func (m *NoteListModel) handlePreview(force bool) tea.Cmd {
 			case string:
 				req := previewRequest{
 					path:        selectedPath,
+					width:       width,
+					height:      height,
 					cache:       cache,
 					index:       m.searchIndex,
 					vault:       vault,
