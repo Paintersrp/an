@@ -49,6 +49,7 @@ type keyMap struct {
 	daily       key.Binding
 	weekly      key.Binding
 	retro       key.Binding
+	exit        key.Binding
 }
 
 type reviewMode struct {
@@ -67,6 +68,9 @@ type reviewSavedMsg struct {
 	path string
 	err  error
 }
+
+// ExitRequestedMsg indicates that the user requested to leave the review view.
+type ExitRequestedMsg struct{}
 
 var modes = []reviewMode{
 	{Name: "Daily", Template: "review-daily", Key: "daily"},
@@ -137,6 +141,10 @@ func newKeyMap() keyMap {
 		retro: key.NewBinding(
 			key.WithKeys("3"),
 			key.WithHelp("3", "retro mode"),
+		),
+		exit: key.NewBinding(
+			key.WithKeys("esc"),
+			key.WithHelp("esc", "exit review"),
 		),
 	}
 }
@@ -255,6 +263,8 @@ func (m *Model) handleKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 		return true, m.switchMode(modes[1])
 	case key.Matches(msg, m.keys.retro):
 		return true, m.switchMode(modes[2])
+	case key.Matches(msg, m.keys.exit):
+		return true, exitRequestedCmd
 	}
 	return false, nil
 }
@@ -365,7 +375,7 @@ func (m *Model) renderChecklist() string {
 		b.WriteString("\n")
 		b.WriteString(m.editor.View())
 	}
-	b.WriteString("\nControls: ctrl+n next · ctrl+p previous · ctrl+enter complete")
+	b.WriteString("\nControls: ctrl+n next · ctrl+p previous · ctrl+enter complete · esc exit")
 	return strings.TrimSpace(b.String())
 }
 
@@ -703,3 +713,5 @@ func cloneStringMap(values map[string]string) map[string]string {
 }
 
 var statusStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+
+var exitRequestedCmd tea.Cmd = func() tea.Msg { return ExitRequestedMsg{} }
