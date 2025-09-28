@@ -36,6 +36,26 @@ type HookConfig struct {
 	PostCreate []CommandTemplate `yaml:"post_create" json:"post_create"`
 }
 
+type CaptureMatcher struct {
+	Template       string `yaml:"template"        json:"template"`
+	UpstreamPrefix string `yaml:"upstream_prefix" json:"upstream_prefix"`
+}
+
+type CaptureAction struct {
+	Clipboard   bool           `yaml:"clipboard"    json:"clipboard"`
+	Tags        []string       `yaml:"tags"         json:"tags"`
+	FrontMatter map[string]any `yaml:"front_matter" json:"front_matter"`
+}
+
+type CaptureRule struct {
+	Match  CaptureMatcher `yaml:"match"  json:"match"`
+	Action CaptureAction  `yaml:"action" json:"action"`
+}
+
+type CaptureConfig struct {
+	Rules []CaptureRule `yaml:"rules" json:"rules"`
+}
+
 type ReviewConfig struct {
 	Enable     bool   `yaml:"enable"    json:"enable"`
 	Directory  string `yaml:"directory" json:"directory"`
@@ -77,6 +97,7 @@ type Workspace struct {
 	EditorTemplate CommandTemplate           `yaml:"editor_template" json:"editor_template"`
 	Hooks          HookConfig                `yaml:"hooks"           json:"hooks"`
 	Review         ReviewConfig              `yaml:"review"          json:"review"`
+	Capture        CaptureConfig             `yaml:"capture"         json:"capture"`
 }
 
 type Config struct {
@@ -173,6 +194,7 @@ func newWorkspace() *Workspace {
 		ViewOrder:      nil,
 		FileSystemMode: "strict",
 		Review:         ReviewConfig{Enable: true, Directory: defaultReviewDir},
+		Capture:        CaptureConfig{Rules: []CaptureRule{}},
 	}
 	ws.PinManager = pin.NewPinManager(
 		pin.PinMap(ws.NamedPins),
@@ -195,6 +217,9 @@ func (ws *Workspace) ensureDefaults() {
 	}
 	if ws.Views == nil {
 		ws.Views = make(map[string]ViewDefinition)
+	}
+	if ws.Capture.Rules == nil {
+		ws.Capture.Rules = []CaptureRule{}
 	}
 	if !ws.Review.enabledSet && !ws.Review.Enable {
 		ws.Review.Enable = true
@@ -365,6 +390,12 @@ func syncWorkspaceWithViper(ws *Workspace) {
 	viper.Set("editor_template", ws.EditorTemplate)
 	viper.Set("workspace_hooks", ws.Hooks)
 	viper.Set("review", ws.Review)
+	viper.Set("capture", ws.Capture)
+	if ws.Capture.Rules == nil {
+		viper.Set("capture_rules", []CaptureRule{})
+	} else {
+		viper.Set("capture_rules", append([]CaptureRule(nil), ws.Capture.Rules...))
+	}
 	if ws.SubDirs == nil {
 		viper.Set("subdirs", []string{})
 	} else {
