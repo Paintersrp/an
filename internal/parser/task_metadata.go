@@ -76,7 +76,7 @@ func ExtractTaskMetadata(content string) (string, TaskMetadata) {
 	}
 
 	cleaned = backlinkPattern.ReplaceAllString(cleaned, "")
-	cleaned = strings.TrimSpace(strings.Join(strings.Fields(cleaned), " "))
+	cleaned = strings.TrimSpace(cleaned)
 
 	return cleaned, metadata
 }

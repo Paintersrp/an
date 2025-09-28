@@ -35,6 +35,28 @@ func TestExtractTaskMetadataParsesTokens(t *testing.T) {
 	}
 }
 
+func TestExtractTaskMetadataPreservesWhitespace(t *testing.T) {
+	content := `- [ ] Update docs @due(2024-12-01)
+    Continue discussion with team
+        subpoint details @priority(high)`
+
+	cleaned, meta := ExtractTaskMetadata(content)
+
+	expected := `- [ ] Update docs 
+    Continue discussion with team
+        subpoint details`
+	if cleaned != expected {
+		t.Fatalf("expected cleaned content to preserve whitespace, got %q", cleaned)
+	}
+
+	if meta.DueDate == nil {
+		t.Fatalf("expected due metadata to be parsed")
+	}
+	if meta.Priority != "high" {
+		t.Fatalf("expected priority metadata to be parsed, got %q", meta.Priority)
+	}
+}
+
 func TestParseDateRecognizesKeywords(t *testing.T) {
 	today := time.Now()
 	parsed, ok := parseDate("today")
