@@ -252,6 +252,7 @@ func (m *NoteListModel) rebuildSearch(paths []string) {
 
 	if m.state == nil || m.state.Config == nil {
 		m.searchIndex = nil
+		m.reviewQueue = nil
 		m.searchQuery = search.Query{}
 		m.searchConfig = search.Config{}
 		m.indexedPaths = make(map[string]struct{})
@@ -294,6 +295,7 @@ func (m *NoteListModel) rebuildSearch(paths []string) {
 
 	if m.state.Index == nil {
 		m.searchIndex = nil
+		m.reviewQueue = nil
 		return
 	}
 
@@ -304,10 +306,20 @@ func (m *NoteListModel) rebuildSearch(paths []string) {
 			statusStyle(fmt.Sprintf("Search index error: %v", err)),
 		)
 		m.searchIndex = nil
+		m.reviewQueue = nil
 		return
 	}
 
 	m.searchIndex = index
+	queueQuery := search.Query{
+		Tags:     cloneStringSlice(cfg.DefaultTagFilters),
+		Metadata: cloneMetadataMap(cfg.DefaultMetadataFilters),
+	}
+	m.reviewQueue = review.BuildResurfaceQueue(index, review.ResurfaceOptions{
+		Buckets: review.DefaultBuckets(),
+		Query:   queueQuery,
+	})
+	m.rebuildGraphPane()
 }
 
 func configsEqual(a, b search.Config) bool {
