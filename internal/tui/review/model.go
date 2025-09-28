@@ -209,7 +209,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *Model) View() string {
 	if !m.ready && m.loading {
-		return "Loading review data..."
+		return appStyle.Render("Loading review data...")
 	}
 
 	sections := []string{
@@ -225,7 +225,11 @@ func (m *Model) View() string {
 	if m.status != "" {
 		sections = append(sections, statusStyle.Render(m.status))
 	}
-	return strings.Join(filterEmpty(sections), "\n\n")
+	sections = filterEmpty(sections)
+	if len(sections) == 0 {
+		return ""
+	}
+	return appStyle.Render(lipgloss.JoinVertical(lipgloss.Left, sections...))
 }
 
 func (m *Model) handleKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
@@ -288,32 +292,35 @@ func (m *Model) switchMode(mode reviewMode) tea.Cmd {
 }
 
 func (m *Model) renderHeader() string {
-	title := lipgloss.NewStyle().Bold(true).Render("Review")
+	title := headerStyle.Render("Review")
 	info := fmt.Sprintf("Mode: %s — Press 1/2/3 to switch modes", m.mode.Name)
 	if m.loading {
 		info += " (refreshing...)"
 	}
-	return fmt.Sprintf("%s\n%s", title, info)
+	return lipgloss.JoinVertical(lipgloss.Left, title, info)
 }
 
 func (m *Model) renderQueue() string {
 	if len(m.queue) == 0 {
-		return "Resurfacing queue: No notes are currently due."
+		return lipgloss.JoinVertical(
+			lipgloss.Left,
+			"Resurfacing queue:",
+			"No notes are currently due.",
+		)
 	}
-	var b strings.Builder
-	b.WriteString(fmt.Sprintf("Resurfacing queue (%d items):\n", len(m.queue)))
 	limit := len(m.queue)
 	if limit > defaultQueueLimit {
 		limit = defaultQueueLimit
 	}
+	lines := []string{fmt.Sprintf("Resurfacing queue (%d items):", len(m.queue))}
 	for i := 0; i < limit; i++ {
 		item := m.queue[i]
-		fmt.Fprintf(&b, "%2d. %s — last touched %s (%s)\n", i+1, m.relativePath(item.Path), humanizeAge(item.Age), item.Bucket)
+		lines = append(lines, fmt.Sprintf("%2d. %s — last touched %s (%s)", i+1, m.relativePath(item.Path), humanizeAge(item.Age), item.Bucket))
 	}
 	if len(m.queue) > limit {
-		fmt.Fprintf(&b, "…and %d more", len(m.queue)-limit)
+		lines = append(lines, fmt.Sprintf("…and %d more", len(m.queue)-limit))
 	}
-	return strings.TrimSpace(b.String())
+	return lipgloss.JoinVertical(lipgloss.Left, lines...)
 }
 
 func (m *Model) renderGraph() string {
@@ -342,41 +349,46 @@ func (m *Model) renderGraph() string {
 
 func (m *Model) renderChecklist() string {
 	if len(m.manifest.Fields) == 0 {
-		return "Checklist: no steps configured for this mode."
+		return lipgloss.JoinVertical(
+			lipgloss.Left,
+			"Checklist:",
+			"no steps configured for this mode.",
+		)
 	}
 	field := m.manifest.Fields[m.step]
 	title := field.Label
 	if title == "" {
 		title = humanizeKey(field.Key)
 	}
-	var b strings.Builder
-	fmt.Fprintf(&b, "%s checklist — Step %d of %d: %s\n", m.manifest.Name, m.step+1, len(m.manifest.Fields), title)
+	lines := []string{
+		fmt.Sprintf("%s checklist — Step %d of %d: %s", m.manifest.Name, m.step+1, len(m.manifest.Fields), title),
+	}
 	if field.Prompt != "" {
-		fmt.Fprintf(&b, "%s\n", field.Prompt)
+		lines = append(lines, field.Prompt)
 	}
 	if len(field.Options) > 0 {
-		fmt.Fprintf(&b, "Options: %s\n", strings.Join(field.Options, ", "))
+		lines = append(lines, fmt.Sprintf("Options: %s", strings.Join(field.Options, ", ")))
 	}
 	if len(field.Defaults) > 0 {
-		fmt.Fprintf(&b, "Suggested focus tags: %s\n", strings.Join(field.Defaults, ", "))
+		lines = append(lines, fmt.Sprintf("Suggested focus tags: %s", strings.Join(field.Defaults, ", ")))
 		suggestions := reviewsvc.FilterQueue(m.queue, field.Defaults, nil)
 		if len(suggestions) > 0 {
 			max := suggestions
 			if len(max) > 3 {
 				max = suggestions[:3]
 			}
-			fmt.Fprintln(&b, "Related resurfacing candidates:")
+			candidateLines := []string{"Related resurfacing candidates:"}
 			for _, item := range max {
-				fmt.Fprintf(&b, "  • %s (%s)\n", m.relativePath(item.Path), item.ModifiedAt.Format("2006-01-02"))
+				candidateLines = append(candidateLines, fmt.Sprintf("  • %s (%s)", m.relativePath(item.Path), item.ModifiedAt.Format("2006-01-02")))
 			}
+			lines = append(lines, lipgloss.JoinVertical(lipgloss.Left, candidateLines...))
 		}
 	}
 	if m.editor != nil {
-		b.WriteString("\n")
-		b.WriteString(m.editor.View())
+		lines = append(lines, "", m.editor.View())
 	}
-	b.WriteString("\nControls: ctrl+n next · ctrl+p previous · ctrl+enter complete · esc exit")
-	return strings.TrimSpace(b.String())
+	lines = append(lines, "Controls: ctrl+n next · ctrl+p previous · ctrl+enter complete · esc exit")
+	return lipgloss.JoinVertical(lipgloss.Left, lines...)
 }
 
 func (m *Model) refreshQueue() tea.Cmd {
@@ -711,7 +723,5 @@ func cloneStringMap(values map[string]string) map[string]string {
 	}
 	return cloned
 }
-
-var statusStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
 var exitRequestedCmd tea.Cmd = func() tea.Msg { return ExitRequestedMsg{} }
