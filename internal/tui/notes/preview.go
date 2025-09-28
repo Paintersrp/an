@@ -54,16 +54,24 @@ func buildPreviewContext(
 }
 
 func formatPreviewContext(ctx previewContext, vault string) string {
+	outboundCount := len(ctx.Outbound)
+	backlinkCount := len(ctx.Backlinks)
+	neighbourCount := len(ctx.QueueNeighbours)
+
+	if outboundCount == 0 && backlinkCount == 0 && neighbourCount == 0 {
+		return "No links yet"
+	}
+
 	summary := fmt.Sprintf(
 		"Links: %d outbound · %d backlinks",
-		len(ctx.Outbound),
-		len(ctx.Backlinks),
+		outboundCount,
+		backlinkCount,
 	)
-	if len(ctx.QueueNeighbours) > 0 {
+	if neighbourCount > 0 {
 		summary = fmt.Sprintf(
 			"%s · %d queue neighbours",
 			summary,
-			len(ctx.QueueNeighbours),
+			neighbourCount,
 		)
 	}
 
@@ -90,18 +98,18 @@ func formatPreviewContext(ctx previewContext, vault string) string {
 		}
 
 		builder.WriteString("\n")
-		builder.WriteString(section.title)
+		builder.WriteString(previewMetadataSectionTitleStyle.Render(section.title))
 		builder.WriteString(":\n")
 
 		display := displayPaths(section.items, vault)
 		shown, hidden := limitItems(display, len(section.items), maxContextItems)
 		for _, item := range shown {
-			builder.WriteString("  • ")
-			builder.WriteString(item)
+			builder.WriteString(previewMetadataBulletStyle.Render(fmt.Sprintf("  • %s", item)))
 			builder.WriteString("\n")
 		}
 		if hidden > 0 {
-			builder.WriteString(fmt.Sprintf("  • … and %d more\n", hidden))
+			builder.WriteString(previewMetadataBulletStyle.Render(fmt.Sprintf("  • … and %d more", hidden)))
+			builder.WriteString("\n")
 		}
 	}
 
