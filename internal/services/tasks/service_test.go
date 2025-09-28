@@ -78,3 +78,53 @@ func TestServiceToggleFlipsCompletion(t *testing.T) {
 		t.Fatalf("expected task to be toggled, got %q", string(data))
 	}
 }
+
+func TestServiceToggleRefreshesIndex(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "atoms", "example.md")
+	if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+		t.Fatalf("failed to create directory: %v", err)
+	}
+
+	content := "- [ ] first task\n"
+	if err := os.WriteFile(file, []byte(content), 0o644); err != nil {
+		t.Fatalf("failed to write file: %v", err)
+	}
+
+	idx := taskindex.NewService(dir)
+	t.Cleanup(func() {
+		_ = idx.Close()
+	})
+
+	svc := NewService(handler.NewFileHandler(dir), idx)
+
+	tasks, err := svc.List()
+	if err != nil {
+		t.Fatalf("List returned error: %v", err)
+	}
+	if len(tasks) != 1 {
+		t.Fatalf("expected one task, got %d", len(tasks))
+	}
+	if tasks[0].Completed {
+		t.Fatalf("expected task to start incomplete")
+	}
+
+	completed, err := svc.Toggle(file, 1)
+	if err != nil {
+		t.Fatalf("Toggle returned error: %v", err)
+	}
+	if !completed {
+		t.Fatalf("expected toggle to return completed state")
+	}
+
+	tasks, err = svc.List()
+	if err != nil {
+		t.Fatalf("List returned error after toggle: %v", err)
+	}
+	if len(tasks) != 1 {
+		t.Fatalf("expected one task after toggle, got %d", len(tasks))
+	}
+	if !tasks[0].Completed {
+		t.Fatalf("expected task to be marked complete after toggle")
+	}
+}
