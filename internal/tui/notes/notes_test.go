@@ -107,7 +107,12 @@ func TestPreviewViewportUpdatesOnPreviewLoaded(t *testing.T) {
 		t.Fatalf("expected selected list item")
 	}
 
-	msg := previewLoadedMsg{path: selected.path, markdown: "body", summary: "Links: 1 outbound"}
+	msg := previewLoadedMsg{
+		path:     selected.path,
+		markdown: "body",
+		summary:  "Links: 1 outbound",
+		context:  previewContext{Outbound: []string{selected.path}},
+	}
 	updated, _ := model.Update(msg)
 
 	noteModel, ok := updated.(*NoteListModel)
@@ -134,7 +139,7 @@ func TestHandleDefaultUpdateForwardsPreviewScrollKeys(t *testing.T) {
 	model := newEditorTestModel(t, map[string]string{"note.md": "content"})
 	model.previewViewport.Width = 10
 	model.previewViewport.Height = 3
-	model.setPreviewContent("line1\nline2\nline3\nline4", "")
+	model.setPreviewContent("line1\nline2\nline3\nline4", "", previewContext{})
 	model.previewViewport.GotoTop()
 
 	if cmd, handled := model.handleDefaultUpdate(tea.KeyMsg{Type: tea.KeyShiftTab}); handled {
@@ -165,7 +170,7 @@ func TestHandleDefaultUpdateSkipsPreviewScrollWhenUnfocused(t *testing.T) {
 	model := newEditorTestModel(t, map[string]string{"note.md": "content"})
 	model.previewViewport.Width = 10
 	model.previewViewport.Height = 3
-	model.setPreviewContent("line1\nline2\nline3\nline4", "")
+	model.setPreviewContent("line1\nline2\nline3\nline4", "", previewContext{})
 	model.previewViewport.GotoTop()
 
 	if cmd, handled := model.handleDefaultUpdate(tea.KeyMsg{Type: tea.KeyShiftTab}); !handled {
@@ -198,6 +203,107 @@ func TestHandleDefaultUpdateSkipsPreviewScrollWhenUnfocused(t *testing.T) {
 	}
 	if model.previewViewport.YOffset != yBefore {
 		t.Fatalf("expected viewport y offset to remain unchanged")
+	}
+}
+
+func TestPreviewPaletteToggleAndView(t *testing.T) {
+	model := newEditorTestModel(t, map[string]string{
+		"note.md":   "content",
+		"linked.md": "linked",
+	})
+
+	selected, ok := model.list.SelectedItem().(ListItem)
+	if !ok {
+		t.Fatalf("expected selected list item")
+	}
+
+	target := filepath.Join(model.state.Vault, "linked.md")
+	ctx := previewContext{Outbound: []string{target}, Backlinks: []string{target}}
+	summary := previewContextSummary(ctx)
+	msg := previewLoadedMsg{path: selected.path, markdown: "body", summary: summary, context: ctx}
+	updated, cmd := model.Update(msg)
+	noteModel, ok := updated.(*NoteListModel)
+	if !ok {
+		t.Fatalf("expected *NoteListModel, got %T", updated)
+	}
+
+	noteModel = drainNoteCmd(t, noteModel, cmd)
+
+	if cmd, handled := noteModel.handleDefaultUpdate(tea.KeyMsg{Type: tea.KeyCtrlL}); !handled {
+		t.Fatalf("expected preview palette toggle to be handled")
+	} else if cmd != nil {
+		noteModel = drainNoteCmd(t, noteModel, cmd)
+	}
+
+	if !noteModel.previewPaletteOpen {
+		t.Fatalf("expected preview palette to be open")
+	}
+
+	view := noteModel.previewPaletteView()
+	if !strings.Contains(view, "Preview links") {
+		t.Fatalf("expected palette view to include title, got %q", view)
+	}
+	if !strings.Contains(view, "Outbound") {
+		t.Fatalf("expected palette to include outbound header")
+	}
+	if !strings.Contains(view, "Backlinks") {
+		t.Fatalf("expected palette to include backlinks header")
+	}
+	relative := displayPath(target, noteModel.state.Vault)
+	if !strings.Contains(view, relative) {
+		t.Fatalf("expected palette to include link label %q, got %q", relative, view)
+	}
+}
+
+func TestPreviewPaletteTabFocusesList(t *testing.T) {
+	model := newEditorTestModel(t, map[string]string{
+		"note.md":   "content",
+		"linked.md": "linked",
+	})
+
+	selected, ok := model.list.SelectedItem().(ListItem)
+	if !ok {
+		t.Fatalf("expected selected list item")
+	}
+
+	target := filepath.Join(model.state.Vault, "linked.md")
+	ctx := previewContext{Outbound: []string{target}}
+	summary := previewContextSummary(ctx)
+	msg := previewLoadedMsg{path: selected.path, markdown: "body", summary: summary, context: ctx}
+	updated, cmd := model.Update(msg)
+	noteModel, ok := updated.(*NoteListModel)
+	if !ok {
+		t.Fatalf("expected *NoteListModel, got %T", updated)
+	}
+
+	noteModel = drainNoteCmd(t, noteModel, cmd)
+
+	if cmd, handled := noteModel.handleDefaultUpdate(tea.KeyMsg{Type: tea.KeyCtrlL}); !handled {
+		t.Fatalf("expected preview palette toggle to be handled")
+	} else if cmd != nil {
+		noteModel = drainNoteCmd(t, noteModel, cmd)
+	}
+
+	result, cmd := noteModel.Update(tea.KeyMsg{Type: tea.KeyTab})
+	updatedModel, ok := result.(*NoteListModel)
+	if !ok {
+		t.Fatalf("expected *NoteListModel after tab, got %T", result)
+	}
+	noteModel = updatedModel
+
+	if noteModel.previewPaletteOpen {
+		t.Fatalf("expected preview palette to close after focusing list")
+	}
+
+	noteModel = drainNoteCmd(t, noteModel, cmd)
+
+	focused, ok := noteModel.list.SelectedItem().(ListItem)
+	if !ok {
+		t.Fatalf("expected list selection after focusing from palette")
+	}
+
+	if pathutil.NormalizePath(focused.path) != pathutil.NormalizePath(target) {
+		t.Fatalf("expected focus to move to %q, got %q", target, focused.path)
 	}
 }
 

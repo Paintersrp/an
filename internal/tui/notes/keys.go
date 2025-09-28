@@ -12,6 +12,7 @@ type listKeyMap struct {
 	quit                  key.Binding
 	changeView            key.Binding
 	filterPalette         key.Binding
+	previewPalette        key.Binding
 	rename                key.Binding
 	create                key.Binding
 	copy                  key.Binding
@@ -76,6 +77,10 @@ func newListKeyMap() *listKeyMap {
 		filterPalette: key.NewBinding(
 			key.WithKeys("F"),
 			key.WithHelp("F", "filters"),
+		),
+		previewPalette: key.NewBinding(
+			key.WithKeys("ctrl+l"),
+			key.WithHelp("ctrl+l", "preview links"),
 		),
 		rename: key.NewBinding(
 			key.WithKeys("R"),
@@ -164,6 +169,7 @@ func (m listKeyMap) fullHelp() []key.Binding {
 		m.editInline,
 		m.quickCapture,
 		m.filterPalette,
+		m.previewPalette,
 		m.rename,
 		m.copy,
 		m.changeView,
