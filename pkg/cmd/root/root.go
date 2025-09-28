@@ -20,7 +20,6 @@ import (
 	"github.com/Paintersrp/an/pkg/cmd/symlink"
 	"github.com/Paintersrp/an/pkg/cmd/tags"
 	"github.com/Paintersrp/an/pkg/cmd/tasks"
-	"github.com/Paintersrp/an/pkg/cmd/todo"
 	"github.com/Paintersrp/an/pkg/cmd/trash"
 	"github.com/Paintersrp/an/pkg/cmd/unarchive"
 	"github.com/Paintersrp/an/pkg/cmd/untrash"
@@ -80,7 +79,6 @@ func NewCmdRoot(s *state.State) (*cobra.Command, error) {
                 settings.NewCmdSettings(s),
 		symlink.NewCmdSymlink(s),
 		notes.NewCmdNotes(s),
-		todo.NewCmdTodo(s.Config),
 		archive.NewCmdArchive(s),
 		unarchive.NewCmdUnarchive(s),
 		trash.NewCmdTrash(s),
