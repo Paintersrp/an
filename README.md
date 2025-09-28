@@ -103,6 +103,16 @@ an capture --template project-release
 The capture wizard works with workspace-defined views and any template-specific metadata. You can skip the preview step with
 `--no-preview` or pre-fill values such as `--title` and `--view` when scripting.
 
+Capture rules defined in your workspace configuration can also pre-populate tags and front matter before the note hits disk.
+Rules match on template names and optional upstream prefixes, making it easy to apply consistent metadata for release notes,
+meeting logs, or any other templated workflow. If a rule marks a clipboard requirement it only fires when a non-empty clipboard
+value is present, which is perfect for "paste into note" shortcuts.
+
+Any tags you enter manually are deduplicated alongside the rule-provided set so you can confidently re-type common keywords
+without worrying about duplicates in front matter. When you just want to inspect the metadata overlay, run `an capture --dry-run`
+to see the merged tags and front matter preview without creating a file. See [Capture rules & automation](docs/capture-rules.md)
+for configuration examples.
+
 ## Testing
 
 Run the unit suite before sending a pull request to confirm core flows still pass:
