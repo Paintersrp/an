@@ -64,9 +64,25 @@ func (m *FilterModel) SetOptions(tags []string, metadata map[string][]string) {
 
 	m.metadata = make(map[string][]string, len(metadata))
 	for key, values := range metadata {
-		copied := append([]string(nil), values...)
-		sort.Strings(copied)
-		m.metadata[key] = copied
+		trimmedKey := strings.TrimSpace(key)
+		if trimmedKey == "" || ShouldExcludeMetadataKey(trimmedKey) {
+			continue
+		}
+
+		filteredValues := make([]string, 0, len(values))
+		for _, value := range values {
+			trimmedValue := strings.TrimSpace(value)
+			if trimmedValue == "" {
+				continue
+			}
+			filteredValues = append(filteredValues, trimmedValue)
+		}
+		if len(filteredValues) == 0 {
+			continue
+		}
+
+		sort.Strings(filteredValues)
+		m.metadata[trimmedKey] = filteredValues
 	}
 
 	m.rebuildOptions()
@@ -315,6 +331,10 @@ func (m *FilterModel) rebuildOptions() {
 		m.options = append(m.options, filterOption{kind: filterOptionEmpty, label: "No metadata indexed"})
 	} else {
 		for _, key := range metadataKeys {
+			if ShouldExcludeMetadataKey(key) {
+				continue
+			}
+
 			values := m.metadata[key]
 			if len(values) == 0 {
 				continue
