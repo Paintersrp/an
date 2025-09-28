@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/reflow/truncate"
@@ -19,6 +20,7 @@ import (
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/internal/handler"
 	"github.com/Paintersrp/an/internal/pathutil"
+	"github.com/Paintersrp/an/internal/review"
 	"github.com/Paintersrp/an/internal/search"
 	indexsvc "github.com/Paintersrp/an/internal/services/index"
 	"github.com/Paintersrp/an/internal/state"
@@ -1178,5 +1180,220 @@ func TestRootStatusSuffixTruncatesToAvailableWidth(t *testing.T) {
 
 	if noGap := rootStatusSuffix("", available, status, ""); noGap != want {
 		t.Fatalf("expected suffix %q without gap, got %q", want, noGap)
+	}
+}
+
+func TestRebuildSearchClearsReviewQueueWhenIndexUnavailable(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	ws := &config.Workspace{VaultDir: tempDir}
+	cfg := &config.Config{
+		Workspaces:       map[string]*config.Workspace{"default": ws},
+		CurrentWorkspace: "default",
+	}
+	activateWorkspace(t, cfg, "default")
+
+	delegate := list.NewDefaultDelegate()
+	l := list.New(nil, delegate, 0, 0)
+
+	model := &NoteListModel{
+		list: l,
+		state: &state.State{
+			Config: cfg,
+		},
+		reviewQueue: []review.ResurfaceItem{{Path: "note.md"}},
+	}
+
+	model.rebuildSearch(nil)
+
+	if model.searchIndex != nil {
+		t.Fatalf("expected search index to be cleared when unavailable")
+	}
+	if len(model.reviewQueue) != 0 {
+		t.Fatalf("expected review queue to be cleared, got %d entries", len(model.reviewQueue))
+	}
+}
+
+func TestRebuildSearchBuildsReviewQueueWithDefaultFilters(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	matching := filepath.Join(tempDir, "matching.md")
+	otherTag := filepath.Join(tempDir, "other-tag.md")
+	missingTag := filepath.Join(tempDir, "missing.md")
+
+	write := func(path, content string) {
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatalf("failed to write %s: %v", path, err)
+		}
+	}
+
+	write(matching, "---\ntags:\n- queue\ncategory:\n- focus\n---\ncontent")
+	write(otherTag, "---\ntags:\n- queue\ncategory:\n- other\n---\ncontent")
+	write(missingTag, "---\ntags:\n- other\ncategory:\n- focus\n---\ncontent")
+
+	old := time.Now().Add(-48 * time.Hour)
+	for _, path := range []string{matching, otherTag, missingTag} {
+		if err := os.Chtimes(path, old, old); err != nil {
+			t.Fatalf("failed to set modtime for %s: %v", path, err)
+		}
+	}
+
+	idx := search.NewIndex(tempDir, search.Config{})
+	paths := []string{matching, otherTag, missingTag}
+	if err := idx.Build(paths); err != nil {
+		t.Fatalf("build index: %v", err)
+	}
+
+	ws := &config.Workspace{
+		VaultDir: tempDir,
+		Search: config.SearchConfig{
+			DefaultTagFilters:      []string{"queue"},
+			DefaultMetadataFilters: map[string][]string{"category": {"focus"}},
+		},
+	}
+	cfg := &config.Config{
+		Workspaces:       map[string]*config.Workspace{"default": ws},
+		CurrentWorkspace: "default",
+	}
+	activateWorkspace(t, cfg, "default")
+
+	delegate := list.NewDefaultDelegate()
+	l := list.New(nil, delegate, 0, 0)
+
+	model := &NoteListModel{
+		list: l,
+		state: &state.State{
+			Config: cfg,
+			Index:  &stubIndexService{idx: idx},
+		},
+	}
+
+	model.rebuildSearch(paths)
+
+	if model.searchIndex == nil {
+		t.Fatalf("expected search index snapshot")
+	}
+	if len(model.reviewQueue) != 1 {
+		t.Fatalf("expected one queue entry, got %d", len(model.reviewQueue))
+	}
+
+	got := pathutil.NormalizePath(model.reviewQueue[0].Path)
+	want := pathutil.NormalizePath(matching)
+	if got != want {
+		t.Fatalf("expected queue path %q, got %q", want, got)
+	}
+}
+
+func TestQueuePathsReturnsNormalizedUniqueEntries(t *testing.T) {
+	t.Parallel()
+
+	model := &NoteListModel{
+		reviewQueue: []review.ResurfaceItem{
+			{Path: " ./alpha.md "},
+			{Path: "alpha.md"},
+			{Path: "notes/../beta.md"},
+			{Path: "beta.md   "},
+			{Path: ""},
+		},
+	}
+
+	got := model.queuePaths()
+	want := []string{
+		pathutil.NormalizePath("alpha.md"),
+		pathutil.NormalizePath("beta.md"),
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("unexpected queue paths: got %v, want %v", got, want)
+	}
+}
+
+func TestHandlePreviewUsesUpdatedQueue(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	alpha := filepath.Join(tempDir, "alpha.md")
+	bravo := filepath.Join(tempDir, "bravo.md")
+
+	write := func(path, body string) {
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatalf("failed to write %s: %v", path, err)
+		}
+	}
+
+	write(alpha, "---\n---\n[[bravo]]\n")
+	write(bravo, "---\n---\n[[alpha]]\n")
+
+	old := time.Now().Add(-48 * time.Hour)
+	for _, path := range []string{alpha, bravo} {
+		if err := os.Chtimes(path, old, old); err != nil {
+			t.Fatalf("failed to update modtime for %s: %v", path, err)
+		}
+	}
+
+	idx := search.NewIndex(tempDir, search.Config{})
+	paths := []string{alpha, bravo}
+	if err := idx.Build(paths); err != nil {
+		t.Fatalf("build index: %v", err)
+	}
+
+	ws := &config.Workspace{VaultDir: tempDir}
+	cfg := &config.Config{
+		Workspaces:       map[string]*config.Workspace{"default": ws},
+		CurrentWorkspace: "default",
+	}
+	activateWorkspace(t, cfg, "default")
+
+	delegate := list.NewDefaultDelegate()
+	items := []list.Item{
+		ListItem{fileName: filepath.Base(alpha), path: alpha},
+		ListItem{fileName: filepath.Base(bravo), path: bravo},
+	}
+	l := list.New(items, delegate, 0, 0)
+	l.SetSize(40, 10)
+	l.Select(0)
+
+	model := &NoteListModel{
+		list:            l,
+		state:           &state.State{Config: cfg, Index: &stubIndexService{idx: idx}, Vault: tempDir},
+		previewWidth:    40,
+		previewViewport: viewport.New(40, 10),
+	}
+	model.width = 80
+
+	model.rebuildSearch(paths)
+
+	if len(model.reviewQueue) == 0 {
+		t.Fatalf("expected review queue to populate")
+	}
+
+	cmd := model.handlePreview(true)
+	if cmd == nil {
+		t.Fatalf("expected preview command")
+	}
+
+	msg := cmd()
+	loaded, ok := msg.(previewLoadedMsg)
+	if !ok {
+		t.Fatalf("expected previewLoadedMsg, got %T", msg)
+	}
+
+	if len(loaded.context.QueueNeighbours) == 0 {
+		t.Fatalf("expected queue neighbours in preview context, got none")
+	}
+
+	normalizedBravo := pathutil.NormalizePath(bravo)
+	found := false
+	for _, candidate := range loaded.context.QueueNeighbours {
+		if pathutil.NormalizePath(candidate) == normalizedBravo {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Fatalf("expected queue neighbours to include %q, got %v", normalizedBravo, loaded.context.QueueNeighbours)
 	}
 }
