@@ -138,9 +138,6 @@ func (m *FilterModel) Update(msg tea.Msg) (tea.Cmd, bool) {
 				return m.selectionChangedCmd(), true
 			}
 			return nil, true
-		case tea.KeyCtrlL:
-			m.clearSelections()
-			return m.selectionChangedCmd(), true
 		case tea.KeyEnter:
 			fallthrough
 		case tea.KeyEsc:
@@ -158,6 +155,9 @@ func (m *FilterModel) Update(msg tea.Msg) (tea.Cmd, bool) {
 			return nil, true
 		case "q":
 			return func() tea.Msg { return FilterClosedMsg{} }, true
+		case "l", "L":
+			m.clearSelections()
+			return m.selectionChangedCmd(), true
 		}
 	}
 
@@ -188,7 +188,7 @@ func (m *FilterModel) View() string {
 		}
 	}
 
-	help := "space toggle • ctrl+l clear • enter/q close"
+	help := "space toggle • L clear • enter/q close"
 	lines = append(lines, "", filterHelpStyle.Render(help))
 	return strings.Join(lines, "\n")
 }

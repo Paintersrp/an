@@ -2342,12 +2342,15 @@ func (m *NoteListModel) handlePreviewPaletteUpdate(msg tea.KeyMsg) (tea.Model, t
 			return m, nil
 		}
 		return m, m.focusListOnPreviewLink(link.path)
-	case tea.KeyEsc, tea.KeyCtrlC, tea.KeyCtrlL:
+	case tea.KeyEsc, tea.KeyCtrlC:
 		m.previewPaletteOpen = false
 		return m, nil
 	}
 
 	switch msg.String() {
+	case "L", "l":
+		m.previewPaletteOpen = false
+		return m, nil
 	case "j":
 		m.movePreviewPaletteCursor(1)
 		return m, nil

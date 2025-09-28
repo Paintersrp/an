@@ -79,8 +79,8 @@ func newListKeyMap() *listKeyMap {
 			key.WithHelp("F", "filters"),
 		),
 		previewPalette: key.NewBinding(
-			key.WithKeys("ctrl+l"),
-			key.WithHelp("ctrl+l", "preview links"),
+			key.WithKeys("L"),
+			key.WithHelp("L", "preview links"),
 		),
 		rename: key.NewBinding(
 			key.WithKeys("R"),
