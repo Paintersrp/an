@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -17,6 +18,7 @@ import (
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/internal/handler"
 	"github.com/Paintersrp/an/internal/state"
+	"github.com/Paintersrp/an/internal/tui/notes/submodels"
 	"github.com/Paintersrp/an/internal/views"
 )
 
@@ -423,6 +425,171 @@ func TestApplyActiveFiltersRestrictsItems(t *testing.T) {
 	if filtered.path != filepath.Clean(activePath) {
 		t.Fatalf("expected filtered path %q, got %q", filepath.Clean(activePath), filtered.path)
 	}
+}
+
+func TestFilterSelectionChangedUpdatesPreview(t *testing.T) {
+	model := newEditorTestModel(t, map[string]string{
+		"keep.md": "---\ntitle: Keep\ntags:\n  - keep\n---\nKeep body",
+		"drop.md": "---\ntitle: Drop\ntags:\n  - drop\n---\nDrop body",
+	})
+
+	model.previewViewport.Width = 80
+	model.previewViewport.Height = 10
+
+	dropIndex := -1
+	items := model.list.Items()
+	for i, item := range items {
+		li, ok := item.(ListItem)
+		if !ok {
+			continue
+		}
+		if filepath.Base(li.path) == "drop.md" {
+			dropIndex = i
+			break
+		}
+	}
+
+	if dropIndex == -1 {
+		t.Fatalf("expected to locate drop.md in list items")
+	}
+
+	model.list.Select(dropIndex)
+	model = drainNoteCmd(t, model, model.handlePreview(true))
+
+	initialBody := stripANSI(model.previewViewport.View())
+	if !strings.Contains(initialBody, "Drop body") {
+		t.Fatalf(
+			"expected preview to include drop body before filtering, got %q",
+			truncateString(initialBody, 200),
+		)
+	}
+
+	msg := submodels.FilterSelectionChangedMsg{Tags: []string{"keep"}}
+	updated, cmd := model.Update(msg)
+
+	noteModel, ok := updated.(*NoteListModel)
+	if !ok {
+		t.Fatalf("expected *NoteListModel, got %T", updated)
+	}
+
+	noteModel = drainNoteCmd(t, noteModel, cmd)
+
+	filteredItems := noteModel.list.Items()
+	if len(filteredItems) != 1 {
+		t.Fatalf("expected 1 filtered item, got %d", len(filteredItems))
+	}
+
+	selected, ok := noteModel.list.SelectedItem().(ListItem)
+	if !ok {
+		t.Fatalf("expected a selected list item after filtering")
+	}
+
+	if filepath.Base(selected.path) != "keep.md" {
+		t.Fatalf("expected keep.md to remain selected, got %s", selected.path)
+	}
+
+	filteredBody := stripANSI(noteModel.previewViewport.View())
+	if !strings.Contains(filteredBody, "Keep body") {
+		t.Fatalf(
+			"expected preview to include keep body after filtering, got %q",
+			truncateString(filteredBody, 200),
+		)
+	}
+
+	if strings.Contains(filteredBody, "Drop body") {
+		t.Fatalf(
+			"expected preview to replace drop content after filtering, got %q",
+			truncateString(filteredBody, 200),
+		)
+	}
+}
+
+var ansiRegexp = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
+func stripANSI(s string) string {
+	return ansiRegexp.ReplaceAllString(s, "")
+}
+
+func truncateString(s string, limit int) string {
+	if limit <= 0 || len(s) <= limit {
+		return s
+	}
+	return s[:limit] + "..."
+}
+
+func drainNoteCmd(t *testing.T, model *NoteListModel, cmd tea.Cmd) *NoteListModel {
+	t.Helper()
+
+	drained := drainCmd(t, model, cmd)
+	noteModel, ok := drained.(*NoteListModel)
+	if !ok {
+		t.Fatalf("expected *NoteListModel, got %T", drained)
+	}
+	return noteModel
+}
+
+func drainCmd(t *testing.T, model tea.Model, cmd tea.Cmd) tea.Model {
+	t.Helper()
+
+	if model == nil {
+		t.Fatalf("model must not be nil")
+	}
+
+	if cmd == nil {
+		return model
+	}
+
+	queue := []tea.Cmd{cmd}
+	cmdType := reflect.TypeOf((func() tea.Msg)(nil))
+
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+		if current == nil {
+			continue
+		}
+
+		msg := current()
+		if msg == nil {
+			continue
+		}
+
+		switch m := msg.(type) {
+		case tea.BatchMsg:
+			for _, nested := range m {
+				if nested != nil {
+					queue = append(queue, nested)
+				}
+			}
+			continue
+		}
+
+		val := reflect.ValueOf(msg)
+		if val.IsValid() && val.Kind() == reflect.Slice && val.Type().Elem() == cmdType {
+			cmds := make([]tea.Cmd, 0, val.Len())
+			for i := 0; i < val.Len(); i++ {
+				nested, _ := val.Index(i).Interface().(tea.Cmd)
+				if nested != nil {
+					cmds = append(cmds, nested)
+				}
+			}
+			if len(cmds) > 0 {
+				nextQueue := make([]tea.Cmd, 0, len(cmds)+len(queue))
+				nextQueue = append(nextQueue, cmds...)
+				nextQueue = append(nextQueue, queue...)
+				queue = nextQueue
+			}
+			continue
+		}
+
+		var next tea.Cmd
+		model, next = model.Update(msg)
+		if next != nil {
+			queue = append(queue, next)
+		}
+	}
+
+	return model
 }
 
 func TestPadAreaPadsViewToRequestedBounds(t *testing.T) {
