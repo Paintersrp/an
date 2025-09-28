@@ -29,6 +29,7 @@ import (
 	"github.com/Paintersrp/an/internal/state"
 	journaltui "github.com/Paintersrp/an/internal/tui/journal"
 	"github.com/Paintersrp/an/internal/tui/notes/submodels"
+	reviewtui "github.com/Paintersrp/an/internal/tui/review"
 	taskstui "github.com/Paintersrp/an/internal/tui/tasks"
 	v "github.com/Paintersrp/an/internal/views"
 	"github.com/Paintersrp/an/utils"
@@ -1738,7 +1739,12 @@ func Run(s *state.State, views map[string]v.View, viewFlag string) error {
 		return err
 	}
 
-	root := NewRootModel(noteModel, tasksModel, journalModel)
+	reviewModel, err := reviewtui.NewModel(s)
+	if err != nil {
+		return err
+	}
+
+	root := NewRootModel(noteModel, tasksModel, journalModel, reviewModel)
 
 	if _, err := tea.NewProgram(root, tea.WithInput(os.Stdin), tea.WithAltScreen()).Run(); err != nil {
 		// handle error for instances where neovim/editor doesn't pass stdin back in time to close gracefully with bubbletea

@@ -14,6 +14,7 @@ import (
 	"github.com/Paintersrp/an/internal/state"
 	"github.com/Paintersrp/an/internal/templater"
 	journaltui "github.com/Paintersrp/an/internal/tui/journal"
+	reviewtui "github.com/Paintersrp/an/internal/tui/review"
 	taskstui "github.com/Paintersrp/an/internal/tui/tasks"
 	"github.com/Paintersrp/an/internal/views"
 )
@@ -87,7 +88,12 @@ func TestRootModelNavigation(t *testing.T) {
 		t.Fatalf("failed to create journal model: %v", err)
 	}
 
-	root := NewRootModel(noteModel, tasksModel, journalModel)
+	reviewModel, err := reviewtui.NewModel(st)
+	if err != nil {
+		t.Fatalf("failed to create review model: %v", err)
+	}
+
+	root := NewRootModel(noteModel, tasksModel, journalModel, reviewModel)
 	root.Init()
 	root.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 
@@ -132,7 +138,7 @@ func TestRootModelKeepsNotesViewWhenEditorActive(t *testing.T) {
 		t.Fatalf("expected note model")
 	}
 
-	root := NewRootModel(noteModel, nil, nil)
+	root := NewRootModel(noteModel, nil, nil, nil)
 
 	_ = noteModel.startScratchCapture()
 	if !noteModel.editorActive() {
@@ -152,7 +158,7 @@ func TestRootModelKeepsNotesViewWhenEditorActive(t *testing.T) {
 
 func TestRootModelViewHeightMatchesWindowSize(t *testing.T) {
 	noteModel := newEditorTestModel(t, map[string]string{"note.md": "content"})
-	root := NewRootModel(noteModel, nil, nil)
+	root := NewRootModel(noteModel, nil, nil, nil)
 	root.Init()
 
 	const height = 12
