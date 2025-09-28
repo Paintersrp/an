@@ -123,6 +123,92 @@ func TestLoadMigratesLegacyConfig(t *testing.T) {
 	}
 }
 
+func TestLoadSetsReviewDefaults(t *testing.T) {
+	home := t.TempDir()
+	cfgData := map[string]any{
+		"current_workspace": "main",
+		"workspaces": map[string]any{
+			"main": map[string]any{
+				"vaultdir": filepath.Join(home, "vault"),
+				"fsmode":   "strict",
+			},
+		},
+	}
+
+	writeConfigFile(t, home, cfgData)
+
+	cfg, err := config.Load(home)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+
+	ws := cfg.MustWorkspace()
+	if !ws.Review.Enable {
+		t.Fatalf("expected review to be enabled by default")
+	}
+	if got := ws.Review.Directory; got != "reviews" {
+		t.Fatalf("expected review directory 'reviews', got %q", got)
+	}
+}
+
+func TestLoadReviewDirectoryPrefersLegacyPin(t *testing.T) {
+	home := t.TempDir()
+	cfgData := map[string]any{
+		"current_workspace": "main",
+		"workspaces": map[string]any{
+			"main": map[string]any{
+				"vaultdir":   filepath.Join(home, "vault"),
+				"fsmode":     "strict",
+				"named_pins": map[string]any{"review": "rituals"},
+			},
+		},
+	}
+
+	writeConfigFile(t, home, cfgData)
+
+	cfg, err := config.Load(home)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+
+	ws := cfg.MustWorkspace()
+	if got := ws.Review.Directory; got != "rituals" {
+		t.Fatalf("expected review directory 'rituals', got %q", got)
+	}
+}
+
+func TestLoadReviewOverrides(t *testing.T) {
+	home := t.TempDir()
+	cfgData := map[string]any{
+		"current_workspace": "main",
+		"workspaces": map[string]any{
+			"main": map[string]any{
+				"vaultdir": filepath.Join(home, "vault"),
+				"fsmode":   "strict",
+				"review": map[string]any{
+					"enable":    false,
+					"directory": "custom/logs",
+				},
+			},
+		},
+	}
+
+	writeConfigFile(t, home, cfgData)
+
+	cfg, err := config.Load(home)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+
+	ws := cfg.MustWorkspace()
+	if ws.Review.Enable {
+		t.Fatalf("expected review to be disabled")
+	}
+	if got := ws.Review.Directory; got != "custom/logs" {
+		t.Fatalf("expected review directory 'custom/logs', got %q", got)
+	}
+}
+
 func TestSaveWithNoEditorSkipsValidation(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

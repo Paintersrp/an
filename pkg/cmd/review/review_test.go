@@ -39,8 +39,8 @@ func TestReviewCommand_WritesLog(t *testing.T) {
 	cfg := &config.Config{
 		Workspaces: map[string]*config.Workspace{
 			"default": {
-				VaultDir:  vault,
-				NamedPins: config.PinMap{"review": "logs"},
+				VaultDir: vault,
+				Review:   config.ReviewConfig{Enable: true, Directory: "logs"},
 			},
 		},
 		CurrentWorkspace: "default",
@@ -54,7 +54,7 @@ func TestReviewCommand_WritesLog(t *testing.T) {
 		t.Fatalf("failed to create templater: %v", err)
 	}
 
-	st := &state.State{Config: cfg, Workspace: cfg.MustWorkspace(), WorkspaceName: cfg.CurrentWorkspace, Templater: tmpl, Vault: vault}
+	st := &state.State{Config: cfg, Workspace: cfg.MustWorkspace(), WorkspaceName: cfg.CurrentWorkspace, Review: cfg.MustWorkspace().Review, Templater: tmpl, Vault: vault}
 
 	cmd := NewCmdReview(st)
 	cmd.SetArgs([]string{})
@@ -129,8 +129,8 @@ func TestReviewCommand_LogWriteFailure(t *testing.T) {
 	cfg := &config.Config{
 		Workspaces: map[string]*config.Workspace{
 			"default": {
-				VaultDir:  vault,
-				NamedPins: config.PinMap{"review": "protected"},
+				VaultDir: vault,
+				Review:   config.ReviewConfig{Enable: true, Directory: "protected"},
 			},
 		},
 		CurrentWorkspace: "default",
@@ -144,7 +144,7 @@ func TestReviewCommand_LogWriteFailure(t *testing.T) {
 		t.Fatalf("failed to create templater: %v", err)
 	}
 
-	st := &state.State{Config: cfg, Workspace: cfg.MustWorkspace(), WorkspaceName: cfg.CurrentWorkspace, Templater: tmpl, Vault: vault}
+	st := &state.State{Config: cfg, Workspace: cfg.MustWorkspace(), WorkspaceName: cfg.CurrentWorkspace, Review: cfg.MustWorkspace().Review, Templater: tmpl, Vault: vault}
 
 	cmd := NewCmdReview(st)
 	cmd.SetArgs([]string{"--log-path", "protected"})

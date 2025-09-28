@@ -20,6 +20,7 @@ type State struct {
 	Config        *config.Config
 	Workspace     *config.Workspace
 	WorkspaceName string
+	Review        config.ReviewConfig
 	Templater     *templater.Templater
 	Handler       *handler.FileHandler
 	ViewManager   *views.ViewManager
@@ -102,6 +103,7 @@ func NewState(workspaceOverride string) (*State, error) {
 		Config:        cfg,
 		Workspace:     ws,
 		WorkspaceName: cfg.CurrentWorkspace,
+		Review:        ws.Review,
 		Templater:     t,
 		Handler:       h,
 		ViewManager:   vm,

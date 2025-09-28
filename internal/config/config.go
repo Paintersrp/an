@@ -36,6 +36,30 @@ type HookConfig struct {
 	PostCreate []CommandTemplate `yaml:"post_create" json:"post_create"`
 }
 
+type ReviewConfig struct {
+	Enable     bool   `yaml:"enable"    json:"enable"`
+	Directory  string `yaml:"directory" json:"directory"`
+	enabledSet bool   `yaml:"-"         json:"-"`
+}
+
+func (cfg *ReviewConfig) UnmarshalYAML(value *yaml.Node) error {
+	type plain ReviewConfig
+	var raw plain
+	if err := value.Decode(&raw); err != nil {
+		return err
+	}
+	*cfg = ReviewConfig(raw)
+	if value.Kind == yaml.MappingNode {
+		for i := 0; i < len(value.Content); i += 2 {
+			if strings.EqualFold(value.Content[i].Value, "enable") {
+				cfg.enabledSet = true
+				break
+			}
+		}
+	}
+	return nil
+}
+
 type Workspace struct {
 	PinManager     *pin.PinManager           `yaml:"-"`
 	NamedPins      PinMap                    `yaml:"named_pins"       json:"named_pins"`
@@ -52,6 +76,7 @@ type Workspace struct {
 	ViewOrder      []string                  `yaml:"view_order"      json:"view_order"`
 	EditorTemplate CommandTemplate           `yaml:"editor_template" json:"editor_template"`
 	Hooks          HookConfig                `yaml:"hooks"           json:"hooks"`
+	Review         ReviewConfig              `yaml:"review"          json:"review"`
 }
 
 type Config struct {
@@ -73,7 +98,10 @@ type ViewDefinition struct {
 	Predicates []string `yaml:"predicates" json:"predicates"`
 }
 
-const defaultWorkspaceName = "default"
+const (
+	defaultWorkspaceName = "default"
+	defaultReviewDir     = "reviews"
+)
 
 var ValidModes = map[string]bool{
 	"strict":  true,
@@ -144,6 +172,7 @@ func newWorkspace() *Workspace {
 		Views:          make(map[string]ViewDefinition),
 		ViewOrder:      nil,
 		FileSystemMode: "strict",
+		Review:         ReviewConfig{Enable: true, Directory: defaultReviewDir},
 	}
 	ws.PinManager = pin.NewPinManager(
 		pin.PinMap(ws.NamedPins),
@@ -166,6 +195,19 @@ func (ws *Workspace) ensureDefaults() {
 	}
 	if ws.Views == nil {
 		ws.Views = make(map[string]ViewDefinition)
+	}
+	if !ws.Review.enabledSet && !ws.Review.Enable {
+		ws.Review.Enable = true
+	}
+	ws.Review.Directory = strings.TrimSpace(ws.Review.Directory)
+	if ws.Review.Enable {
+		if ws.Review.Directory == "" {
+			if pin := strings.TrimSpace(ws.NamedPins["review"]); pin != "" {
+				ws.Review.Directory = pin
+			} else {
+				ws.Review.Directory = defaultReviewDir
+			}
+		}
 	}
 	if ws.PinManager == nil {
 		ws.PinManager = pin.NewPinManager(
@@ -322,6 +364,7 @@ func syncWorkspaceWithViper(ws *Workspace) {
 	viper.Set("pinned_task_file", ws.PinnedTaskFile)
 	viper.Set("editor_template", ws.EditorTemplate)
 	viper.Set("workspace_hooks", ws.Hooks)
+	viper.Set("review", ws.Review)
 	if ws.SubDirs == nil {
 		viper.Set("subdirs", []string{})
 	} else {
