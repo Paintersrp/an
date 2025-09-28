@@ -297,6 +297,102 @@ func TestLoadCaptureDefaults(t *testing.T) {
 	}
 }
 
+func TestLoadCaptureRulesMultipleDefinitions(t *testing.T) {
+	home := t.TempDir()
+	cfgData := map[string]any{
+		"current_workspace": "main",
+		"workspaces": map[string]any{
+			"main": map[string]any{
+				"vaultdir": filepath.Join(home, "vault"),
+				"fsmode":   "strict",
+				"capture": map[string]any{
+					"rules": []any{
+						map[string]any{
+							"match": map[string]any{
+								"template": "daily",
+							},
+							"action": map[string]any{
+								"tags": []any{"daily"},
+							},
+						},
+						map[string]any{
+							"match": map[string]any{
+								"upstream_prefix": "obsidian://",
+							},
+							"action": map[string]any{
+								"clipboard":    true,
+								"front_matter": map[string]any{"status": "synced"},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	writeConfigFile(t, home, cfgData)
+
+	cfg, err := config.Load(home)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+
+	rules := cfg.MustWorkspace().Capture.Rules
+	if got := len(rules); got != 2 {
+		t.Fatalf("expected 2 capture rules, got %d", got)
+	}
+
+	if got := rules[0].Match.Template; got != "daily" {
+		t.Fatalf("expected first rule template 'daily', got %q", got)
+	}
+	if len(rules[0].Action.Tags) != 1 || rules[0].Action.Tags[0] != "daily" {
+		t.Fatalf("expected first rule tags [daily], got %v", rules[0].Action.Tags)
+	}
+
+	if got := rules[1].Match.UpstreamPrefix; got != "obsidian://" {
+		t.Fatalf("expected second rule upstream prefix 'obsidian://', got %q", got)
+	}
+	if rules[1].Action.Clipboard != true {
+		t.Fatalf("expected clipboard action enabled for second rule")
+	}
+	if len(rules[1].Action.Tags) != 0 {
+		t.Fatalf("expected second rule tags to default empty, got %v", rules[1].Action.Tags)
+	}
+	wantFrontMatter := map[string]any{"status": "synced"}
+	if !reflect.DeepEqual(rules[1].Action.FrontMatter, wantFrontMatter) {
+		t.Fatalf("expected front matter %#v, got %#v", wantFrontMatter, rules[1].Action.FrontMatter)
+	}
+}
+
+func TestLoadCaptureRulesSectionInitialisesSlice(t *testing.T) {
+	home := t.TempDir()
+	cfgData := map[string]any{
+		"current_workspace": "main",
+		"workspaces": map[string]any{
+			"main": map[string]any{
+				"vaultdir": filepath.Join(home, "vault"),
+				"fsmode":   "strict",
+				"capture":  map[string]any{},
+			},
+		},
+	}
+
+	writeConfigFile(t, home, cfgData)
+
+	cfg, err := config.Load(home)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+
+	rules := cfg.MustWorkspace().Capture.Rules
+	if rules == nil {
+		t.Fatalf("expected capture rules slice to be initialised")
+	}
+	if len(rules) != 0 {
+		t.Fatalf("expected no capture rules, got %d", len(rules))
+	}
+}
+
 func TestCaptureRulesRoundTrip(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
