@@ -63,6 +63,31 @@ func TestCompleteConfirmationCancel(t *testing.T) {
 	}
 }
 
+func TestExitRequestedMessage(t *testing.T) {
+	t.Helper()
+	tempDir := t.TempDir()
+	st := newTestState(t, tempDir)
+
+	model, err := NewModel(st)
+	if err != nil {
+		t.Fatalf("NewModel returned error: %v", err)
+	}
+
+	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if cmd == nil {
+		t.Fatal("expected exit command when pressing esc")
+	}
+	m := adoptTestModel(updated)
+	if m.confirmingSave {
+		t.Fatalf("expected confirmingSave to remain false, got true")
+	}
+
+	msg := cmd()
+	if _, ok := msg.(ExitRequestedMsg); !ok {
+		t.Fatalf("expected ExitRequestedMsg, got %T", msg)
+	}
+}
+
 func TestCompleteConfirmationSavesLog(t *testing.T) {
 	tempDir := t.TempDir()
 	st := newTestState(t, tempDir)

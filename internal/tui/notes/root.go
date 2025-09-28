@@ -116,6 +116,10 @@ func (m *RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.notes = adoptNoteModel(model, m.notes)
 		}
 		return m, nil
+	case reviewtui.ExitRequestedMsg:
+		if m.active == viewReview {
+			m.active = viewNotes
+		}
 	case tea.KeyMsg:
 		editorActive := m.active == viewNotes && m.notes != nil && m.notes.editorActive()
 

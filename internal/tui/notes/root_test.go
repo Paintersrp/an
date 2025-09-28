@@ -371,6 +371,52 @@ func TestRootModelProcessesReviewRefreshWhileInactive(t *testing.T) {
 	}
 }
 
+func TestRootModelHandlesReviewExitRequest(t *testing.T) {
+	noteModel := newEditorTestModel(t, map[string]string{"note.md": "content"})
+
+	templ, err := templater.NewTemplater(noteModel.state.Workspace)
+	if err != nil {
+		t.Fatalf("failed to create templater: %v", err)
+	}
+	noteModel.state.Templater = templ
+
+	reviewModel, err := reviewtui.NewModel(noteModel.state)
+	if err != nil {
+		t.Fatalf("failed to create review model: %v", err)
+	}
+
+	root := NewRootModel(noteModel, nil, nil, reviewModel)
+	root.active = viewReview
+
+	updated, cmd := root.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	root = adoptRootTestModel(updated, root)
+	if cmd == nil {
+		t.Fatal("expected exit command from review model")
+	}
+
+	msgs := runCmds(cmd)
+	var exitMsg tea.Msg
+	for _, m := range msgs {
+		if _, ok := m.(reviewtui.ExitRequestedMsg); ok {
+			exitMsg = m
+			break
+		}
+	}
+	if exitMsg == nil {
+		t.Fatalf("expected ExitRequestedMsg in command output, got %v", msgs)
+	}
+
+	updated, cmd = root.Update(exitMsg)
+	root = adoptRootTestModel(updated, root)
+
+	if root.active != viewNotes {
+		t.Fatalf("expected to return to notes view after exit, got %v", root.active)
+	}
+	if cmd != nil {
+		t.Fatalf("expected no additional command after processing exit, got %T", cmd)
+	}
+}
+
 func runCmds(cmd tea.Cmd) []tea.Msg {
 	if cmd == nil {
 		return nil
@@ -389,4 +435,11 @@ func runCmds(cmd tea.Cmd) []tea.Msg {
 		}
 		return []tea.Msg{msg}
 	}
+}
+
+func adoptRootTestModel(model tea.Model, current *RootModel) *RootModel {
+	if m, ok := model.(*RootModel); ok {
+		return m
+	}
+	return current
 }
