@@ -156,6 +156,8 @@ func (m *FilterModel) Update(msg tea.Msg) (tea.Cmd, bool) {
 		case "k":
 			m.moveCursor(-1)
 			return nil, true
+		case "q":
+			return func() tea.Msg { return FilterClosedMsg{} }, true
 		}
 	}
 
@@ -186,7 +188,7 @@ func (m *FilterModel) View() string {
 		}
 	}
 
-	help := "space toggle • ctrl+l clear • enter close"
+	help := "space toggle • ctrl+l clear • enter/q close"
 	lines = append(lines, "", filterHelpStyle.Render(help))
 	return strings.Join(lines, "\n")
 }
