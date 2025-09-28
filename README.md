@@ -84,7 +84,7 @@ Press <kbd>e</kbd> to open the highlighted note inside an inline editor without 
 
 For quick captures, hit <kbd>q</kbd> to spawn a scratch buffer. Saving with <kbd>ctrl+s</kbd> writes the content into the first configured subdirectory (or the vault root when none is set) using a timestamped filename and refreshes the list so the new note is immediately available.
 
-Run `an --help` or any subcommand with `--help` to explore the rest of the command surface (journal, todo, settings, pin management, symlinks, etc.).
+Run `an --help` or any subcommand with `--help` to explore the rest of the command surface (journal, settings, pin management, symlinks, etc.).
 
 ## Smarter templates & guided capture
 
