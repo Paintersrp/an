@@ -79,7 +79,9 @@ func NewCmdReview(s *state.State) *cobra.Command {
 	)
 
 	if s != nil && s.Workspace != nil {
-		logPath = strings.TrimSpace(s.Workspace.NamedPins["review"])
+		if s.Workspace.Review.Enable {
+			logPath = strings.TrimSpace(s.Workspace.Review.Directory)
+		}
 	}
 
 	cmd := &cobra.Command{
@@ -94,6 +96,9 @@ Use it to keep daily, weekly, or project retrospectives inside your vault.`,
 			}
 
 			ws := s.Config.MustWorkspace()
+			if !ws.Review.Enable {
+				return errors.New("review rituals are disabled for this workspace")
+			}
 			searchCfg := search.Config{
 				EnableBody:     ws.Search.EnableBody,
 				IgnoredFolders: append([]string(nil), ws.Search.IgnoredFolders...),
@@ -189,7 +194,12 @@ Use it to keep daily, weekly, or project retrospectives inside your vault.`,
 				return err
 			}
 
-			logDir, _, err := reviewsvc.EnsureLogDir(s.Vault, strings.TrimSpace(logPath))
+			dir := strings.TrimSpace(logPath)
+			if dir == "" {
+				dir = ws.Review.Directory
+			}
+
+			logDir, _, err := reviewsvc.EnsureLogDir(s.Vault, dir)
 			if err != nil {
 				return fmt.Errorf("prepare review log directory: %w", err)
 			}

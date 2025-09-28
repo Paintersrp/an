@@ -58,7 +58,10 @@ func ensureReviewDir(st *state.State) (string, string, error) {
 	vault := strings.TrimSpace(st.Vault)
 	configured := ""
 	if st.Workspace != nil {
-		configured = st.Workspace.NamedPins["review"]
+		if !st.Workspace.Review.Enable {
+			return "", "", errors.New("review rituals are disabled for this workspace")
+		}
+		configured = st.Workspace.Review.Directory
 	}
 	return reviewsvc.EnsureLogDir(vault, configured)
 }

@@ -11,11 +11,14 @@ import (
 	"github.com/Paintersrp/an/internal/templater"
 )
 
-var filenameSanitizer = regexp.MustCompile(`[^a-zA-Z0-9\-]+`)
+var (
+	filenameSanitizer = regexp.MustCompile(`[^a-zA-Z0-9\-]+`)
+	defaultLogDir     = "reviews"
+)
 
 // EnsureLogDir resolves and creates the directory used for persisted review logs.
 // The configured path may be absolute or relative to the vault. When empty, the
-// default ".an/review" directory inside the vault is used. The resolved
+// default "reviews" directory inside the vault is used. The resolved
 // directory must live inside the vault.
 func EnsureLogDir(vault, configured string) (string, string, error) {
 	vault = strings.TrimSpace(vault)
@@ -25,7 +28,7 @@ func EnsureLogDir(vault, configured string) (string, string, error) {
 
 	dir := strings.TrimSpace(configured)
 	if dir == "" {
-		dir = filepath.Join(vault, ".an", "review")
+		dir = filepath.Join(vault, defaultLogDir)
 	} else if !filepath.IsAbs(dir) {
 		dir = filepath.Join(vault, dir)
 	}
