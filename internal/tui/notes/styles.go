@@ -64,25 +64,54 @@ var (
 				Border(lipgloss.NormalBorder(), false, false, false, true).
 				BorderForeground(lipgloss.Color("#334455"))
 
+	graphPaneStyle = lipgloss.NewStyle().
+			MarginLeft(1).
+			Border(lipgloss.NormalBorder(), false, false, false, true).
+			BorderForeground(lipgloss.Color("#334455"))
+
 	previewPaletteTitleStyle = lipgloss.NewStyle().
 					Bold(true).
 					Foreground(lipgloss.Color("#0AF"))
+
+	graphPaneTitleStyle = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(lipgloss.Color("#0AF"))
 
 	previewPaletteHeaderStyle = lipgloss.NewStyle().
 					Bold(true).
 					Foreground(lipgloss.Color("#89dceb"))
 
+	graphPaneHeaderStyle = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(lipgloss.Color("#89dceb"))
+
 	previewPaletteCursorStyle = lipgloss.NewStyle().
 					Foreground(lipgloss.Color("#FFF")).
 					Background(lipgloss.Color("#0AF"))
 
+	graphPaneCursorStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#FFF")).
+				Background(lipgloss.Color("#0AF"))
+
 	previewPaletteInactiveStyle = lipgloss.NewStyle().
 					Foreground(lipgloss.Color("#cdd6f4"))
+
+	graphPaneInactiveStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#cdd6f4"))
+
+	graphPaneQueueStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#f9e2af"))
 
 	previewPaletteEmptyStyle = lipgloss.NewStyle().
 					Foreground(lipgloss.Color("#6c7086"))
 
+	graphPaneEmptyStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#6c7086"))
+
 	previewPaletteHelpStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#94e2d5"))
+
+	graphPaneHelpStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#94e2d5"))
 
 	linkSelectStyle = lipgloss.NewStyle().MarginLeft(1).
