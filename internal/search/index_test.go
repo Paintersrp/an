@@ -125,9 +125,10 @@ func TestIndexSearchSupportsMetadataAndTags(t *testing.T) {
 	dir := t.TempDir()
 	matched := writeNote(t, dir, "projects/plan.md", "---\ntitle: Plan\ntags:\n  - project\n  - urgent\nstatus: active\n---\nMilestone body\n")
 	archived := writeNote(t, dir, "projects/archive.md", "---\ntitle: Old\ntags:\n  - project\nstatus: done\n---\nFinished body\n")
+	unrelated := writeNote(t, dir, "projects/reference.md", "---\ntitle: Reference\ntags:\n  - reference\nstatus: planned\n---\nReference content\n")
 
 	idx := NewIndex(dir, Config{EnableBody: true})
-	if err := idx.Build([]string{matched, archived}); err != nil {
+	if err := idx.Build([]string{matched, archived, unrelated}); err != nil {
 		t.Fatalf("Build returned error: %v", err)
 	}
 
@@ -155,6 +156,88 @@ func TestIndexSearchSupportsMetadataAndTags(t *testing.T) {
 	results = idx.Search(query)
 	if len(results) != 0 {
 		t.Fatalf("expected metadata filters to exclude non-matching notes, got %+v", results)
+	}
+
+	// Tag filters should require only one matching value.
+	tagOnly := Query{Tags: []string{"project", "reference"}}
+	results = idx.Search(tagOnly)
+	wantTags := map[string]struct{}{
+		filepath.Clean(matched):   {},
+		filepath.Clean(archived):  {},
+		filepath.Clean(unrelated): {},
+	}
+	if len(results) != len(wantTags) {
+		t.Fatalf("expected %d tag matches, got %+v", len(wantTags), results)
+	}
+	for _, res := range results {
+		if _, ok := wantTags[res.Path]; !ok {
+			t.Fatalf("unexpected tag result %+v", res)
+		}
+		delete(wantTags, res.Path)
+	}
+	if len(wantTags) != 0 {
+		t.Fatalf("tag filter missing expected notes: %+v", wantTags)
+	}
+}
+
+func TestIndexSearchFiltersMatchAnySelectedValues(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	projectActive := writeNote(t, dir, "notes/alpha.md", "---\ntitle: Alpha\ntags:\n  - project\n  - urgent\nstatus: active\n---\nAlpha body\n")
+	planningStalled := writeNote(t, dir, "notes/beta.md", "---\ntitle: Beta\ntags:\n  - planning\nstatus: stalled\n---\nBeta body\n")
+	referenceDone := writeNote(t, dir, "notes/gamma.md", "---\ntitle: Gamma\ntags:\n  - reference\nstatus: done\n---\nGamma body\n")
+	unrelatedTag := writeNote(t, dir, "notes/delta.md", "---\ntitle: Delta\ntags:\n  - urgent\nstatus: active\n---\nDelta body\n")
+
+	idx := NewIndex(dir, Config{EnableBody: true})
+	if err := idx.Build([]string{projectActive, planningStalled, referenceDone, unrelatedTag}); err != nil {
+		t.Fatalf("Build returned error: %v", err)
+	}
+
+	query := Query{
+		Tags: []string{"project", "planning"},
+		Metadata: map[string][]string{
+			"status": []string{"active", "stalled"},
+		},
+	}
+
+	results := idx.Search(query)
+	want := map[string]struct{}{
+		filepath.Clean(projectActive):   {},
+		filepath.Clean(planningStalled): {},
+	}
+	if len(results) != len(want) {
+		t.Fatalf("expected %d matching notes, got %+v", len(want), results)
+	}
+	for _, res := range results {
+		if _, ok := want[res.Path]; !ok {
+			t.Fatalf("unexpected result %+v", res)
+		}
+		delete(want, res.Path)
+	}
+	if len(want) != 0 {
+		t.Fatalf("missing expected results: %+v", want)
+	}
+
+	// Metadata-only queries should return all notes with any selected value.
+	metadataOnly := Query{Metadata: map[string][]string{"status": []string{"active", "stalled"}}}
+	results = idx.Search(metadataOnly)
+	want = map[string]struct{}{
+		filepath.Clean(projectActive):   {},
+		filepath.Clean(planningStalled): {},
+		filepath.Clean(unrelatedTag):    {},
+	}
+	if len(results) != len(want) {
+		t.Fatalf("expected %d metadata matches, got %+v", len(want), results)
+	}
+	for _, res := range results {
+		if _, ok := want[res.Path]; !ok {
+			t.Fatalf("unexpected metadata result %+v", res)
+		}
+		delete(want, res.Path)
+	}
+	if len(want) != 0 {
+		t.Fatalf("metadata results missing expected notes: %+v", want)
 	}
 }
 

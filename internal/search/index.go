@@ -591,10 +591,15 @@ func cloneMetadata(values map[string][]string) map[string][]string {
 
 func (d document) matchesFilters(q Query) bool {
 	if len(q.Tags) > 0 {
+		matched := false
 		for _, required := range q.Tags {
-			if !containsFold(d.Tags, required) {
-				return false
+			if containsFold(d.Tags, required) {
+				matched = true
+				break
 			}
+		}
+		if !matched {
+			return false
 		}
 	}
 
@@ -607,10 +612,15 @@ func (d document) matchesFilters(q Query) bool {
 		if !ok {
 			return false
 		}
+		matched := false
 		for _, want := range values {
-			if !containsFold(available, want) {
-				return false
+			if containsFold(available, want) {
+				matched = true
+				break
 			}
+		}
+		if !matched {
+			return false
 		}
 	}
 	return true
@@ -799,15 +809,11 @@ func metadataMatchCount(doc document, q Query) int {
 		if !ok {
 			continue
 		}
-		allMatch := true
 		for _, want := range values {
-			if !containsFold(available, want) {
-				allMatch = false
+			if containsFold(available, want) {
+				matches++
 				break
 			}
-		}
-		if allMatch {
-			matches++
 		}
 	}
 	return matches

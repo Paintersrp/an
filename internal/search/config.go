@@ -14,11 +14,12 @@ type Config struct {
 type Query struct {
 	// Term is the free-text query to evaluate against indexed content.
 	Term string
-	// Tags enumerates tag names that must be present on the note. All tags must
-	// be satisfied for a document to match.
+	// Tags enumerates tag names where a document matches when it includes at
+	// least one of the provided values.
 	Tags []string
 	// Metadata filters require front-matter fields to contain one or more
-	// values. The values associated with a key are treated as an AND match.
+	// values. The values associated with a key are treated as an OR match,
+	// while different keys must all be satisfied.
 	Metadata map[string][]string
 }
 
