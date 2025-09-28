@@ -27,7 +27,7 @@ This document captures medium-term feature expansions for the Atomic Notes CLI a
 **Tasks.**
 - [x] Design a template manifest format (YAML or TOML) and parser to populate default note scaffolds.
 - [x] Implement a `an capture --template <name>` subcommand that uses the manifest and still respects configured editors.
-- [ ] Add optional auto-tagging rules (e.g., based on capture source) that update front matter before the file hits disk.
+- [x] Add optional auto-tagging rules (e.g., based on capture source) that update front matter before the file hits disk.
 - [x] Document the capture workflow in the README with examples and troubleshooting tips.
 
 ## 3. Task-focused agenda mode
