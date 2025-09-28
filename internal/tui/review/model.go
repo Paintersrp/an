@@ -22,21 +22,22 @@ import (
 )
 
 type Model struct {
-	state     *state.State
-	queue     []reviewsvc.ResurfaceItem
-	graph     reviewsvc.Graph
-	manifest  templater.TemplateManifest
-	responses map[string]string
-	editor    *textarea.Model
-	keys      keyMap
-	width     int
-	height    int
-	step      int
-	mode      reviewMode
-	showGraph bool
-	status    string
-	loading   bool
-	ready     bool
+	state          *state.State
+	queue          []reviewsvc.ResurfaceItem
+	graph          reviewsvc.Graph
+	manifest       templater.TemplateManifest
+	responses      map[string]string
+	editor         *textarea.Model
+	keys           keyMap
+	width          int
+	height         int
+	step           int
+	mode           reviewMode
+	showGraph      bool
+	status         string
+	loading        bool
+	ready          bool
+	confirmingSave bool
 }
 
 type keyMap struct {
@@ -60,6 +61,11 @@ type queueLoadedMsg struct {
 	queue []reviewsvc.ResurfaceItem
 	graph reviewsvc.Graph
 	err   error
+}
+
+type reviewSavedMsg struct {
+	path string
+	err  error
 }
 
 var modes = []reviewMode{
@@ -166,7 +172,20 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = fmt.Sprintf("Loaded resurfacing queue (%d items)", len(m.queue))
 		}
 		return m, nil
+	case reviewSavedMsg:
+		if msg.err != nil {
+			m.status = fmt.Sprintf("Failed to save review log: %v", msg.err)
+		} else {
+			m.status = fmt.Sprintf("Review log saved: %s", m.relativePath(msg.path))
+		}
+		m.confirmingSave = false
+		return m, nil
 	case tea.KeyMsg:
+		if m.confirmingSave && msg.Type == tea.KeyEsc {
+			m.confirmingSave = false
+			m.status = "Canceled review save."
+			return m, nil
+		}
 		if handled, cmd := m.handleKeys(msg); handled {
 			return m, cmd
 		}
@@ -220,8 +239,16 @@ func (m *Model) handleKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 		return true, nil
 	case key.Matches(msg, m.keys.complete):
 		m.persistCurrentResponse()
-		m.status = "Checklist responses captured."
-		return true, nil
+		if !m.confirmingSave {
+			m.confirmingSave = true
+			m.status = "Press ctrl+enter again to save the review log, or esc to cancel."
+			return true, nil
+		}
+		m.confirmingSave = false
+		m.status = "Saving review log..."
+		responses := cloneStringMap(m.responses)
+		queue := append([]reviewsvc.ResurfaceItem(nil), m.queue...)
+		return true, m.saveReviewLog(responses, m.manifest, queue, time.Now().UTC())
 	case key.Matches(msg, m.keys.daily):
 		return true, m.switchMode(modes[0])
 	case key.Matches(msg, m.keys.weekly):
@@ -413,6 +440,14 @@ func (m *Model) persistCurrentResponse() {
 	}
 	field := m.manifest.Fields[m.step]
 	m.responses[field.Key] = strings.TrimSpace(m.editor.Value())
+}
+
+func (m *Model) saveReviewLog(responses map[string]string, manifest templater.TemplateManifest, queue []reviewsvc.ResurfaceItem, ts time.Time) tea.Cmd {
+	state := m.state
+	return func() tea.Msg {
+		path, err := persistReviewLog(state, manifest, responses, queue, ts)
+		return reviewSavedMsg{path: path, err: err}
+	}
 }
 
 func (m *Model) resizeEditor() {
@@ -654,6 +689,17 @@ func filterEmpty(values []string) []string {
 		out = append(out, v)
 	}
 	return out
+}
+
+func cloneStringMap(values map[string]string) map[string]string {
+	if len(values) == 0 {
+		return make(map[string]string)
+	}
+	cloned := make(map[string]string, len(values))
+	for key, value := range values {
+		cloned[key] = value
+	}
+	return cloned
 }
 
 var statusStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
