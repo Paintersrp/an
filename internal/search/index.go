@@ -38,6 +38,63 @@ type Index struct {
 	backlinks map[string][]string
 }
 
+// Clone creates a deep copy of the index that can be used independently of the
+// original. The returned index shares no mutable state with the source,
+// allowing callers to safely read from the snapshot without holding locks on
+// the owner.
+func (idx *Index) Clone() *Index {
+	if idx == nil {
+		return nil
+	}
+
+	clone := &Index{
+		root:      idx.root,
+		cfg:       idx.cfg,
+		docs:      make(map[string]document, len(idx.docs)),
+		aliases:   make(map[string]string, len(idx.aliases)),
+		outbound:  make(map[string][]string, len(idx.outbound)),
+		backlinks: make(map[string][]string, len(idx.backlinks)),
+	}
+
+	for path, doc := range idx.docs {
+		clone.docs[path] = document{
+			Path:        doc.Path,
+			Tags:        append([]string(nil), doc.Tags...),
+			FrontMatter: cloneFrontMatter(doc.FrontMatter),
+			Links:       append([]string(nil), doc.Links...),
+			Body:        doc.Body,
+			ModifiedAt:  doc.ModifiedAt,
+			Headings:    append([]string(nil), doc.Headings...),
+		}
+	}
+
+	for alias, canonical := range idx.aliases {
+		clone.aliases[alias] = canonical
+	}
+
+	for path, edges := range idx.outbound {
+		clone.outbound[path] = append([]string(nil), edges...)
+	}
+
+	for path, edges := range idx.backlinks {
+		clone.backlinks[path] = append([]string(nil), edges...)
+	}
+
+	return clone
+}
+
+func cloneFrontMatter(values map[string][]string) map[string][]string {
+	if len(values) == 0 {
+		return nil
+	}
+
+	copied := make(map[string][]string, len(values))
+	for key, vals := range values {
+		copied[key] = append([]string(nil), vals...)
+	}
+	return copied
+}
+
 // NewIndex constructs an empty index rooted at the provided directory.
 func NewIndex(root string, cfg Config) *Index {
 	return &Index{

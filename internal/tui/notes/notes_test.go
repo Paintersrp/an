@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -17,10 +18,44 @@ import (
 
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/internal/handler"
+	"github.com/Paintersrp/an/internal/search"
+	indexsvc "github.com/Paintersrp/an/internal/services/index"
 	"github.com/Paintersrp/an/internal/state"
 	"github.com/Paintersrp/an/internal/tui/notes/submodels"
 	"github.com/Paintersrp/an/internal/views"
 )
+
+type stubIndexService struct {
+	idx *search.Index
+}
+
+func (s *stubIndexService) AcquireSnapshot() (*search.Index, error) {
+	if s == nil || s.idx == nil {
+		return nil, indexsvc.ErrUnavailable
+	}
+	clone := s.idx.Clone()
+	if clone == nil {
+		panic("stub index clone returned nil")
+	}
+	return clone, nil
+}
+
+func (s *stubIndexService) QueueUpdate(string) {}
+
+func (s *stubIndexService) Stats() indexsvc.Stats { return indexsvc.Stats{} }
+
+func (s *stubIndexService) Close() error { return nil }
+
+var configMu sync.Mutex
+
+func activateWorkspace(t *testing.T, cfg *config.Config, name string) {
+	t.Helper()
+	configMu.Lock()
+	defer configMu.Unlock()
+	if err := cfg.ActivateWorkspace(name); err != nil {
+		t.Fatalf("failed to activate workspace: %v", err)
+	}
+}
 
 func TestCycleViewOrder(t *testing.T) {
 	t.Parallel()
@@ -32,9 +67,7 @@ func TestCycleViewOrder(t *testing.T) {
 		Workspaces:       map[string]*config.Workspace{"default": ws},
 		CurrentWorkspace: "default",
 	}
-	if err := cfg.ActivateWorkspace("default"); err != nil {
-		t.Fatalf("failed to activate workspace: %v", err)
-	}
+	activateWorkspace(t, cfg, "default")
 	viewManager, err := views.NewViewManager(fileHandler, cfg)
 	if err != nil {
 		t.Fatalf("NewViewManager returned error: %v", err)
@@ -232,9 +265,7 @@ func TestApplyViewReplacesListItems(t *testing.T) {
 		Workspaces:       map[string]*config.Workspace{"default": ws},
 		CurrentWorkspace: "default",
 	}
-	if err := cfg.ActivateWorkspace("default"); err != nil {
-		t.Fatalf("failed to activate workspace: %v", err)
-	}
+	activateWorkspace(t, cfg, "default")
 
 	viewManager, err := views.NewViewManager(fileHandler, cfg)
 	if err != nil {
@@ -297,9 +328,7 @@ func TestRefreshItemsClampsSelectionWhenListShrinks(t *testing.T) {
 		Workspaces:       map[string]*config.Workspace{"default": ws},
 		CurrentWorkspace: "default",
 	}
-	if err := cfg.ActivateWorkspace("default"); err != nil {
-		t.Fatalf("failed to activate workspace: %v", err)
-	}
+	activateWorkspace(t, cfg, "default")
 
 	viewManager, err := views.NewViewManager(fileHandler, cfg)
 	if err != nil {
@@ -384,23 +413,34 @@ func TestApplyActiveFiltersRestrictsItems(t *testing.T) {
 		Workspaces:       map[string]*config.Workspace{"default": ws},
 		CurrentWorkspace: "default",
 	}
-	if err := cfg.ActivateWorkspace("default"); err != nil {
-		t.Fatalf("failed to activate workspace: %v", err)
-	}
+	activateWorkspace(t, cfg, "default")
 
 	viewManager, err := views.NewViewManager(fileHandler, cfg)
 	if err != nil {
 		t.Fatalf("NewViewManager returned error: %v", err)
 	}
 
-	model, err := NewNoteListModel(&state.State{
+	searchCfg := search.Config{
+		EnableBody:     ws.Search.EnableBody,
+		IgnoredFolders: append([]string(nil), ws.Search.IgnoredFolders...),
+	}
+
+	idx := search.NewIndex(tempDir, searchCfg)
+	if err := idx.Build([]string{activePath, donePath}); err != nil {
+		t.Fatalf("failed to build search index: %v", err)
+	}
+
+	st := &state.State{
 		Config:        cfg,
 		Workspace:     ws,
 		WorkspaceName: cfg.CurrentWorkspace,
 		Handler:       fileHandler,
 		ViewManager:   viewManager,
 		Vault:         tempDir,
-	}, "default")
+		Index:         &stubIndexService{idx: idx},
+	}
+
+	model, err := NewNoteListModel(st, "default")
 	if err != nil {
 		t.Fatalf("NewNoteListModel returned error: %v", err)
 	}
@@ -698,26 +738,41 @@ func TestSearchFilterIncludesBodyMatches(t *testing.T) {
 		Workspaces:       map[string]*config.Workspace{"default": ws},
 		CurrentWorkspace: "default",
 	}
-	if err := cfg.ActivateWorkspace("default"); err != nil {
-		t.Fatalf("failed to activate workspace: %v", err)
-	}
+	activateWorkspace(t, cfg, "default")
 
 	viewManager, err := views.NewViewManager(fileHandler, cfg)
 	if err != nil {
 		t.Fatalf("NewViewManager returned error: %v", err)
 	}
 
-	model, err := NewNoteListModel(&state.State{
+	searchCfg := search.Config{
+		EnableBody:     ws.Search.EnableBody,
+		IgnoredFolders: append([]string(nil), ws.Search.IgnoredFolders...),
+	}
+	idx := search.NewIndex(tempDir, searchCfg)
+	if err := idx.Build([]string{bodyPath, otherPath}); err != nil {
+		t.Fatalf("failed to build search index: %v", err)
+	}
+
+	st := &state.State{
 		Config:        cfg,
 		Workspace:     ws,
 		WorkspaceName: cfg.CurrentWorkspace,
 		Handler:       fileHandler,
 		ViewManager:   viewManager,
 		Vault:         tempDir,
-	}, "default")
+		Index:         &stubIndexService{idx: idx},
+	}
+
+	model, err := NewNoteListModel(st, "default")
 	if err != nil {
 		t.Fatalf("NewNoteListModel returned error: %v", err)
 	}
+
+	if got := len(model.indexedPaths); got != 2 {
+		t.Fatalf("expected indexed paths to include both notes, got %d", got)
+	}
+	model.searchIndex = idx
 
 	items := model.list.Items()
 	targets := make([]string, len(items))
@@ -789,26 +844,38 @@ func TestSearchFilterPrefersSearchRankOrder(t *testing.T) {
 		Workspaces:       map[string]*config.Workspace{"default": ws},
 		CurrentWorkspace: "default",
 	}
-	if err := cfg.ActivateWorkspace("default"); err != nil {
-		t.Fatalf("failed to activate workspace: %v", err)
-	}
+	activateWorkspace(t, cfg, "default")
 
 	viewManager, err := views.NewViewManager(fileHandler, cfg)
 	if err != nil {
 		t.Fatalf("NewViewManager returned error: %v", err)
 	}
 
-	model, err := NewNoteListModel(&state.State{
+	searchCfg := search.Config{
+		EnableBody:     ws.Search.EnableBody,
+		IgnoredFolders: append([]string(nil), ws.Search.IgnoredFolders...),
+	}
+	idx := search.NewIndex(tempDir, searchCfg)
+	if err := idx.Build([]string{titlePath, bodyPath}); err != nil {
+		t.Fatalf("failed to build search index: %v", err)
+	}
+
+	st := &state.State{
 		Config:        cfg,
 		Workspace:     ws,
 		WorkspaceName: cfg.CurrentWorkspace,
 		Handler:       fileHandler,
 		ViewManager:   viewManager,
 		Vault:         tempDir,
-	}, "default")
+		Index:         &stubIndexService{idx: idx},
+	}
+
+	model, err := NewNoteListModel(st, "default")
 	if err != nil {
 		t.Fatalf("NewNoteListModel returned error: %v", err)
 	}
+
+	model.searchIndex = idx
 
 	items := model.list.Items()
 	targets := make([]string, len(items))

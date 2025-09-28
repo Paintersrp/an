@@ -14,6 +14,7 @@ import (
 
 	reviewsvc "github.com/Paintersrp/an/internal/review"
 	"github.com/Paintersrp/an/internal/search"
+	indexsvc "github.com/Paintersrp/an/internal/services/index"
 	"github.com/Paintersrp/an/internal/state"
 )
 
@@ -102,14 +103,30 @@ Use it to keep daily, weekly, or project retrospectives inside your vault.`,
 				query.Metadata[key] = append(query.Metadata[key], values...)
 			}
 
-			paths, err := collectNotePaths(s.Vault, searchCfg.IgnoredFolders)
-			if err != nil {
-				return err
+			var idx *search.Index
+			if s.Index != nil {
+				snapshot, err := s.Index.AcquireSnapshot()
+				switch {
+				case err == nil:
+					idx = snapshot
+				case errors.Is(err, indexsvc.ErrUnavailable) || errors.Is(err, indexsvc.ErrClosed):
+					// fall back to building a local index below
+				default:
+					return fmt.Errorf("acquire search index: %w", err)
+				}
 			}
 
-			idx := search.NewIndex(s.Vault, searchCfg)
-			if err := idx.Build(paths); err != nil {
-				return fmt.Errorf("build search index: %w", err)
+			if idx == nil {
+				paths, err := collectNotePaths(s.Vault, searchCfg.IgnoredFolders)
+				if err != nil {
+					return err
+				}
+
+				built := search.NewIndex(s.Vault, searchCfg)
+				if err := built.Build(paths); err != nil {
+					return fmt.Errorf("build search index: %w", err)
+				}
+				idx = built
 			}
 
 			queue := reviewsvc.BuildResurfaceQueue(idx, reviewsvc.ResurfaceOptions{

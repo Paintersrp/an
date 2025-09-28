@@ -15,6 +15,7 @@ import (
 
 	reviewsvc "github.com/Paintersrp/an/internal/review"
 	"github.com/Paintersrp/an/internal/search"
+	indexsvc "github.com/Paintersrp/an/internal/services/index"
 	"github.com/Paintersrp/an/internal/state"
 	"github.com/Paintersrp/an/internal/templater"
 	"github.com/Paintersrp/an/internal/tui/textarea"
@@ -478,6 +479,23 @@ func buildQueue(st *state.State) ([]reviewsvc.ResurfaceItem, *search.Index, erro
 		Metadata: cloneMetadata(ws.Search.DefaultMetadataFilters),
 	}
 
+	if st.Index != nil {
+		snapshot, err := st.Index.AcquireSnapshot()
+		if err == nil && snapshot != nil {
+			queue := reviewsvc.BuildResurfaceQueue(snapshot, reviewsvc.ResurfaceOptions{
+				Now:        time.Now(),
+				MinimumAge: 0,
+				Limit:      defaultQueueLimit,
+				Buckets:    reviewsvc.DefaultBuckets(),
+				Query:      query,
+			})
+			return queue, snapshot, nil
+		}
+		if err != nil && !errors.Is(err, indexsvc.ErrUnavailable) && !errors.Is(err, indexsvc.ErrClosed) {
+			return nil, nil, err
+		}
+	}
+
 	paths, err := collectNotePaths(st.Vault, searchCfg.IgnoredFolders)
 	if err != nil {
 		return nil, nil, err
@@ -500,6 +518,23 @@ func buildGraph(st *state.State, queue []reviewsvc.ResurfaceItem) (reviewsvc.Gra
 	if st == nil {
 		return reviewsvc.Graph{}, errors.New("state is not configured")
 	}
+	if st.Index != nil {
+		snapshot, err := st.Index.AcquireSnapshot()
+		if err == nil && snapshot != nil {
+			if len(queue) == 0 {
+				return reviewsvc.Graph{}, nil
+			}
+			seeds := make([]string, len(queue))
+			for i, item := range queue {
+				seeds[i] = item.Path
+			}
+			return reviewsvc.BuildBacklinkGraph(snapshot, seeds), nil
+		}
+		if err != nil && !errors.Is(err, indexsvc.ErrUnavailable) && !errors.Is(err, indexsvc.ErrClosed) {
+			return reviewsvc.Graph{}, err
+		}
+	}
+
 	searchCfg := search.Config{}
 	if st.Config != nil {
 		ws := st.Config.MustWorkspace()
