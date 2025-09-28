@@ -222,8 +222,8 @@ func TestRootHeaderOmittedWhenNoViews(t *testing.T) {
 		}
 	}
 
-	if st.RootStatus.Line != "" {
-		t.Fatalf("expected root status line to be empty, got %q", st.RootStatus.Line)
+	if got := st.RootStatus.Value(); got != "" {
+		t.Fatalf("expected root status line to be empty, got %q", got)
 	}
 }
 

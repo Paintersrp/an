@@ -641,8 +641,13 @@ func cloneMetadataMap(src map[string][]string) map[string][]string {
 func (m *NoteListModel) Init() tea.Cmd {
 	var cmds []tea.Cmd
 
-	if m.state != nil && m.state.Watcher != nil {
-		cmds = append(cmds, m.state.Watcher.Start())
+	if m.state != nil {
+		if m.state.Watcher != nil {
+			cmds = append(cmds, m.state.Watcher.Start())
+		}
+		if cmd := m.state.IndexHeartbeatCmd(); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 	}
 
 	if cmd := m.handlePreview(false); cmd != nil {
@@ -729,6 +734,14 @@ func (m *NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, m.state.Watcher.Start())
 		}
 
+		return m, tea.Batch(cmds...)
+	case state.IndexStatsMsg:
+		if m.state != nil && m.state.Watcher != nil {
+			cmds = append(cmds, m.state.Watcher.Start())
+		}
+		if len(cmds) == 0 {
+			return m, nil
+		}
 		return m, tea.Batch(cmds...)
 
 	case noteListRefreshMsg:
@@ -1646,7 +1659,7 @@ func (m NoteListModel) rootStatusLine() string {
 	if m.state == nil || m.state.RootStatus == nil {
 		return ""
 	}
-	return m.state.RootStatus.Line
+	return m.state.RootStatus.Value()
 }
 
 func rootStatusSuffix(view string, width int, status, gap string) string {

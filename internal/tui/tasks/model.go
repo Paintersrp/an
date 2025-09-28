@@ -173,6 +173,13 @@ func (i listItem) FilterValue() string {
 }
 
 func (m *Model) Init() tea.Cmd {
+	if m.state == nil {
+		return nil
+	}
+
+	if cmd := m.state.IndexHeartbeatCmd(); cmd != nil {
+		return cmd
+	}
 	return nil
 }
 
@@ -207,6 +214,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.resetFilters()
 			return m, m.applyFilters()
 		}
+	case state.IndexStatsMsg:
+		if m.state != nil && m.state.Watcher != nil {
+			return m, m.state.Watcher.Start()
+		}
+		return m, nil
 	}
 
 	var cmd tea.Cmd
@@ -263,7 +275,7 @@ func (m *Model) rootStatusLine() string {
 	if m.state == nil || m.state.RootStatus == nil {
 		return ""
 	}
-	return m.state.RootStatus.Line
+	return m.state.RootStatus.Value()
 }
 
 func rootStatusSuffix(view string, width int, status, gap string) string {

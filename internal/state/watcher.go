@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/fsnotify/fsnotify"
@@ -23,12 +24,16 @@ type VaultWatcherErrMsg struct {
 }
 
 type VaultWatcher struct {
-	watcher  *fsnotify.Watcher
-	vault    string
-	done     chan struct{}
-	once     sync.Once
-	onChange func(string)
-	onClose  func()
+	watcher   *fsnotify.Watcher
+	vault     string
+	done      chan struct{}
+	once      sync.Once
+	mu        sync.Mutex
+	pending   []tea.Msg
+	heartbeat func() tea.Cmd
+	interval  time.Duration
+	onChange  func(string)
+	onClose   func()
 }
 
 func NewVaultWatcher(vault string) (*VaultWatcher, error) {
@@ -62,10 +67,27 @@ func (w *VaultWatcher) Start() tea.Cmd {
 	}
 
 	return func() tea.Msg {
+		if msg := w.dequeuePending(); msg != nil {
+			return msg
+		}
+
+		hb, interval := w.heartbeatConfig()
+		var ticker *time.Ticker
+		var ticks <-chan time.Time
+		if hb != nil && interval > 0 {
+			ticker = time.NewTicker(interval)
+			ticks = ticker.C
+			defer ticker.Stop()
+		}
+
 		for {
 			select {
 			case <-w.done:
 				return nil
+			case <-ticks:
+				if msg := w.invokeHeartbeat(hb); msg != nil {
+					return msg
+				}
 			case event, ok := <-w.watcher.Events:
 				if !ok {
 					return nil
@@ -91,6 +113,11 @@ func (w *VaultWatcher) Start() tea.Cmd {
 					w.onChange(rel)
 				}
 
+				if msg := w.invokeHeartbeat(hb); msg != nil {
+					w.enqueuePending(VaultNoteChangedMsg{Path: rel})
+					return msg
+				}
+
 				return VaultNoteChangedMsg{Path: rel}
 			case err, ok := <-w.watcher.Errors:
 				if !ok {
@@ -102,6 +129,40 @@ func (w *VaultWatcher) Start() tea.Cmd {
 			}
 		}
 	}
+}
+
+func (w *VaultWatcher) heartbeatConfig() (func() tea.Cmd, time.Duration) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.heartbeat, w.interval
+}
+
+func (w *VaultWatcher) invokeHeartbeat(fn func() tea.Cmd) tea.Msg {
+	if fn == nil {
+		return nil
+	}
+	cmd := fn()
+	if cmd == nil {
+		return nil
+	}
+	return cmd()
+}
+
+func (w *VaultWatcher) enqueuePending(msg tea.Msg) {
+	w.mu.Lock()
+	w.pending = append(w.pending, msg)
+	w.mu.Unlock()
+}
+
+func (w *VaultWatcher) dequeuePending() tea.Msg {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if len(w.pending) == 0 {
+		return nil
+	}
+	msg := w.pending[0]
+	w.pending = w.pending[1:]
+	return msg
 }
 
 func (w *VaultWatcher) Close() error {
@@ -137,6 +198,19 @@ func (w *VaultWatcher) OnClose(fn func()) {
 		return
 	}
 	w.onClose = fn
+}
+
+// SetHeartbeat configures a command that is invoked whenever the watcher
+// detects a change event or when the periodic ticker fires.
+func (w *VaultWatcher) SetHeartbeat(fn func() tea.Cmd, interval time.Duration) {
+	if w == nil {
+		return
+	}
+
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.heartbeat = fn
+	w.interval = interval
 }
 
 func (w *VaultWatcher) addRecursive(root string) error {

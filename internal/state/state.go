@@ -4,7 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sync"
+	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/viper"
 
 	"github.com/Paintersrp/an/internal/config"
@@ -33,7 +36,27 @@ type State struct {
 }
 
 type RootStatus struct {
-	Line string
+	mu   sync.RWMutex
+	line string
+}
+
+func (r *RootStatus) Set(line string) {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	r.line = line
+	r.mu.Unlock()
+}
+
+func (r *RootStatus) Value() string {
+	if r == nil {
+		return ""
+	}
+	r.mu.RLock()
+	line := r.line
+	r.mu.RUnlock()
+	return line
 }
 
 // IndexService exposes the shared search index snapshots produced by the
@@ -44,6 +67,8 @@ type IndexService interface {
 	Stats() indexsvc.Stats
 	Close() error
 }
+
+const indexHeartbeatInterval = 5 * time.Second
 
 func NewState(workspaceOverride string) (*State, error) {
 	home, err := GetHomeDir()
@@ -99,7 +124,7 @@ func NewState(workspaceOverride string) (*State, error) {
 		}
 	})
 
-	return &State{
+	st := &State{
 		Config:        cfg,
 		Workspace:     ws,
 		WorkspaceName: cfg.CurrentWorkspace,
@@ -113,7 +138,13 @@ func NewState(workspaceOverride string) (*State, error) {
 		Watcher:       watcher,
 		Index:         indexService,
 		RootStatus:    &RootStatus{},
-	}, nil
+	}
+
+	watcher.SetHeartbeat(func() tea.Cmd {
+		return st.IndexHeartbeatCmd()
+	}, indexHeartbeatInterval)
+
+	return st, nil
 }
 
 func GetHomeDir() (string, error) {
