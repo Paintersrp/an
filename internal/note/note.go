@@ -248,14 +248,12 @@ func StaticHandleNoteLaunch(
 	tmpl, content string,
 	metadata map[string]interface{},
 ) {
-	if metadata == nil {
-		var err error
-		metadata, err = CollectTemplateMetadata(t, tmpl, nil)
-		if err != nil {
-			fmt.Printf("error collecting template metadata: %v\n", err)
-			os.Exit(1)
-		}
+	collected, err := CollectTemplateMetadata(t, tmpl, metadata)
+	if err != nil {
+		fmt.Printf("error collecting template metadata: %v\n", err)
+		os.Exit(1)
 	}
+	metadata = collected
 
 	created, err := note.Create(tmpl, t, content, metadata)
 	if err != nil {
@@ -307,17 +305,14 @@ func collectTemplateMetadata(
 		return nil, err
 	}
 	if len(manifest.Fields) == 0 {
-		if len(prefills) == 0 {
-			return map[string]interface{}{}, nil
+		for key := range prefills {
+			return nil, fmt.Errorf("prefill provided for unknown field %q", key)
 		}
-		answers := make(map[string]interface{}, len(prefills))
-		for key, value := range prefills {
-			answers[key] = value
-		}
-		return answers, nil
+		return map[string]interface{}{}, nil
 	}
 
-	answers := make(map[string]interface{})
+	answers := make(map[string]interface{}, len(manifest.Fields))
+	consumedPrefills := make(map[string]struct{}, len(prefills))
 
 	if interactive {
 		fmt.Printf("Template %s requires additional details:\n", manifest.Name)
@@ -329,7 +324,12 @@ func collectTemplateMetadata(
 		}
 
 		if value, ok := prefills[field.Key]; ok {
-			answers[field.Key] = value
+			normalized, err := normalizePrefillValue(field, value)
+			if err != nil {
+				return nil, fmt.Errorf("prefill for field %q: %w", field.Key, err)
+			}
+			answers[field.Key] = normalized
+			consumedPrefills[field.Key] = struct{}{}
 			continue
 		}
 
@@ -420,14 +420,102 @@ func collectTemplateMetadata(
 		answers[field.Key] = value
 	}
 
-	for key, value := range prefills {
-		if _, ok := answers[key]; ok {
+	for key := range prefills {
+		if _, ok := consumedPrefills[key]; ok {
 			continue
 		}
-		answers[key] = value
+		return nil, fmt.Errorf("prefill provided for unknown field %q", key)
 	}
 
 	return answers, nil
+}
+
+func normalizePrefillValue(field templater.TemplateField, value any) (interface{}, error) {
+	if field.Multi || len(field.Defaults) > 0 {
+		entries, err := coerceToStringSlice(value)
+		if err != nil {
+			return nil, err
+		}
+		if field.Required && len(entries) == 0 {
+			return nil, errors.New("value is required")
+		}
+		if len(field.Options) > 0 && len(entries) > 0 {
+			if err := validateOptions(entries, field.Options); err != nil {
+				return nil, err
+			}
+		}
+		return entries, nil
+	}
+
+	str, err := coerceToString(value)
+	if err != nil {
+		return nil, err
+	}
+	if str == "" {
+		if field.Required {
+			return nil, errors.New("value is required")
+		}
+		return str, nil
+	}
+	if len(field.Options) > 0 {
+		if err := validateOption(str, field.Options); err != nil {
+			return nil, err
+		}
+	}
+	return str, nil
+}
+
+func coerceToStringSlice(value any) ([]string, error) {
+	if value == nil {
+		return []string{}, nil
+	}
+
+	switch v := value.(type) {
+	case []string:
+		return normalizeStringEntries(v), nil
+	case []interface{}:
+		entries := make([]string, 0, len(v))
+		for idx, raw := range v {
+			str, ok := raw.(string)
+			if !ok {
+				return nil, fmt.Errorf("expected string value at index %d", idx)
+			}
+			entries = append(entries, str)
+		}
+		return normalizeStringEntries(entries), nil
+	case string:
+		trimmed := strings.TrimSpace(v)
+		if trimmed == "" {
+			return []string{}, nil
+		}
+		return splitListInput(v), nil
+	default:
+		return nil, fmt.Errorf("expected a list of strings, got %T", value)
+	}
+}
+
+func coerceToString(value any) (string, error) {
+	if value == nil {
+		return "", nil
+	}
+
+	str, ok := value.(string)
+	if !ok {
+		return "", fmt.Errorf("expected string value, got %T", value)
+	}
+	return strings.TrimSpace(str), nil
+}
+
+func normalizeStringEntries(entries []string) []string {
+	normalized := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		trimmed := strings.TrimSpace(entry)
+		if trimmed == "" {
+			continue
+		}
+		normalized = append(normalized, trimmed)
+	}
+	return normalized
 }
 
 func fieldPrompt(field templater.TemplateField) string {

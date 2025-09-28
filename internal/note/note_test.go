@@ -110,3 +110,114 @@ func TestEditorLaunchWithCustomTemplate(t *testing.T) {
 		t.Fatalf("expected template wait override to disable waiting")
 	}
 }
+
+func TestCollectTemplateMetadataPrefillSingle(t *testing.T) {
+	templater := newTestTemplater(t)
+
+	metadata, err := CollectTemplateMetadataNonInteractive(templater, "test", map[string]any{
+		"status": "done",
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	status, ok := metadata["status"].(string)
+	if !ok {
+		t.Fatalf("expected status to be a string, got %T", metadata["status"])
+	}
+	if status != "done" {
+		t.Fatalf("expected status to be 'done', got %q", status)
+	}
+}
+
+func TestCollectTemplateMetadataPrefillMulti(t *testing.T) {
+	templater := newTestTemplater(t)
+
+	metadata, err := CollectTemplateMetadataNonInteractive(templater, "test", map[string]any{
+		"status": "todo",
+		"tags":   []interface{}{"one", "two"},
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	tags, ok := metadata["tags"].([]string)
+	if !ok {
+		t.Fatalf("expected tags to be []string, got %T", metadata["tags"])
+	}
+	expected := []string{"one", "two"}
+	if !reflect.DeepEqual(tags, expected) {
+		t.Fatalf("expected tags %v, got %v", expected, tags)
+	}
+}
+
+func TestCollectTemplateMetadataPrefillRequiredEmpty(t *testing.T) {
+	templater := newTestTemplater(t)
+
+	_, err := CollectTemplateMetadataNonInteractive(templater, "test", map[string]any{
+		"status": "",
+	})
+	if err == nil {
+		t.Fatalf("expected error for empty required field")
+	}
+}
+
+func TestCollectTemplateMetadataPrefillUnknownKey(t *testing.T) {
+	templater := newTestTemplater(t)
+
+	_, err := CollectTemplateMetadataNonInteractive(templater, "test", map[string]any{
+		"status":  "todo",
+		"unknown": "value",
+	})
+	if err == nil {
+		t.Fatalf("expected error for unknown prefill key")
+	}
+}
+
+func TestCollectTemplateMetadataPrefillInvalidType(t *testing.T) {
+	templater := newTestTemplater(t)
+
+	_, err := CollectTemplateMetadataNonInteractive(templater, "test", map[string]any{
+		"status": "todo",
+		"tags":   5,
+	})
+	if err == nil {
+		t.Fatalf("expected error for invalid prefill type")
+	}
+}
+
+func newTestTemplater(t *testing.T) *templater.Templater {
+	t.Helper()
+
+	dir := t.TempDir()
+	templatesDir := filepath.Join(dir, ".an", "templates")
+	if err := os.MkdirAll(templatesDir, 0o755); err != nil {
+		t.Fatalf("failed to create templates dir: %v", err)
+	}
+
+	content := `{{/* an:manifest
+name: test
+fields:
+  - key: status
+    prompt: Status
+    required: true
+    options: ["todo", "done"]
+  - key: tags
+    prompt: Tags
+    multi: true
+    options: ["one", "two", "three"]
+*/}}
+Body
+`
+
+	if err := os.WriteFile(filepath.Join(templatesDir, "test.tmpl"), []byte(content), 0o644); err != nil {
+		t.Fatalf("failed to write template: %v", err)
+	}
+
+	templater, err := templater.NewTemplater(&config.Workspace{VaultDir: dir})
+	if err != nil {
+		t.Fatalf("failed to create templater: %v", err)
+	}
+
+	return templater
+}
