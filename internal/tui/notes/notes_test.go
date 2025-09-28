@@ -18,6 +18,7 @@ import (
 
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/internal/handler"
+	"github.com/Paintersrp/an/internal/pathutil"
 	"github.com/Paintersrp/an/internal/search"
 	indexsvc "github.com/Paintersrp/an/internal/services/index"
 	"github.com/Paintersrp/an/internal/state"
@@ -236,6 +237,32 @@ func TestHandlePreviewCachedBackgroundUsesActiveWidth(t *testing.T) {
 
 	if msg.background.width != expectedWidth {
 		t.Fatalf("expected background width %d, got %d", expectedWidth, msg.background.width)
+	}
+}
+
+func TestOpenNoteClearsPreviewCacheEntry(t *testing.T) {
+	model := newEditorTestModel(t, map[string]string{"note.md": "content"})
+
+	selected, ok := model.list.SelectedItem().(ListItem)
+	if !ok {
+		t.Fatalf("expected selected list item")
+	}
+
+	normalized := pathutil.NormalizePath(selected.path)
+	entry := previewCacheEntry{Markdown: "cached", Complete: true}
+	if err := model.cache.Put(normalized, entry); err != nil {
+		t.Fatalf("failed to seed cache: %v", err)
+	}
+
+	cmd := model.openNote(false)
+	if cmd == nil {
+		t.Fatalf("expected openNote to return a command")
+	}
+
+	if _, exists, err := model.cache.Get(normalized); err != nil {
+		t.Fatalf("unexpected cache error: %v", err)
+	} else if exists {
+		t.Fatalf("expected cache entry for %q to be removed", normalized)
 	}
 }
 
