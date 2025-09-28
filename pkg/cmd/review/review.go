@@ -74,8 +74,13 @@ func NewCmdReview(s *state.State) *cobra.Command {
 		minAge    time.Duration
 		showGraph bool
 		tags      []string
+		logPath   string
 		meta      = make(metadataFlag)
 	)
+
+	if s != nil && s.Workspace != nil {
+		logPath = strings.TrimSpace(s.Workspace.NamedPins["review"])
+	}
 
 	cmd := &cobra.Command{
 		Use:   "review",
@@ -174,13 +179,28 @@ Use it to keep daily, weekly, or project retrospectives inside your vault.`,
 				return fmt.Errorf("load %s manifest: %w", templateName, err)
 			}
 
-			_, err = reviewsvc.RunChecklist(
+			responses, err := reviewsvc.RunChecklist(
 				manifest,
 				queue,
 				cmd.InOrStdin(),
 				out,
 			)
-			return err
+			if err != nil {
+				return err
+			}
+
+			logDir, _, err := reviewsvc.EnsureLogDir(s.Vault, strings.TrimSpace(logPath))
+			if err != nil {
+				return fmt.Errorf("prepare review log directory: %w", err)
+			}
+
+			savedPath, err := reviewsvc.WriteMarkdownLog(logDir, manifest, responses, queue, time.Now().UTC(), s.Vault)
+			if err != nil {
+				return fmt.Errorf("save review log: %w", err)
+			}
+
+			fmt.Fprintf(out, "\nReview log saved: %s\n", savedPath)
+			return nil
 		},
 	}
 
@@ -190,6 +210,7 @@ Use it to keep daily, weekly, or project retrospectives inside your vault.`,
 	cmd.Flags().BoolVar(&showGraph, "graph", false, "Render a backlink graph for resurfacing candidates")
 	cmd.Flags().StringArrayVar(&tags, "tag", nil, "Additional tag filters to apply to the resurfacing queue")
 	cmd.Flags().Var(meta, "metadata", "Metadata filter in key=value form (repeatable)")
+	cmd.Flags().StringVar(&logPath, "log-path", logPath, "Directory to store review logs (relative to the vault by default)")
 
 	return cmd
 }
