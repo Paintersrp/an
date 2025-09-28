@@ -183,6 +183,10 @@ func (idx *Index) Canonical(path string) string {
 // note path. The method accepts absolute or relative paths and falls back to
 // alias matching using the index metadata when possible.
 func (idx *Index) Related(path string) RelatedNotes {
+	if idx == nil {
+		return RelatedNotes{}
+	}
+
 	canonical := filepath.Clean(path)
 
 	// Attempt to resolve via alias lookup so relative paths or stem names

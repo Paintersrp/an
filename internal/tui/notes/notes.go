@@ -2132,7 +2132,15 @@ func renderPreviewContent(markdown, summary string) string {
 	content := markdown
 	trimmedContent := strings.TrimSpace(content)
 	if trimmedSummary != "" {
-		renderedSummary := previewSummaryStyle.Render(trimmedSummary)
+		lines := strings.Split(trimmedSummary, "\n")
+		header := strings.TrimSpace(lines[0])
+		renderedSummary := previewSummaryStyle.Render(header)
+
+		rest := strings.Join(lines[1:], "\n")
+		if strings.TrimSpace(rest) != "" {
+			renderedSummary = fmt.Sprintf("%s\n%s", renderedSummary, rest)
+		}
+
 		if trimmedContent != "" {
 			return fmt.Sprintf("%s\n\n%s", renderedSummary, content)
 		}

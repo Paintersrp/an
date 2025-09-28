@@ -45,6 +45,13 @@ var (
 			Border(lipgloss.NormalBorder(), false, false, false, true).
 			BorderForeground(lipgloss.Color("#334455"))
 
+	previewMetadataSectionTitleStyle = lipgloss.NewStyle().
+						Foreground(lipgloss.Color("#89dceb")).
+						Bold(true)
+
+	previewMetadataBulletStyle = lipgloss.NewStyle().
+					Foreground(lipgloss.Color("#bac2de"))
+
 	textPromptStyle = previewStyle.Copy()
 
 	filterPaletteStyle = lipgloss.NewStyle().
