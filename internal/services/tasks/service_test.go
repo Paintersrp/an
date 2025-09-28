@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/Paintersrp/an/internal/handler"
+	taskindex "github.com/Paintersrp/an/internal/services/tasks/index"
 )
 
 func TestServiceListIncludesPathAndStatus(t *testing.T) {
@@ -20,7 +21,7 @@ func TestServiceListIncludesPathAndStatus(t *testing.T) {
 		t.Fatalf("failed to write file: %v", err)
 	}
 
-	svc := NewService(handler.NewFileHandler(dir))
+	svc := NewService(handler.NewFileHandler(dir), taskindex.NewService(dir))
 	tasks, err := svc.List()
 	if err != nil {
 		t.Fatalf("List returned error: %v", err)
@@ -60,7 +61,7 @@ func TestServiceToggleFlipsCompletion(t *testing.T) {
 		t.Fatalf("failed to write file: %v", err)
 	}
 
-	svc := NewService(handler.NewFileHandler(dir))
+	svc := NewService(handler.NewFileHandler(dir), nil)
 	completed, err := svc.Toggle(file, 1)
 	if err != nil {
 		t.Fatalf("Toggle returned error: %v", err)
