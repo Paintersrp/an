@@ -3,6 +3,7 @@ package config_test
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -206,6 +207,160 @@ func TestLoadReviewOverrides(t *testing.T) {
 	}
 	if got := ws.Review.Directory; got != "custom/logs" {
 		t.Fatalf("expected review directory 'custom/logs', got %q", got)
+	}
+}
+
+func TestLoadCaptureRules(t *testing.T) {
+	home := t.TempDir()
+	cfgData := map[string]any{
+		"current_workspace": "main",
+		"workspaces": map[string]any{
+			"main": map[string]any{
+				"vaultdir": filepath.Join(home, "vault"),
+				"fsmode":   "strict",
+				"capture": map[string]any{
+					"rules": []any{
+						map[string]any{
+							"match": map[string]any{
+								"template":        "daily",
+								"upstream_prefix": "obsidian://",
+							},
+							"action": map[string]any{
+								"clipboard":    true,
+								"tags":         []any{"foo", "bar"},
+								"front_matter": map[string]any{"status": "wip", "priority": 2},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	writeConfigFile(t, home, cfgData)
+
+	cfg, err := config.Load(home)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+
+	ws := cfg.MustWorkspace()
+	if got := len(ws.Capture.Rules); got != 1 {
+		t.Fatalf("expected 1 capture rule, got %d", got)
+	}
+
+	rule := ws.Capture.Rules[0]
+	if rule.Match.Template != "daily" {
+		t.Fatalf("expected template 'daily', got %q", rule.Match.Template)
+	}
+	if rule.Match.UpstreamPrefix != "obsidian://" {
+		t.Fatalf("expected upstream prefix 'obsidian://', got %q", rule.Match.UpstreamPrefix)
+	}
+	if !rule.Action.Clipboard {
+		t.Fatalf("expected clipboard action to be true")
+	}
+	if !slices.Equal(rule.Action.Tags, []string{"foo", "bar"}) {
+		t.Fatalf("expected tags [foo bar], got %v", rule.Action.Tags)
+	}
+
+	wantFrontMatter := map[string]any{"status": "wip", "priority": 2}
+	if !reflect.DeepEqual(rule.Action.FrontMatter, wantFrontMatter) {
+		t.Fatalf("expected front matter %#v, got %#v", wantFrontMatter, rule.Action.FrontMatter)
+	}
+}
+
+func TestLoadCaptureDefaults(t *testing.T) {
+	home := t.TempDir()
+	cfgData := map[string]any{
+		"current_workspace": "main",
+		"workspaces": map[string]any{
+			"main": map[string]any{
+				"vaultdir": filepath.Join(home, "vault"),
+				"fsmode":   "strict",
+			},
+		},
+	}
+
+	writeConfigFile(t, home, cfgData)
+
+	cfg, err := config.Load(home)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+
+	ws := cfg.MustWorkspace()
+	if ws.Capture.Rules == nil {
+		t.Fatalf("expected capture rules slice to be initialized")
+	}
+	if len(ws.Capture.Rules) != 0 {
+		t.Fatalf("expected no capture rules by default, got %d", len(ws.Capture.Rules))
+	}
+}
+
+func TestCaptureRulesRoundTrip(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	cfgData := map[string]any{
+		"current_workspace": "main",
+		"workspaces": map[string]any{
+			"main": map[string]any{
+				"vaultdir": filepath.Join(home, "vault"),
+				"fsmode":   "strict",
+				"capture": map[string]any{
+					"rules": []any{
+						map[string]any{
+							"match": map[string]any{
+								"template":        "daily",
+								"upstream_prefix": "obsidian://",
+							},
+							"action": map[string]any{
+								"clipboard":    true,
+								"tags":         []any{"foo", "bar"},
+								"front_matter": map[string]any{"status": "wip", "priority": 2},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	writeConfigFile(t, home, cfgData)
+
+	cfg, err := config.Load(home)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+
+	if err := cfg.Save(); err != nil {
+		t.Fatalf("Save returned error: %v", err)
+	}
+
+	reloaded, err := config.Load(home)
+	if err != nil {
+		t.Fatalf("reload after save failed: %v", err)
+	}
+
+	want := []config.CaptureRule{
+		{
+			Match: config.CaptureMatcher{
+				Template:       "daily",
+				UpstreamPrefix: "obsidian://",
+			},
+			Action: config.CaptureAction{
+				Clipboard: true,
+				Tags:      []string{"foo", "bar"},
+				FrontMatter: map[string]any{
+					"status":   "wip",
+					"priority": 2,
+				},
+			},
+		},
+	}
+
+	if !reflect.DeepEqual(reloaded.MustWorkspace().Capture.Rules, want) {
+		t.Fatalf("capture rules did not round-trip: got %#v, want %#v", reloaded.MustWorkspace().Capture.Rules, want)
 	}
 }
 
