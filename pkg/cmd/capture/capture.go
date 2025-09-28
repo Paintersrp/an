@@ -96,7 +96,12 @@ func runCapture(s *state.State, templateName, title, viewName string, skipPrevie
 		return err
 	}
 
-	metadata, err := note.CollectTemplateMetadata(s.Templater, templateChoice)
+	ruleTags, ruleMetadata, ruleFields, err := resolveCaptureMetadata(s, templateChoice, upstream)
+	if err != nil {
+		return err
+	}
+
+	metadata, err := note.CollectTemplateMetadata(s.Templater, templateChoice, ruleFields)
 	if err != nil {
 		return err
 	}
@@ -105,11 +110,6 @@ func runCapture(s *state.State, templateName, title, viewName string, skipPrevie
 	}
 	if viewSelection != "" {
 		metadata["view"] = viewSelection
-	}
-
-	ruleTags, ruleMetadata, err := resolveCaptureMetadata(s, templateChoice, upstream)
-	if err != nil {
-		return err
 	}
 
 	tags = mergeTagSets(tags, ruleTags)
@@ -136,14 +136,15 @@ func runCapture(s *state.State, templateName, title, viewName string, skipPrevie
 	return nil
 }
 
-func resolveCaptureMetadata(s *state.State, templateName, upstream string) ([]string, map[string]any, error) {
+func resolveCaptureMetadata(s *state.State, templateName, upstream string) ([]string, map[string]any, map[string]any, error) {
 	if s == nil || s.Workspace == nil {
-		return nil, nil, nil
+		return nil, nil, nil, nil
 	}
 
 	var (
 		overlayTags    []string
 		frontMatter    map[string]any
+		fields         map[string]any
 		clipboardValue string
 		clipboardRead  bool
 	)
@@ -159,7 +160,7 @@ func resolveCaptureMetadata(s *state.State, templateName, upstream string) ([]st
 			if !clipboardRead {
 				value, err := readClipboard()
 				if err != nil {
-					return nil, nil, fmt.Errorf("read clipboard: %w", err)
+					return nil, nil, nil, fmt.Errorf("read clipboard: %w", err)
 				}
 				clipboardValue = value
 				clipboardRead = true
@@ -185,6 +186,15 @@ func resolveCaptureMetadata(s *state.State, templateName, upstream string) ([]st
 				frontMatter[key] = value
 			}
 		}
+
+		if len(rule.Action.Fields) > 0 {
+			if fields == nil {
+				fields = make(map[string]any)
+			}
+			for key, value := range rule.Action.Fields {
+				fields[key] = value
+			}
+		}
 	}
 
 	overlayTags = dedupePreserveOrder(overlayTags)
@@ -193,7 +203,11 @@ func resolveCaptureMetadata(s *state.State, templateName, upstream string) ([]st
 		frontMatter = nil
 	}
 
-	return overlayTags, frontMatter, nil
+	if len(fields) == 0 {
+		fields = nil
+	}
+
+	return overlayTags, frontMatter, fields, nil
 }
 
 func matchesTemplate(rule config.CaptureRule, template string) bool {

@@ -250,7 +250,7 @@ func StaticHandleNoteLaunch(
 ) {
 	if metadata == nil {
 		var err error
-		metadata, err = CollectTemplateMetadata(t, tmpl)
+		metadata, err = CollectTemplateMetadata(t, tmpl, nil)
 		if err != nil {
 			fmt.Printf("error collecting template metadata: %v\n", err)
 			os.Exit(1)
@@ -271,7 +271,7 @@ func StaticHandleNoteLaunch(
 	}
 }
 
-func CollectTemplateMetadata(t *templater.Templater, templateName string) (map[string]interface{}, error) {
+func CollectTemplateMetadata(t *templater.Templater, templateName string, prefills map[string]any) (map[string]interface{}, error) {
 	interactive := term.IsTerminal(int(os.Stdin.Fd()))
 	if interactive {
 		execName := filepath.Base(os.Args[0])
@@ -280,7 +280,7 @@ func CollectTemplateMetadata(t *templater.Templater, templateName string) (map[s
 		}
 	}
 
-	return collectTemplateMetadata(t, templateName, interactive, func() *bufio.Reader {
+	return collectTemplateMetadata(t, templateName, prefills, interactive, func() *bufio.Reader {
 		if interactive {
 			return bufio.NewReader(os.Stdin)
 		}
@@ -291,13 +291,14 @@ func CollectTemplateMetadata(t *templater.Templater, templateName string) (map[s
 // CollectTemplateMetadataNonInteractive gathers metadata defaults and validates required
 // fields without prompting the user for input. This is intended for callers that cannot
 // interact with stdin, such as the TUI, but still need manifest processing.
-func CollectTemplateMetadataNonInteractive(t *templater.Templater, templateName string) (map[string]interface{}, error) {
-	return collectTemplateMetadata(t, templateName, false, nil)
+func CollectTemplateMetadataNonInteractive(t *templater.Templater, templateName string, prefills map[string]any) (map[string]interface{}, error) {
+	return collectTemplateMetadata(t, templateName, prefills, false, nil)
 }
 
 func collectTemplateMetadata(
 	t *templater.Templater,
 	templateName string,
+	prefills map[string]any,
 	interactive bool,
 	reader *bufio.Reader,
 ) (map[string]interface{}, error) {
@@ -306,7 +307,14 @@ func collectTemplateMetadata(
 		return nil, err
 	}
 	if len(manifest.Fields) == 0 {
-		return map[string]interface{}{}, nil
+		if len(prefills) == 0 {
+			return map[string]interface{}{}, nil
+		}
+		answers := make(map[string]interface{}, len(prefills))
+		for key, value := range prefills {
+			answers[key] = value
+		}
+		return answers, nil
 	}
 
 	answers := make(map[string]interface{})
@@ -317,6 +325,11 @@ func collectTemplateMetadata(
 
 	for _, field := range manifest.Fields {
 		if field.Key == "" {
+			continue
+		}
+
+		if value, ok := prefills[field.Key]; ok {
+			answers[field.Key] = value
 			continue
 		}
 
@@ -405,6 +418,13 @@ func collectTemplateMetadata(
 		}
 
 		answers[field.Key] = value
+	}
+
+	for key, value := range prefills {
+		if _, ok := answers[key]; ok {
+			continue
+		}
+		answers[key] = value
 	}
 
 	return answers, nil

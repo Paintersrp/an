@@ -301,7 +301,7 @@ func (m FormModel) handleSubmit() FormModel {
 		return m
 	}
 
-	metadata, err := note.CollectTemplateMetadataNonInteractive(m.state.Templater, tmpl)
+	metadata, err := note.CollectTemplateMetadataNonInteractive(m.state.Templater, tmpl, nil)
 	if err != nil {
 		fmt.Printf("error collecting template metadata: %v\n", err)
 		return m

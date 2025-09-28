@@ -10,7 +10,7 @@ import (
 )
 
 func TestResolveCaptureMetadataNilWorkspace(t *testing.T) {
-	tags, metadata, err := resolveCaptureMetadata(nil, "daily", "")
+	tags, metadata, fields, err := resolveCaptureMetadata(nil, "daily", "")
 	if err != nil {
 		t.Fatalf("resolveCaptureMetadata returned error: %v", err)
 	}
@@ -19,6 +19,9 @@ func TestResolveCaptureMetadataNilWorkspace(t *testing.T) {
 	}
 	if metadata != nil {
 		t.Fatalf("expected nil metadata, got %v", metadata)
+	}
+	if fields != nil {
+		t.Fatalf("expected nil fields, got %v", fields)
 	}
 }
 
@@ -32,6 +35,7 @@ func TestResolveCaptureMetadataMergesRules(t *testing.T) {
 						Action: config.CaptureAction{
 							Tags:        []string{"foo"},
 							FrontMatter: map[string]any{"status": "wip"},
+							Fields:      map[string]any{"source": "seed"},
 						},
 					},
 					{
@@ -39,6 +43,7 @@ func TestResolveCaptureMetadataMergesRules(t *testing.T) {
 						Action: config.CaptureAction{
 							Tags:        []string{"foo", "bar"},
 							FrontMatter: map[string]any{"priority": 2},
+							Fields:      map[string]any{"source": "api"},
 						},
 					},
 				},
@@ -46,7 +51,7 @@ func TestResolveCaptureMetadataMergesRules(t *testing.T) {
 		},
 	}
 
-	tags, metadata, err := resolveCaptureMetadata(s, "daily", "obsidian://note")
+	tags, metadata, fields, err := resolveCaptureMetadata(s, "daily", "obsidian://note")
 	if err != nil {
 		t.Fatalf("resolveCaptureMetadata returned error: %v", err)
 	}
@@ -62,6 +67,13 @@ func TestResolveCaptureMetadataMergesRules(t *testing.T) {
 	}
 	if !reflect.DeepEqual(metadata, wantMetadata) {
 		t.Fatalf("expected metadata %#v, got %#v", wantMetadata, metadata)
+	}
+
+	wantFields := map[string]any{
+		"source": "api",
+	}
+	if !reflect.DeepEqual(fields, wantFields) {
+		t.Fatalf("expected fields %#v, got %#v", wantFields, fields)
 	}
 }
 
@@ -90,7 +102,7 @@ func TestResolveCaptureMetadataClipboard(t *testing.T) {
 		return "", nil
 	}
 
-	tags, _, err := resolveCaptureMetadata(s, "", "")
+	tags, _, _, err := resolveCaptureMetadata(s, "", "")
 	if err != nil {
 		t.Fatalf("resolveCaptureMetadata returned error: %v", err)
 	}
@@ -102,7 +114,7 @@ func TestResolveCaptureMetadataClipboard(t *testing.T) {
 		return "hello", nil
 	}
 
-	tags, _, err = resolveCaptureMetadata(s, "", "")
+	tags, _, _, err = resolveCaptureMetadata(s, "", "")
 	if err != nil {
 		t.Fatalf("resolveCaptureMetadata returned error: %v", err)
 	}
@@ -114,7 +126,7 @@ func TestResolveCaptureMetadataClipboard(t *testing.T) {
 		return "", errors.New("boom")
 	}
 
-	if _, _, err := resolveCaptureMetadata(s, "", ""); err == nil {
+	if _, _, _, err := resolveCaptureMetadata(s, "", ""); err == nil {
 		t.Fatalf("expected error when clipboard read fails")
 	}
 }

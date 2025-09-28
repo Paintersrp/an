@@ -229,6 +229,7 @@ func TestLoadCaptureRules(t *testing.T) {
 								"clipboard":    true,
 								"tags":         []any{"foo", "bar"},
 								"front_matter": map[string]any{"status": "wip", "priority": 2},
+								"fields":       map[string]any{"source": "rule"},
 							},
 						},
 					},
@@ -266,6 +267,11 @@ func TestLoadCaptureRules(t *testing.T) {
 	wantFrontMatter := map[string]any{"status": "wip", "priority": 2}
 	if !reflect.DeepEqual(rule.Action.FrontMatter, wantFrontMatter) {
 		t.Fatalf("expected front matter %#v, got %#v", wantFrontMatter, rule.Action.FrontMatter)
+	}
+
+	wantFields := map[string]any{"source": "rule"}
+	if !reflect.DeepEqual(rule.Action.Fields, wantFields) {
+		t.Fatalf("expected fields %#v, got %#v", wantFields, rule.Action.Fields)
 	}
 }
 
@@ -414,6 +420,7 @@ func TestCaptureRulesRoundTrip(t *testing.T) {
 								"clipboard":    true,
 								"tags":         []any{"foo", "bar"},
 								"front_matter": map[string]any{"status": "wip", "priority": 2},
+								"fields":       map[string]any{"source": "rule"},
 							},
 						},
 					},
@@ -450,6 +457,9 @@ func TestCaptureRulesRoundTrip(t *testing.T) {
 				FrontMatter: map[string]any{
 					"status":   "wip",
 					"priority": 2,
+				},
+				Fields: map[string]any{
+					"source": "rule",
 				},
 			},
 		},

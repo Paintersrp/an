@@ -45,6 +45,7 @@ type CaptureAction struct {
 	Clipboard   bool           `yaml:"clipboard"    json:"clipboard"`
 	Tags        []string       `yaml:"tags"         json:"tags"`
 	FrontMatter map[string]any `yaml:"front_matter" json:"front_matter"`
+	Fields      map[string]any `yaml:"fields"       json:"fields"`
 }
 
 type CaptureRule struct {
