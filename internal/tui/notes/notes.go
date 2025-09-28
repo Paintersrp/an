@@ -712,7 +712,7 @@ func (m *NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.searchQuery.Metadata = cloneMetadataMap(msg.Metadata)
 		m.syncFilterPalette()
 		m.updateFilterStatus()
-		return m, m.applyActiveFilters()
+		return m, batchCmds(m.applyActiveFilters(), m.handlePreview(true))
 
 	case submodels.FilterClosedMsg:
 		m.filtering = false
