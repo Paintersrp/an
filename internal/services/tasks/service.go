@@ -31,6 +31,7 @@ type Item struct {
 
 type Index interface {
 	AcquireSnapshot() (*taskindex.Snapshot, error)
+	QueueUpdate(string)
 }
 
 type Service struct {
@@ -106,20 +107,43 @@ func (s *Service) Toggle(path string, line int) (bool, error) {
 	case strings.Contains(target, "[ ]"):
 		idx := strings.Index(target, "[ ]")
 		lines[line-1] = target[:idx] + strings.Replace(target[idx:], "[ ]", "[x]", 1)
-		if err := s.handler.WriteFile(path, []byte(strings.Join(lines, "\n"))); err != nil {
+		if err := s.writeTaskFile(path, lines); err != nil {
 			return false, err
 		}
 		return true, nil
 	case strings.Contains(target, "[x]"):
 		idx := strings.Index(target, "[x]")
 		lines[line-1] = target[:idx] + strings.Replace(target[idx:], "[x]", "[ ]", 1)
-		if err := s.handler.WriteFile(path, []byte(strings.Join(lines, "\n"))); err != nil {
+		if err := s.writeTaskFile(path, lines); err != nil {
 			return false, err
 		}
 		return false, nil
 	default:
 		return false, fmt.Errorf("no markdown task found on line %d", line)
 	}
+}
+
+func (s *Service) writeTaskFile(path string, lines []string) error {
+	if err := s.handler.WriteFile(path, []byte(strings.Join(lines, "\n"))); err != nil {
+		return err
+	}
+	s.queueIndexUpdate(path)
+	return nil
+}
+
+func (s *Service) queueIndexUpdate(path string) {
+	if s == nil || s.index == nil || s.handler == nil {
+		return
+	}
+
+	rel := filepath.ToSlash(path)
+	if vault := s.handler.VaultDir(); vault != "" {
+		if relPath, err := filepath.Rel(vault, path); err == nil {
+			rel = filepath.ToSlash(relPath)
+		}
+	}
+
+	s.index.QueueUpdate(rel)
 }
 
 func (s *Service) Open(path string) error {
