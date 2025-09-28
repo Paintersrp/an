@@ -1955,6 +1955,10 @@ func (m *NoteListModel) openNote(obsidian bool) tea.Cmd {
 		return nil
 	}
 
+	if m.cache != nil {
+		m.cache.Delete(pathutil.NormalizePath(item.path))
+	}
+
 	launch, err := note.EditorLaunchForPath(item.path, obsidian)
 	if err != nil {
 		m.list.NewStatusMessage(statusStyle(fmt.Sprintf("Open Error: %v", err)))
