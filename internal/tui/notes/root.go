@@ -131,35 +131,54 @@ func (m *RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	var activeCmd tea.Cmd
+
 	switch m.active {
 	case viewNotes:
 		if m.notes == nil {
-			return m, nil
+			break
 		}
 		model, cmd := m.notes.Update(msg)
 		m.notes = adoptNoteModel(model, m.notes)
-		return m, cmd
+		activeCmd = cmd
 	case viewTasks:
 		if m.tasks == nil {
-			return m, nil
+			break
 		}
 		model, cmd := m.tasks.Update(msg)
 		m.tasks = adoptTasksModel(model, m.tasks)
-		return m, cmd
+		activeCmd = cmd
 	case viewJournal:
 		if m.journal == nil {
-			return m, nil
+			break
 		}
 		model, cmd := m.journal.Update(msg)
 		m.journal = adoptJournalModel(model, m.journal)
-		return m, cmd
+		activeCmd = cmd
 	case viewReview:
 		if m.review == nil {
-			return m, nil
+			break
 		}
 		model, cmd := m.review.Update(msg)
 		m.review = adoptReviewModel(model, m.review)
-		return m, cmd
+		activeCmd = cmd
+	}
+
+	cmds := []tea.Cmd{}
+	if activeCmd != nil {
+		cmds = append(cmds, activeCmd)
+	}
+
+	if _, isKey := msg.(tea.KeyMsg); !isKey && m.review != nil && m.active != viewReview {
+		model, cmd := m.review.Update(msg)
+		m.review = adoptReviewModel(model, m.review)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	}
+
+	if len(cmds) > 0 {
+		return m, tea.Batch(cmds...)
 	}
 
 	return m, nil

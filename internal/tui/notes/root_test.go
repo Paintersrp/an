@@ -283,3 +283,110 @@ func TestPadFrame(t *testing.T) {
 		})
 	}
 }
+
+func TestRootModelProcessesReviewRefreshWhileInactive(t *testing.T) {
+	dir := t.TempDir()
+	atoms := filepath.Join(dir, "atoms")
+	if err := os.MkdirAll(atoms, 0o755); err != nil {
+		t.Fatalf("failed to create atoms directory: %v", err)
+	}
+
+	notePath := filepath.Join(atoms, "note.md")
+	if err := os.WriteFile(notePath, []byte("---\ntitle: test\n---\nbody"), 0o644); err != nil {
+		t.Fatalf("failed to write note: %v", err)
+	}
+
+	tasksPath := filepath.Join(atoms, "tasks.md")
+	if err := os.WriteFile(tasksPath, []byte("- [ ] task"), 0o644); err != nil {
+		t.Fatalf("failed to write tasks file: %v", err)
+	}
+
+	ws := &config.Workspace{
+		VaultDir:       dir,
+		PinnedTaskFile: tasksPath,
+		NamedTaskPins:  config.PinMap{},
+	}
+	cfg := &config.Config{
+		Workspaces:       map[string]*config.Workspace{"default": ws},
+		CurrentWorkspace: "default",
+	}
+	if err := cfg.ActivateWorkspace("default"); err != nil {
+		t.Fatalf("failed to activate workspace: %v", err)
+	}
+
+	handler := handler.NewFileHandler(dir)
+	templ, err := templater.NewTemplater(ws)
+	if err != nil {
+		t.Fatalf("failed to create templater: %v", err)
+	}
+	viewManager, err := views.NewViewManager(handler, cfg)
+	if err != nil {
+		t.Fatalf("failed to create view manager: %v", err)
+	}
+
+	st := &state.State{
+		Config:        cfg,
+		Workspace:     ws,
+		WorkspaceName: "default",
+		Templater:     templ,
+		Handler:       handler,
+		ViewManager:   viewManager,
+		Views:         viewManager.Views,
+		Vault:         dir,
+	}
+
+	noteModel, err := NewNoteListModel(st, "default")
+	if err != nil {
+		t.Fatalf("failed to create note model: %v", err)
+	}
+
+	reviewModel, err := reviewtui.NewModel(st)
+	if err != nil {
+		t.Fatalf("failed to create review model: %v", err)
+	}
+
+	root := NewRootModel(noteModel, nil, nil, reviewModel)
+
+	if cmd := root.review.Init(); cmd != nil {
+		for _, msg := range runCmds(cmd) {
+			root.Update(msg)
+		}
+	}
+
+	if root.active != viewNotes {
+		t.Fatalf("expected to remain on notes view after init, got %v", root.active)
+	}
+
+	root.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
+	if root.active != viewReview {
+		t.Fatalf("expected to switch to review view, got %v", root.active)
+	}
+
+	view := root.View()
+	if strings.Contains(view, "Loading review data...") {
+		t.Fatalf("expected review view to render loaded data, got %q", view)
+	}
+	if !strings.Contains(view, "Resurfacing queue") {
+		t.Fatalf("expected review view to render resurfacing queue, got %q", view)
+	}
+}
+
+func runCmds(cmd tea.Cmd) []tea.Msg {
+	if cmd == nil {
+		return nil
+	}
+	msg := cmd()
+	switch msg := msg.(type) {
+	case tea.BatchMsg:
+		var msgs []tea.Msg
+		for _, c := range msg {
+			msgs = append(msgs, runCmds(c)...)
+		}
+		return msgs
+	default:
+		if msg == nil {
+			return nil
+		}
+		return []tea.Msg{msg}
+	}
+}
