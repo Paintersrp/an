@@ -23,10 +23,12 @@ type VaultWatcherErrMsg struct {
 }
 
 type VaultWatcher struct {
-	watcher *fsnotify.Watcher
-	vault   string
-	done    chan struct{}
-	once    sync.Once
+	watcher  *fsnotify.Watcher
+	vault    string
+	done     chan struct{}
+	once     sync.Once
+	onChange func(string)
+	onClose  func()
 }
 
 func NewVaultWatcher(vault string) (*VaultWatcher, error) {
@@ -85,6 +87,10 @@ func (w *VaultWatcher) Start() tea.Cmd {
 					continue
 				}
 
+				if w.onChange != nil {
+					w.onChange(rel)
+				}
+
 				return VaultNoteChangedMsg{Path: rel}
 			case err, ok := <-w.watcher.Errors:
 				if !ok {
@@ -107,9 +113,30 @@ func (w *VaultWatcher) Close() error {
 	w.once.Do(func() {
 		close(w.done)
 		closeErr = w.watcher.Close()
+		if w.onClose != nil {
+			w.onClose()
+		}
 	})
 
 	return closeErr
+}
+
+// OnChange registers a callback that receives relative note paths whenever the
+// watcher detects a relevant change.
+func (w *VaultWatcher) OnChange(fn func(string)) {
+	if w == nil {
+		return
+	}
+	w.onChange = fn
+}
+
+// OnClose registers a callback that is invoked exactly once when the watcher
+// shuts down.
+func (w *VaultWatcher) OnClose(fn func()) {
+	if w == nil {
+		return
+	}
+	w.onClose = fn
 }
 
 func (w *VaultWatcher) addRecursive(root string) error {

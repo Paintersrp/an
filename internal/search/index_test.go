@@ -69,6 +69,51 @@ func TestIndexUpdateHandlesChangesAndRemovals(t *testing.T) {
 	}
 }
 
+func TestIndexCloneProducesIndependentCopy(t *testing.T) {
+	dir := t.TempDir()
+	path := writeNote(t, dir, "note.md", "---\ntitle: First\n---\noriginal content")
+
+	idx := NewIndex(dir, Config{EnableBody: true})
+	if err := idx.Build([]string{path}); err != nil {
+		t.Fatalf("Build returned error: %v", err)
+	}
+
+	clone := idx.Clone()
+	if clone == nil {
+		t.Fatalf("Clone returned nil")
+	}
+
+	if got, want := len(clone.Documents()), len(idx.Documents()); got != want {
+		t.Fatalf("expected clone to copy documents, got %d want %d", got, want)
+	}
+
+	// Mutate the original index and ensure the clone is unaffected.
+	if err := idx.Remove(path); err != nil {
+		t.Fatalf("Remove returned error: %v", err)
+	}
+
+	if got := len(idx.Documents()); got != 0 {
+		t.Fatalf("expected original index to drop document, got %d", got)
+	}
+
+	if got := len(clone.Documents()); got != 1 {
+		t.Fatalf("expected clone to preserve document, got %d", got)
+	}
+
+	// Mutate the clone and ensure the original remains unchanged.
+	if err := clone.Remove(path); err != nil {
+		t.Fatalf("Remove on clone returned error: %v", err)
+	}
+
+	if got := len(clone.Documents()); got != 0 {
+		t.Fatalf("expected clone removal to drop document, got %d", got)
+	}
+
+	if got := len(idx.Documents()); got != 0 {
+		t.Fatalf("expected original index to remain empty, got %d", got)
+	}
+}
+
 func TestIndexSearchBodyRespectsToggle(t *testing.T) {
 	t.Parallel()
 

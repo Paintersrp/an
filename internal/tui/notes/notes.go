@@ -37,44 +37,41 @@ import (
 
 var maxCacheSizeMB int64 = 50
 
-const searchCompactionInterval = time.Hour
-
 type NoteListModel struct {
-	list                list.Model
-	cache               *cache.Cache
-	keys                *listKeyMap
-	delegateKeys        *delegateKeyMap
-	state               *state.State
-	preview             string
-	previewSummary      string
-	previewViewport     viewport.Model
-	viewName            string
-	formModel           submodels.FormModel
-	filterModel         *submodels.FilterModel
-	inputModel          submodels.InputModel
-	width               int
-	height              int
-	previewWidth        int
-	renaming            bool
-	showDetails         bool
-	creating            bool
-	copying             bool
-	filtering           bool
-	editor              *editorSession
-	sortField           sortField
-	sortOrder           sortOrder
-	searchIndex         *search.Index
-	searchQuery         search.Query
-	searchConfig        search.Config
-	lastSearchRebuild   time.Time
-	highlights          *highlightStore
-	pendingIndexUpdates map[string]struct{}
-	reviewQueue         []review.ResurfaceItem
-	availableTags       []string
-	availableMetadata   map[string][]string
-	allItems            []list.Item
-	searchInitialized   bool
-	previewFocused      bool
+	list              list.Model
+	cache             *cache.Cache
+	keys              *listKeyMap
+	delegateKeys      *delegateKeyMap
+	state             *state.State
+	preview           string
+	previewSummary    string
+	previewViewport   viewport.Model
+	viewName          string
+	formModel         submodels.FormModel
+	filterModel       *submodels.FilterModel
+	inputModel        submodels.InputModel
+	width             int
+	height            int
+	previewWidth      int
+	renaming          bool
+	showDetails       bool
+	creating          bool
+	copying           bool
+	filtering         bool
+	editor            *editorSession
+	sortField         sortField
+	sortOrder         sortOrder
+	searchIndex       *search.Index
+	searchQuery       search.Query
+	searchConfig      search.Config
+	highlights        *highlightStore
+	indexedPaths      map[string]struct{}
+	reviewQueue       []review.ResurfaceItem
+	availableTags     []string
+	availableMetadata map[string][]string
+	allItems          []list.Item
+	searchInitialized bool
+	previewFocused    bool
 }
 
 type previewLoadedMsg struct {
@@ -148,25 +145,25 @@ func NewNoteListModel(
 	filterModel := submodels.NewFilterModel()
 
 	m := &NoteListModel{
-		state:               s,
-		cache:               c,
-		list:                l,
-		viewName:            viewName,
-		keys:                lkeys,
-		delegateKeys:        dkeys,
-		inputModel:          i,
-		formModel:           f,
-		filterModel:         filterModel,
-		renaming:            false,
-		creating:            false,
-		copying:             false,
-		filtering:           false,
-		sortField:           sortField,
-		sortOrder:           sortOrder,
-		highlights:          highlightMatches,
-		pendingIndexUpdates: make(map[string]struct{}),
-		availableMetadata:   make(map[string][]string),
-		previewViewport:     viewport.New(0, 0),
+		state:             s,
+		cache:             c,
+		list:              l,
+		viewName:          viewName,
+		keys:              lkeys,
+		delegateKeys:      dkeys,
+		inputModel:        i,
+		formModel:         f,
+		filterModel:       filterModel,
+		renaming:          false,
+		creating:          false,
+		copying:           false,
+		filtering:         false,
+		sortField:         sortField,
+		sortOrder:         sortOrder,
+		highlights:        highlightMatches,
+		indexedPaths:      make(map[string]struct{}),
+		availableMetadata: make(map[string][]string),
+		previewViewport:   viewport.New(0, 0),
 	}
 
 	m.allItems = append([]list.Item(nil), sortedItems...)
@@ -187,16 +184,11 @@ func (m *NoteListModel) rebuildSearch(paths []string) {
 		m.highlights.clear()
 	}
 
-	if m.pendingIndexUpdates == nil {
-		m.pendingIndexUpdates = make(map[string]struct{})
-	}
-
 	if m.state == nil || m.state.Config == nil {
 		m.searchIndex = nil
 		m.searchQuery = search.Query{}
 		m.searchConfig = search.Config{}
-		m.lastSearchRebuild = time.Time{}
-		m.pendingIndexUpdates = make(map[string]struct{})
+		m.indexedPaths = make(map[string]struct{})
 		return
 	}
 
@@ -209,7 +201,8 @@ func (m *NoteListModel) rebuildSearch(paths []string) {
 
 	metadata := cloneMetadataMap(cfg.DefaultMetadataFilters)
 
-	if !m.searchInitialized {
+	configChanged := !configsEqual(m.searchConfig, searchCfg)
+	if !m.searchInitialized || configChanged {
 		m.searchQuery = search.Query{
 			Tags:     cloneStringSlice(cfg.DefaultTagFilters),
 			Metadata: metadata,
@@ -224,120 +217,31 @@ func (m *NoteListModel) rebuildSearch(paths []string) {
 		}
 	}
 
-	forceRebuild := m.searchIndex == nil ||
-		!configsEqual(m.searchConfig, searchCfg) ||
-		time.Since(m.lastSearchRebuild) > searchCompactionInterval
-
-	if forceRebuild {
-		index := search.NewIndex(m.state.Vault, searchCfg)
-		if err := index.Build(paths); err != nil {
-			log.Printf("failed to rebuild search index: %v", err)
-			m.list.NewStatusMessage(
-				statusStyle(fmt.Sprintf("Search index error: %v", err)),
-			)
-			m.searchIndex = nil
-			return
-		}
-
-		m.searchIndex = index
-		m.searchConfig = searchCfg
-		m.lastSearchRebuild = time.Now()
-		m.pendingIndexUpdates = make(map[string]struct{})
-		return
-	}
-
 	m.searchConfig = searchCfg
-	m.applyPendingIndexUpdates()
-	m.pruneIndex(paths)
-}
-
-func (m *NoteListModel) queueIndexUpdate(rel string) {
-	cleaned := strings.TrimSpace(rel)
-	if cleaned == "" {
-		return
-	}
-	if m.pendingIndexUpdates == nil {
-		m.pendingIndexUpdates = make(map[string]struct{})
-	}
-	m.pendingIndexUpdates[filepath.ToSlash(cleaned)] = struct{}{}
-}
-
-func (m *NoteListModel) applyPendingIndexUpdates() {
-	if len(m.pendingIndexUpdates) == 0 || m.searchIndex == nil || m.state == nil {
-		return
-	}
-
-	for rel := range m.pendingIndexUpdates {
-		abs := filepath.Join(m.state.Vault, filepath.FromSlash(rel))
-		normalized := pathutil.NormalizePath(abs)
-		if normalized == "" {
-			continue
-		}
-
-		info, err := os.Stat(normalized)
-		if err != nil {
-			if errors.Is(err, os.ErrNotExist) {
-				if removeErr := m.searchIndex.Remove(normalized); removeErr != nil {
-					log.Printf("failed to remove %s from search index: %v", normalized, removeErr)
-				}
-				continue
-			}
-			log.Printf("stat for %s failed: %v", normalized, err)
-			continue
-		}
-
-		if info.IsDir() {
-			if removeErr := m.searchIndex.Remove(normalized); removeErr != nil {
-				log.Printf("failed to remove directory %s from search index: %v", normalized, removeErr)
-			}
-			continue
-		}
-
-		if err := m.searchIndex.Update(normalized); err != nil {
-			log.Printf("failed to update search index for %s: %v", normalized, err)
-		}
-	}
-
-	m.pendingIndexUpdates = make(map[string]struct{})
-}
-
-func (m *NoteListModel) pruneIndex(paths []string) {
-	if m.searchIndex == nil {
-		return
-	}
-
-	desired := make(map[string]struct{}, len(paths))
+	m.indexedPaths = make(map[string]struct{}, len(paths))
 	for _, p := range paths {
 		normalized := pathutil.NormalizePath(p)
 		if normalized != "" {
-			desired[normalized] = struct{}{}
+			m.indexedPaths[normalized] = struct{}{}
 		}
 	}
 
-	existingMeta := m.searchIndex.Documents()
-	existing := make(map[string]struct{}, len(existingMeta))
-	for _, meta := range existingMeta {
-		normalized := pathutil.NormalizePath(meta.Path)
-		if normalized == "" {
-			continue
-		}
-		existing[normalized] = struct{}{}
-		if _, ok := desired[normalized]; ok {
-			continue
-		}
-		if err := m.searchIndex.Remove(meta.Path); err != nil {
-			log.Printf("failed to remove stale search document %s: %v", meta.Path, err)
-		}
+	if m.state.Index == nil {
+		m.searchIndex = nil
+		return
 	}
 
-	for normalized := range desired {
-		if _, ok := existing[normalized]; ok {
-			continue
-		}
-		if err := m.searchIndex.Update(normalized); err != nil {
-			log.Printf("failed to index new note %s: %v", normalized, err)
-		}
+	index, err := m.state.Index.AcquireSnapshot()
+	if err != nil {
+		log.Printf("failed to load search index: %v", err)
+		m.list.NewStatusMessage(
+			statusStyle(fmt.Sprintf("Search index error: %v", err)),
+		)
+		m.searchIndex = nil
+		return
 	}
+
+	m.searchIndex = index
 }
 
 func configsEqual(a, b search.Config) bool {
@@ -506,6 +410,15 @@ func (m *NoteListModel) updateFilterInventory() {
 
 	if m.searchIndex != nil {
 		for _, doc := range m.searchIndex.Documents() {
+			normalized := pathutil.NormalizePath(doc.Path)
+			if normalized == "" {
+				continue
+			}
+			if len(m.indexedPaths) > 0 {
+				if _, ok := m.indexedPaths[normalized]; !ok {
+					continue
+				}
+			}
 			for _, tag := range doc.Tags {
 				trimmed := strings.TrimSpace(tag)
 				if trimmed == "" {
@@ -755,7 +668,6 @@ func (m *NoteListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case state.VaultNoteChangedMsg:
-		m.queueIndexUpdate(msg.Path)
 		var force bool
 		if m.cache != nil && m.state != nil {
 			abs := filepath.Join(m.state.Vault, filepath.FromSlash(msg.Path))
@@ -1759,14 +1671,11 @@ func Run(s *state.State, views map[string]v.View, viewFlag string) error {
 }
 
 func (m *NoteListModel) closeWatcher() error {
-	if m.state == nil || m.state.Watcher == nil {
+	if m.state == nil {
 		return nil
 	}
 
-	err := m.state.Watcher.Close()
-	m.state.Watcher = nil
-
-	return err
+	return m.state.Close()
 }
 
 func (m *NoteListModel) handlePreview(force bool) tea.Cmd {

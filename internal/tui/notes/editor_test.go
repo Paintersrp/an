@@ -11,6 +11,7 @@ import (
 
 	"github.com/Paintersrp/an/internal/config"
 	"github.com/Paintersrp/an/internal/handler"
+	"github.com/Paintersrp/an/internal/search"
 	"github.com/Paintersrp/an/internal/state"
 	"github.com/Paintersrp/an/internal/views"
 )
@@ -45,9 +46,7 @@ func newEditorTestModel(t *testing.T, files map[string]string) *NoteListModel {
 		CurrentWorkspace: "default",
 	}
 
-	if err := cfg.ActivateWorkspace("default"); err != nil {
-		t.Fatalf("failed to activate workspace: %v", err)
-	}
+	activateWorkspace(t, cfg, "default")
 
 	fileHandler := handler.NewFileHandler(vault)
 	viewManager, err := views.NewViewManager(fileHandler, cfg)
@@ -63,6 +62,21 @@ func newEditorTestModel(t *testing.T, files map[string]string) *NoteListModel {
 		ViewManager:   viewManager,
 		Vault:         vault,
 	}
+
+	paths := make([]string, 0, len(files))
+	for name := range files {
+		paths = append(paths, filepath.Join(vault, name))
+	}
+	searchCfg := search.Config{}
+	if ws := cfg.MustWorkspace(); ws != nil {
+		searchCfg.EnableBody = ws.Search.EnableBody
+		searchCfg.IgnoredFolders = append([]string(nil), ws.Search.IgnoredFolders...)
+	}
+	idx := search.NewIndex(vault, searchCfg)
+	if err := idx.Build(paths); err != nil {
+		t.Fatalf("failed to build search index: %v", err)
+	}
+	st.Index = &stubIndexService{idx: idx}
 
 	model, err := NewNoteListModel(st, "default")
 	if err != nil {
