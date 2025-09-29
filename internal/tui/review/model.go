@@ -22,33 +22,42 @@ import (
 )
 
 type Model struct {
-	state          *state.State
-	queue          []reviewsvc.ResurfaceItem
-	graph          reviewsvc.Graph
-	manifest       templater.TemplateManifest
-	responses      map[string]string
-	editor         *textarea.Model
-	keys           keyMap
-	width          int
-	height         int
-	step           int
-	mode           reviewMode
-	showGraph      bool
-	status         string
-	loading        bool
-	ready          bool
-	confirmingSave bool
+	state           *state.State
+	queue           []reviewsvc.ResurfaceItem
+	graph           reviewsvc.Graph
+	manifest        templater.TemplateManifest
+	responses       map[string]string
+	editor          *textarea.Model
+	keys            keyMap
+	width           int
+	height          int
+	step            int
+	mode            reviewMode
+	showGraph       bool
+	status          string
+	loading         bool
+	ready           bool
+	confirmingSave  bool
+	activeTab       reviewTab
+	history         []reviewsvc.LogMetadata
+	historyPreview  map[string][]string
+	historySelected int
+	historyLoading  bool
 }
 
 type keyMap struct {
 	refresh     key.Binding
 	toggleGraph key.Binding
+	toggleTab   key.Binding
 	nextStep    key.Binding
 	prevStep    key.Binding
 	complete    key.Binding
 	daily       key.Binding
 	weekly      key.Binding
 	retro       key.Binding
+	historyNext key.Binding
+	historyPrev key.Binding
+	historyOpen key.Binding
 	exit        key.Binding
 }
 
@@ -58,6 +67,13 @@ type reviewMode struct {
 	Key      string
 }
 
+type reviewTab int
+
+const (
+	tabChecklist reviewTab = iota
+	tabHistory
+)
+
 type queueLoadedMsg struct {
 	queue []reviewsvc.ResurfaceItem
 	graph reviewsvc.Graph
@@ -65,6 +81,16 @@ type queueLoadedMsg struct {
 }
 
 type reviewSavedMsg struct {
+	path string
+	err  error
+}
+
+type historyLoadedMsg struct {
+	logs []reviewsvc.LogMetadata
+	err  error
+}
+
+type historySelectedMsg struct {
 	path string
 	err  error
 }
@@ -96,13 +122,15 @@ func NewModel(st *state.State) (*Model, error) {
 	}
 
 	model := &Model{
-		state:     st,
-		manifest:  manifest,
-		responses: make(map[string]string),
-		editor:    editor,
-		keys:      newKeyMap(),
-		mode:      mode,
-		showGraph: true,
+		state:          st,
+		manifest:       manifest,
+		responses:      make(map[string]string),
+		editor:         editor,
+		keys:           newKeyMap(),
+		mode:           mode,
+		showGraph:      true,
+		activeTab:      tabChecklist,
+		historyPreview: make(map[string][]string),
 	}
 	model.applyCurrentFieldDefaults()
 	return model, nil
@@ -117,6 +145,10 @@ func newKeyMap() keyMap {
 		toggleGraph: key.NewBinding(
 			key.WithKeys("g"),
 			key.WithHelp("g", "toggle graph"),
+		),
+		toggleTab: key.NewBinding(
+			key.WithKeys("tab"),
+			key.WithHelp("tab", "switch checklist/history"),
 		),
 		nextStep: key.NewBinding(
 			key.WithKeys("ctrl+n"),
@@ -142,6 +174,18 @@ func newKeyMap() keyMap {
 			key.WithKeys("3"),
 			key.WithHelp("3", "retro mode"),
 		),
+		historyNext: key.NewBinding(
+			key.WithKeys("down", "ctrl+n"),
+			key.WithHelp("↓/ctrl+n", "next log"),
+		),
+		historyPrev: key.NewBinding(
+			key.WithKeys("up", "ctrl+p"),
+			key.WithHelp("↑/ctrl+p", "previous log"),
+		),
+		historyOpen: key.NewBinding(
+			key.WithKeys("enter", "ctrl+enter"),
+			key.WithHelp("enter", "open log"),
+		),
 		exit: key.NewBinding(
 			key.WithKeys("esc"),
 			key.WithHelp("esc", "exit review"),
@@ -155,6 +199,7 @@ func (m *Model) Init() tea.Cmd {
 		cmds = append(cmds, m.editor.Init())
 	}
 	cmds = append(cmds, m.refreshQueue())
+	cmds = append(cmds, m.loadHistory())
 	return tea.Batch(cmds...)
 }
 
@@ -187,6 +232,52 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = fmt.Sprintf("Review log saved: %s", m.relativePath(msg.path))
 		}
 		m.confirmingSave = false
+		return m, m.loadHistory()
+	case historyLoadedMsg:
+		m.historyLoading = false
+		if msg.err != nil {
+			m.status = fmt.Sprintf("Failed to load review history: %v", msg.err)
+			m.history = nil
+			return m, nil
+		}
+		m.history = msg.logs
+		if m.historyPreview == nil {
+			m.historyPreview = make(map[string][]string, len(msg.logs))
+		} else {
+			for key := range m.historyPreview {
+				delete(m.historyPreview, key)
+			}
+		}
+		for _, entry := range msg.logs {
+			if len(entry.Preview) > 0 {
+				m.historyPreview[entry.Path] = append([]string(nil), entry.Preview...)
+			} else {
+				m.historyPreview[entry.Path] = nil
+			}
+		}
+		if len(m.history) == 0 {
+			m.historySelected = 0
+			if m.activeTab == tabHistory {
+				m.status = "No review history available yet."
+			}
+			return m, nil
+		}
+		if m.historySelected < 0 {
+			m.historySelected = 0
+		}
+		if m.historySelected >= len(m.history) {
+			m.historySelected = len(m.history) - 1
+		}
+		if m.activeTab == tabHistory {
+			m.status = fmt.Sprintf("Loaded %d review logs", len(m.history))
+		}
+		return m, nil
+	case historySelectedMsg:
+		if msg.err != nil {
+			m.status = fmt.Sprintf("Failed to open review log: %v", msg.err)
+		} else {
+			m.status = fmt.Sprintf("Opened review log: %s", m.relativePath(msg.path))
+		}
 		return m, nil
 	case tea.KeyMsg:
 		if m.confirmingSave && msg.Type == tea.KeyEsc {
@@ -208,20 +299,29 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) View() string {
-	if !m.ready && m.loading {
+	if m.activeTab == tabChecklist && !m.ready && m.loading {
 		return appStyle.Render("Loading review data...")
+	}
+	if m.activeTab == tabHistory && m.historyLoading && len(m.history) == 0 {
+		return appStyle.Render("Loading review history...")
 	}
 
 	sections := []string{
 		m.renderHeader(),
-		m.renderQueue(),
+		m.renderTabs(),
 	}
-	if m.showGraph {
-		if graph := m.renderGraph(); graph != "" {
-			sections = append(sections, graph)
+
+	if m.activeTab == tabHistory {
+		sections = append(sections, m.renderHistory())
+	} else {
+		sections = append(sections, m.renderQueue())
+		if m.showGraph {
+			if graph := m.renderGraph(); graph != "" {
+				sections = append(sections, graph)
+			}
 		}
+		sections = append(sections, m.renderChecklist())
 	}
-	sections = append(sections, m.renderChecklist())
 	if m.status != "" {
 		sections = append(sections, statusStyle.Render(m.status))
 	}
@@ -234,15 +334,50 @@ func (m *Model) View() string {
 
 func (m *Model) handleKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 	switch {
+	case key.Matches(msg, m.keys.toggleTab):
+		return true, m.switchTab()
 	case key.Matches(msg, m.keys.refresh):
+		if m.activeTab == tabHistory {
+			return true, m.loadHistory()
+		}
 		return true, m.refreshQueue()
 	case key.Matches(msg, m.keys.toggleGraph):
+		if m.activeTab == tabHistory {
+			return false, nil
+		}
 		m.showGraph = !m.showGraph
 		if m.showGraph && len(m.graph.Nodes) == 0 && len(m.queue) > 0 {
 			// Recompute graph lazily when toggled on.
 			return true, m.computeGraph()
 		}
 		return true, nil
+	case key.Matches(msg, m.keys.daily):
+		return true, m.switchMode(modes[0])
+	case key.Matches(msg, m.keys.weekly):
+		return true, m.switchMode(modes[1])
+	case key.Matches(msg, m.keys.retro):
+		return true, m.switchMode(modes[2])
+	case key.Matches(msg, m.keys.exit):
+		return true, exitRequestedCmd
+	}
+
+	if m.activeTab == tabHistory {
+		switch {
+		case key.Matches(msg, m.keys.historyNext):
+			m.moveHistorySelection(1)
+			return true, nil
+		case key.Matches(msg, m.keys.historyPrev):
+			m.moveHistorySelection(-1)
+			return true, nil
+		case key.Matches(msg, m.keys.historyOpen):
+			return true, m.openSelectedHistory()
+		case key.Matches(msg, m.keys.nextStep), key.Matches(msg, m.keys.prevStep), key.Matches(msg, m.keys.complete):
+			return true, nil
+		}
+		return false, nil
+	}
+
+	switch {
 	case key.Matches(msg, m.keys.nextStep):
 		m.advanceStep(1)
 		return true, nil
@@ -261,14 +396,6 @@ func (m *Model) handleKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 		responses := cloneStringMap(m.responses)
 		queue := append([]reviewsvc.ResurfaceItem(nil), m.queue...)
 		return true, m.saveReviewLog(responses, m.manifest, queue, time.Now().UTC())
-	case key.Matches(msg, m.keys.daily):
-		return true, m.switchMode(modes[0])
-	case key.Matches(msg, m.keys.weekly):
-		return true, m.switchMode(modes[1])
-	case key.Matches(msg, m.keys.retro):
-		return true, m.switchMode(modes[2])
-	case key.Matches(msg, m.keys.exit):
-		return true, exitRequestedCmd
 	}
 	return false, nil
 }
@@ -288,16 +415,119 @@ func (m *Model) switchMode(mode reviewMode) tea.Cmd {
 	m.step = 0
 	m.applyCurrentFieldDefaults()
 	m.status = fmt.Sprintf("Switched to %s review", mode.Name)
+	m.history = nil
+	m.historySelected = 0
+	if m.historyPreview != nil {
+		for key := range m.historyPreview {
+			delete(m.historyPreview, key)
+		}
+	}
+	return m.loadHistory()
+}
+
+func (m *Model) switchTab() tea.Cmd {
+	if m.activeTab == tabHistory {
+		m.activeTab = tabChecklist
+		m.status = "Returned to checklist view."
+		return nil
+	}
+	m.activeTab = tabHistory
+	if m.historyLoading {
+		m.status = "Loading review history..."
+	} else if len(m.history) == 0 {
+		m.status = "No review history available yet."
+	} else {
+		entry := m.history[m.historySelected]
+		m.status = fmt.Sprintf("Selected %s (%s)", m.historyEntryTitle(entry), entry.Timestamp.In(time.UTC).Format("2006-01-02 15:04"))
+	}
+	if len(m.history) == 0 && !m.historyLoading {
+		return m.loadHistory()
+	}
 	return nil
+}
+
+func (m *Model) moveHistorySelection(delta int) {
+	if len(m.history) == 0 {
+		return
+	}
+	next := m.historySelected + delta
+	if next < 0 {
+		next = 0
+	}
+	if next >= len(m.history) {
+		next = len(m.history) - 1
+	}
+	if next == m.historySelected {
+		return
+	}
+	m.historySelected = next
+	if m.activeTab == tabHistory {
+		entry := m.history[m.historySelected]
+		m.status = fmt.Sprintf("Selected %s (%s)", m.historyEntryTitle(entry), entry.Timestamp.In(time.UTC).Format("2006-01-02 15:04"))
+	}
+}
+
+func (m *Model) openSelectedHistory() tea.Cmd {
+	if len(m.history) == 0 {
+		m.status = "No review logs available yet."
+		return nil
+	}
+	if m.historySelected < 0 || m.historySelected >= len(m.history) {
+		m.status = "Select a review log to open."
+		return nil
+	}
+	entry := m.history[m.historySelected]
+	path := entry.Path
+	m.status = fmt.Sprintf("Opening review log: %s", m.relativePath(path))
+	return func() tea.Msg {
+		err := openReviewNote(path, false)
+		return historySelectedMsg{path: path, err: err}
+	}
+}
+
+func (m *Model) loadHistory() tea.Cmd {
+	if m == nil || m.state == nil {
+		return nil
+	}
+	m.historyLoading = true
+	if m.activeTab == tabHistory {
+		m.status = "Loading review history..."
+	}
+	state := m.state
+	manifest := m.manifest
+	mode := m.mode
+	return func() tea.Msg {
+		dir, _, err := ensureReviewDir(state)
+		if err != nil {
+			return historyLoadedMsg{err: err}
+		}
+		logs, err := reviewsvc.ListReviewLogs(dir, manifest, mode.Key)
+		return historyLoadedMsg{logs: logs, err: err}
+	}
 }
 
 func (m *Model) renderHeader() string {
 	title := headerStyle.Render("Review")
-	info := fmt.Sprintf("Mode: %s — Press 1/2/3 to switch modes", m.mode.Name)
+	info := fmt.Sprintf("Mode: %s — Press 1/2/3 to switch modes — Press tab to toggle history", m.mode.Name)
 	if m.loading {
 		info += " (refreshing...)"
 	}
 	return lipgloss.JoinVertical(lipgloss.Left, title, info)
+}
+
+func (m *Model) renderTabs() string {
+	labels := []string{
+		renderTabLabel("Checklist", m.activeTab == tabChecklist),
+		renderTabLabel("History", m.activeTab == tabHistory),
+	}
+	return lipgloss.JoinHorizontal(lipgloss.Left, labels...)
+}
+
+func renderTabLabel(label string, active bool) string {
+	if active {
+		return tabActiveStyle.Render(label)
+	}
+	return tabInactiveStyle.Render(label)
 }
 
 func (m *Model) renderQueue() string {
@@ -321,6 +551,77 @@ func (m *Model) renderQueue() string {
 		lines = append(lines, fmt.Sprintf("…and %d more", len(m.queue)-limit))
 	}
 	return lipgloss.JoinVertical(lipgloss.Left, lines...)
+}
+
+func (m *Model) renderHistory() string {
+	list := m.renderHistoryList()
+	preview := m.renderHistoryPreview()
+	if strings.TrimSpace(preview) == "" {
+		return list
+	}
+	return lipgloss.JoinHorizontal(lipgloss.Top, list, historyPreviewStyle.Render(preview))
+}
+
+func (m *Model) renderHistoryList() string {
+	header := "Review history:"
+	if m.historyLoading {
+		header += " (loading...)"
+	}
+	lines := []string{header}
+	if len(m.history) == 0 {
+		lines = append(lines,
+			"No review logs found for this mode.",
+			"Complete the checklist and press ctrl+enter twice to create one.",
+			"Press tab to return to the checklist.",
+		)
+		return lipgloss.JoinVertical(lipgloss.Left, lines...)
+	}
+
+	for i, entry := range m.history {
+		indicator := " "
+		if i == m.historySelected {
+			indicator = "•"
+		}
+		timestamp := entry.Timestamp.In(time.UTC).Format("2006-01-02 15:04")
+		title := m.historyEntryTitle(entry)
+		lines = append(lines, fmt.Sprintf("%s %s — %s", indicator, timestamp, title))
+	}
+	lines = append(lines, "Use ctrl+n/↓ and ctrl+p/↑ to navigate, enter to open, tab to switch tabs.")
+	return lipgloss.JoinVertical(lipgloss.Left, lines...)
+}
+
+func (m *Model) renderHistoryPreview() string {
+	if len(m.history) == 0 {
+		return ""
+	}
+	if m.historySelected < 0 || m.historySelected >= len(m.history) {
+		return ""
+	}
+	entry := m.history[m.historySelected]
+	preview := m.historyPreview[entry.Path]
+	lines := []string{fmt.Sprintf("Preview — %s", m.relativePath(entry.Path))}
+	if len(preview) == 0 {
+		lines = append(lines, "_No preview available for this log._")
+	} else {
+		lines = append(lines, preview...)
+	}
+	return lipgloss.JoinVertical(lipgloss.Left, lines...)
+}
+
+func (m *Model) historyEntryTitle(entry reviewsvc.LogMetadata) string {
+	title := strings.TrimSpace(entry.Title)
+	if title != "" {
+		return title
+	}
+	name := strings.TrimSpace(entry.Filename)
+	if name == "" {
+		name = filepath.Base(entry.Path)
+	}
+	base := strings.TrimSuffix(name, filepath.Ext(name))
+	if base == "" {
+		return "Review log"
+	}
+	return humanizeKey(base)
 }
 
 func (m *Model) renderGraph() string {
@@ -387,7 +688,7 @@ func (m *Model) renderChecklist() string {
 	if m.editor != nil {
 		lines = append(lines, "", m.editor.View())
 	}
-	lines = append(lines, "Controls: ctrl+n next · ctrl+p previous · ctrl+enter complete · esc exit")
+	lines = append(lines, "Controls: ctrl+n next · ctrl+p previous · ctrl+enter complete · tab history · esc exit")
 	return lipgloss.JoinVertical(lipgloss.Left, lines...)
 }
 

@@ -13,4 +13,16 @@ var (
 
 	statusStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.AdaptiveColor{Light: "#0AF", Dark: "#0AF"})
+
+	tabActiveStyle = lipgloss.NewStyle().
+			Padding(0, 1).
+			Bold(true).
+			Underline(true)
+
+	tabInactiveStyle = lipgloss.NewStyle().
+				Padding(0, 1).
+				Faint(true)
+
+	historyPreviewStyle = lipgloss.NewStyle().
+				MarginLeft(4)
 )
