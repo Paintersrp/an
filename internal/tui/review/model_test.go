@@ -133,7 +133,7 @@ func TestCompleteConfirmationSavesLog(t *testing.T) {
 	}
 
 	msg := cmd()
-	updated, _ = m.Update(msg)
+	updated, historyCmd := m.Update(msg)
 	m = adoptTestModel(updated)
 
 	if openedPath == "" {
@@ -157,6 +157,94 @@ func TestCompleteConfirmationSavesLog(t *testing.T) {
 	}
 	if m.confirmingSave {
 		t.Fatalf("expected confirmation state to be cleared after save")
+	}
+
+	if historyCmd == nil {
+		t.Fatal("expected history refresh command after saving log")
+	}
+	historyMsg := historyCmd()
+	updated, _ = m.Update(historyMsg)
+	m = adoptTestModel(updated)
+	if len(m.history) == 0 {
+		t.Fatalf("expected history to include saved log")
+	}
+	if m.history[0].Path != openedPath {
+		t.Fatalf("expected saved log to appear first in history, got %s", m.history[0].Path)
+	}
+	preview := m.historyPreview[m.history[0].Path]
+	if len(preview) == 0 {
+		t.Fatalf("expected preview cache to be populated")
+	}
+}
+
+func TestHistoryToggleAndPreview(t *testing.T) {
+	tempDir := t.TempDir()
+	st := newTestState(t, tempDir)
+
+	model, err := NewModel(st)
+	if err != nil {
+		t.Fatalf("NewModel returned error: %v", err)
+	}
+
+	logPath := filepath.Join(tempDir, "reviews", "review-daily-2024-01-01.md")
+	logs := []reviewsvc.LogMetadata{
+		{
+			Path:      logPath,
+			Filename:  filepath.Base(logPath),
+			Title:     "Daily Review Ritual",
+			Timestamp: time.Date(2024, 1, 1, 9, 0, 0, 0, time.UTC),
+			Preview:   []string{"First highlight", "- bullet"},
+		},
+	}
+
+	updated, _ := model.Update(historyLoadedMsg{logs: logs})
+	m := adoptTestModel(updated)
+	if m.activeTab != tabChecklist {
+		t.Fatalf("expected to start on checklist tab")
+	}
+
+	prevOpen := openReviewNote
+	defer func() {
+		openReviewNote = prevOpen
+	}()
+	var opened string
+	openReviewNote = func(path string, _ bool) error {
+		opened = path
+		return nil
+	}
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	if cmd != nil {
+		t.Fatalf("expected no command when switching tabs with cached history")
+	}
+	m = adoptTestModel(updated)
+	if m.activeTab != tabHistory {
+		t.Fatalf("expected to switch to history tab")
+	}
+
+	view := m.View()
+	if !strings.Contains(view, "Daily Review Ritual") {
+		t.Fatalf("expected history view to include log title, got %q", view)
+	}
+	if !strings.Contains(view, "First highlight") {
+		t.Fatalf("expected history view to include preview, got %q", view)
+	}
+
+	_, openCmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if openCmd == nil {
+		t.Fatal("expected enter to trigger log open command")
+	}
+	msg := openCmd()
+	if _, ok := msg.(historySelectedMsg); !ok {
+		t.Fatalf("expected historySelectedMsg, got %T", msg)
+	}
+	updated, _ = m.Update(msg)
+	m = adoptTestModel(updated)
+	if opened != logPath {
+		t.Fatalf("expected log to be opened, got %q", opened)
+	}
+	if !strings.Contains(m.status, filepath.Base(logPath)) {
+		t.Fatalf("expected status to mention opened log, got %q", m.status)
 	}
 }
 
